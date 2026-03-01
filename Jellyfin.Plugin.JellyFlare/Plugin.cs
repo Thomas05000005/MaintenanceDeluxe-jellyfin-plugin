@@ -44,7 +44,10 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         yield return new PluginPageInfo
         {
             Name = Name,
-            EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html"
+            EmbeddedResourcePath = $"{GetType().Namespace}.Configuration.configPage.html",
+            EnableInMainMenu = true,
+            MenuSection = "server",
+            MenuIcon = "campaign"
         };
     }
 

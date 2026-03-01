@@ -125,18 +125,18 @@ make update  # build → copy DLL → restart container → tail logs
 
 ### Available targets
 
-| Target   | Description                                                          |
-| -------- | -------------------------------------------------------------------- |
-| `deploy` | First-time bootstrap: download deps, build, start container         |
-| `setup`  | Download JS Injector + File Transformation, write `meta.json`       |
-| `build`  | Build DLL and copy it to the plugin directory                       |
-| `update` | Build, copy DLL, restart container, tail logs                       |
-| `up`     | `docker compose up -d` + tail logs                                  |
-| `down`   | `docker compose down`                                               |
-| `restart`| Restart the Jellyfin container                                      |
-| `logs`   | Tail Jellyfin container logs                                        |
-| `clean`  | Remove `bin/`, `obj/`, and `docker/config/`                         |
-| `bump`   | Bump version: `make bump V=1.1.0`                                   |
+| Target    | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| `deploy`  | First-time bootstrap: download deps, build, start container   |
+| `setup`   | Download JS Injector + File Transformation, write `meta.json` |
+| `build`   | Build DLL and copy it to the plugin directory                 |
+| `update`  | Build, copy DLL, restart container, tail logs                 |
+| `up`      | `docker compose up -d` + tail logs                            |
+| `down`    | `docker compose down`                                         |
+| `restart` | Restart the Jellyfin container                                |
+| `logs`    | Tail Jellyfin container logs                                  |
+| `clean`   | Remove `bin/`, `obj/`, and `docker/config/`                   |
+| `bump`    | Bump version: `make bump V=1.1.0`                             |
 
 ## Releasing a new version
 
