@@ -7,6 +7,15 @@
     "overview": "Rotating announcements with admin dashboard configuration.",
     "description": "Displays rotating announcements at the top of the Jellyfin web UI. Messages, colours, scheduling, and a permanent override banner are all managed through the Jellyfin admin dashboard — no file editing required.",
     "imageUrl": "https://raw.githubusercontent.com/MorganKryze/jellyflare/main/assets/icon.png",
-    "versions": []
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "checksum": "B372B2B47E8F98C2DF96E1B671D9ACED",
+        "changelog": "- first version, may be unstable",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/MorganKryze/JellyFlare/releases/download/v1.0.0/Jellyfin.Plugin.JellyFlare.zip",
+        "timestamp": "2026-03-01T20:43:30"
+      }
+    ]
   }
 ]
