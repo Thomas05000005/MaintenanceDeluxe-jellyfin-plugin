@@ -1,0 +1,113 @@
+name: Build
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Package
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}.0"
+          TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%S)"
+
+          mkdir -p dist
+          cp Jellyfin.Plugin.JellyFlare/bin/Release/net9.0/Jellyfin.Plugin.JellyFlare.dll dist/
+          cp assets/icon.png dist/
+
+          jq -n \
+            --arg id        "a6c0b0ea-4f02-4c47-b8ff-5e27e8c0d0e5" \
+            --arg ver       "$VERSION" \
+            --arg ts        "$TIMESTAMP" \
+            '{
+              Id:                     $id,
+              Name:                   "JellyFlare",
+              AutoUpdateLevel:        "Release",
+              UpdateTreshold:         "Never",
+              UpdateSourceUrl:        "https://raw.githubusercontent.com/MorganKryze/jellyflare/main/manifest.json",
+              Assemblies:             ["Jellyfin.Plugin.JellyFlare.dll"],
+              SignatureValidationLevel: "NoneRequired",
+              Version:                $ver,
+              Timestamp:              $ts,
+              TargetAbi:              "10.11.6.0",
+              Changelog:              "",
+              Disabled:               false,
+              AutoUpdate:             true,
+              HasImage:               true,
+              ImagePath:              "icon.png"
+            }' > dist/meta.json
+
+          zip -j dist/Jellyfin.Plugin.JellyFlare.zip \
+            dist/Jellyfin.Plugin.JellyFlare.dll \
+            dist/meta.json \
+            dist/icon.png
+
+      - name: Update manifest
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}.0"
+          CHECKSUM="$(md5sum dist/Jellyfin.Plugin.JellyFlare.zip | awk '{print toupper($1)}')"
+          TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%S)"
+          SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Jellyfin.Plugin.JellyFlare.zip"
+          CHANGELOG="$(gh release view "${TAG}" --json body -q .body 2>/dev/null || true)"
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="See https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          fi
+
+          git fetch origin main
+          git checkout main
+
+          jq --arg ver "$VERSION" \
+             --arg chk "$CHECKSUM" \
+             --arg ts  "$TIMESTAMP" \
+             --arg url "$SOURCE_URL" \
+             --arg log "$CHANGELOG" \
+             '.[0].versions = ([{
+               version:   $ver,
+               checksum:  $chk,
+               changelog: $log,
+               targetAbi: "10.11.6.0",
+               sourceUrl: $url,
+               timestamp: $ts
+             }] + .[0].versions)' \
+             manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: update manifest for ${TAG}"
+          git push origin main
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Jellyfin.Plugin.JellyFlare.zip

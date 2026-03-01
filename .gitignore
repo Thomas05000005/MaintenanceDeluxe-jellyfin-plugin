@@ -1,0 +1,11 @@
+# Claude
+CLAUDE.md
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# docker testing
+docker/config/
