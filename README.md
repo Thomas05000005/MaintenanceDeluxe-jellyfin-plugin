@@ -7,12 +7,12 @@ Messages are managed entirely through the Jellyfin admin dashboard — no file e
 
 ## Features
 
-- Rotating messages with configurable display and pause durations
+- Rotating messages with configurable display and pause durations (enable/disable without clearing the list)
 - Per-message background and text colour with preset palette
 - Optional date-range scheduling per message (show only between two dates/times)
 - Permanent override banner that supersedes all rotation messages when active (toggle on/off without losing the text)
 - Configurable dismiss controls: show/hide the × button and the "hide all" button, with a custom label for the latter
-- Admin configuration page accessible from the Jellyfin dashboard sidebar (Plugins section)
+- Admin configuration page with tabbed layout (Permanent / Rotation / Settings) accessible from the Jellyfin dashboard sidebar
 
 ## Prerequisites
 
@@ -53,24 +53,9 @@ Messages are managed entirely through the Jellyfin admin dashboard — no file e
 
 ## Configuration
 
-Navigate to **Dashboard → Plugins → JellyFlare**.
+Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
 
-### Timing
-
-| Field                | Default | Description                                   |
-| -------------------- | ------- | --------------------------------------------- |
-| Display duration (s) | 120     | How long each message is shown before cycling |
-| Pause duration (s)   | 60      | Gap between messages (0 = no pause)           |
-
-### Controls
-
-| Field                   | Default    | Description                                     |
-| ----------------------- | ---------- | ----------------------------------------------- |
-| Show dismiss button (×) | on         | Whether the per-message close button is visible |
-| Show "hide all" button  | on         | Whether the "hide all" button is visible        |
-| "Hide all" button label | `hide all` | Custom label for the "hide all" button          |
-
-### Permanent override
+### Permanent tab
 
 A single banner that takes priority over all rotation messages.
 Use the toggle to pause it without losing your text.
@@ -84,19 +69,36 @@ Use the toggle to pause it without losing your text.
 | Start date        | Optional — only show from this date/time     |
 | End date          | Optional — stop showing after this date/time |
 
-### Rotation messages
-
-A list of messages shown in random order. Each entry supports:
+### Rotation tab
 
 | Field             | Description                                  |
 | ----------------- | -------------------------------------------- |
+| Enable            | Toggle all rotation banners on/off           |
 | Text              | Message to display                           |
 | Background colour | CSS colour value, e.g. `#1976d2`             |
 | Text colour       | CSS colour value, e.g. `#fff`                |
 | Start date        | Optional — only show from this date/time     |
 | End date          | Optional — stop showing after this date/time |
 
+Messages are shown in random order. Each row is collapsed by default — click to expand and edit.
 Messages whose date range has not started or has already passed are silently skipped.
+
+### Settings tab
+
+#### Timing
+
+| Field                | Default | Description                                   |
+| -------------------- | ------- | --------------------------------------------- |
+| Display duration (s) | 120     | How long each message is shown before cycling |
+| Pause duration (s)   | 60      | Gap between messages (0 = no pause)           |
+
+#### Controls
+
+| Field                   | Default    | Description                                     |
+| ----------------------- | ---------- | ----------------------------------------------- |
+| Show dismiss button (×) | on         | Whether the per-message close button is visible |
+| Show "hide all" button  | on         | Whether the "hide all" button is visible        |
+| "Hide all" button label | `hide all` | Custom label for the "hide all" button          |
 
 ## Building from source
 
