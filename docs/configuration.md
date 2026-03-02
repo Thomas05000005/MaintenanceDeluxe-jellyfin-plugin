@@ -1,0 +1,90 @@
+# Configuration
+
+Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
+
+## Permanent tab
+
+A library of permanent banners that take priority over all rotation messages.
+Select the active entry with its radio button; use the enable toggle to pause without losing any entries.
+
+| Field             | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
+| Enable            | Toggle the permanent banner on/off (all entries)                 |
+| Radio button      | Select which entry is currently active                           |
+| Text              | Message to display                                               |
+| Background colour | CSS colour value, e.g. `#2e7d32`                                 |
+| Text colour       | CSS colour value, e.g. `#fff`                                    |
+| Schedule          | When to show this entry — see [schedule types](#schedules) below |
+
+Each row is collapsed by default — click the row body (not the radio) to expand and edit.
+Rows with empty text are ignored on save.
+
+## Rotation tab
+
+| Field             | Description                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| Enable            | Toggle all rotation banners on/off                                 |
+| Text              | Message to display                                                 |
+| Background colour | CSS colour value, e.g. `#1976d2`                                   |
+| Text colour       | CSS colour value, e.g. `#fff`                                      |
+| Schedule          | When to show this message — see [schedule types](#schedules) below |
+
+Each message row has its own enable checkbox — uncheck to pause a single message without removing it.
+Messages are shown in random order. Messages that are disabled or outside their schedule are silently skipped.
+
+## Schedules
+
+Each message and permanent entry has a **Schedule** selector with five options:
+
+| Type   | When it shows                                        | Fields                                    |
+| ------ | ---------------------------------------------------- | ----------------------------------------- |
+| Always | Always visible (default)                             | —                                         |
+| Fixed  | Between two specific datetimes                       | Start, End (both optional)                |
+| Annual | Same calendar span every year (e.g. Dec 20 – Jan 5) | From Mo/Dd, To Mo/Dd; optional time window |
+| Weekly | On specific days of the week                         | Day toggles (Su–Sa); optional time window |
+| Daily  | Every day within a time window                       | Time start – Time end                     |
+
+Annual spans that cross year-end (e.g. December → January) are supported automatically.
+The **Annual** panel includes one-click shortcuts for common holidays (Christmas, New Year's, Thanksgiving, Halloween, Valentine's, Summer, Easter).
+
+## Settings tab
+
+### Visibility
+
+| Field                          | Default | Description                                      |
+| ------------------------------ | ------- | ------------------------------------------------ |
+| Show banner in admin dashboard | on      | Hide the banner whenever an admin page is active |
+
+### Timing
+
+| Field                | Default | Description                                   |
+| -------------------- | ------- | --------------------------------------------- |
+| Display duration (s) | 30      | How long each message is shown before cycling |
+| Pause duration (s)   | 60      | Gap between messages (0 = no pause)           |
+
+### Controls
+
+| Field                       | Default    | Description                                     |
+| --------------------------- | ---------- | ----------------------------------------------- |
+| Show dismiss button (×)     | on         | Whether the per-message close button is visible |
+| Dismiss button size (px)    | 20         | Font size of the × button                       |
+| Show "hide all" button      | on         | Whether the "hide all" button is visible        |
+| "Hide all" button size (px) | 10         | Font size of the "hide all" button              |
+| "Hide all" button label     | `hide all` | Custom label for the "hide all" button          |
+
+Each subsection heading has a small `restore` icon that resets only that subsection to defaults.
+
+### Presets
+
+A list of named colour presets available in all message editors. Each preset has a label, background colour, and text colour. Presets can be added, edited, reordered, and deleted. Deleting a preset keeps existing message colours but removes the selection indicator on affected messages.
+
+The `restore` icon next to **Presets** resets the list to the 8 built-in defaults.
+
+### Danger Zone
+
+| Button               | Scope                                                                       |
+| -------------------- | --------------------------------------------------------------------------- |
+| Reset settings       | Restores Timing, Controls, and Presets to defaults; messages unchanged      |
+| Wipe all plugin data | Clears the permanent banner, all rotation messages, and resets all settings |
+
+Both buttons require confirmation before applying. Changes only take effect after clicking **Save**.
