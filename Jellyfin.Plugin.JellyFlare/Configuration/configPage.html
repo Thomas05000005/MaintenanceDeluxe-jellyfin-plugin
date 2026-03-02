@@ -117,6 +117,23 @@
           display: block;
         }
 
+        /* ── Schedule day-of-week toggle buttons ───────────────── */
+        .msg-sch-day-btn {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          border-radius: 4px;
+          color: inherit;
+          cursor: pointer;
+          font-size: inherit;
+          min-width: 38px;
+          padding: 6px 4px;
+        }
+        .msg-sch-day-btn.active {
+          background: var(--accent-color, #00a4dc);
+          border-color: transparent;
+          color: #fff;
+        }
+
         /* ── Icon reset button ──────────────────────────────────── */
         .jf-icon-btn {
           background: none;
@@ -517,6 +534,58 @@
             }
           ];
 
+          var ANNUAL_PRESETS = [
+            {
+              label: 'Christmas',
+              monthStart: 12,
+              dayStart: 20,
+              monthEnd: 1,
+              dayEnd: 5
+            },
+            {
+              label: "New Year's",
+              monthStart: 12,
+              dayStart: 31,
+              monthEnd: 1,
+              dayEnd: 2
+            },
+            {
+              label: 'Thanksgiving',
+              monthStart: 11,
+              dayStart: 21,
+              monthEnd: 12,
+              dayEnd: 1
+            },
+            {
+              label: 'Halloween',
+              monthStart: 10,
+              dayStart: 25,
+              monthEnd: 11,
+              dayEnd: 1
+            },
+            {
+              label: "Valentine's",
+              monthStart: 2,
+              dayStart: 13,
+              monthEnd: 2,
+              dayEnd: 15
+            },
+            {
+              label: 'Summer',
+              monthStart: 6,
+              dayStart: 21,
+              monthEnd: 9,
+              dayEnd: 22
+            },
+            {
+              label: 'Easter',
+              monthStart: 4,
+              dayStart: 10,
+              monthEnd: 4,
+              dayEnd: 20
+            }
+          ];
+
           var currentPresets = []; // populated from config in populatePage
 
           // ── tab switching ─────────────────────────────────────────
@@ -563,6 +632,241 @@
               var h = toHex6(this.value);
               if (/^#[0-9a-fA-F]{6}$/.test(h)) picker.value = h;
             });
+          }
+
+          // ── schedule helpers ──────────────────────────────────────
+
+          function getScheduleDetailHtml() {
+            return (
+              '<div style="margin-top:10px">' +
+              '  <div style="font-size:0.85em;opacity:0.7;margin-bottom:6px">Schedule</div>' +
+              '  <select class="msg-sch-type" style="margin-bottom:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:inherit;padding:6px 10px;font-size:inherit">' +
+              '    <option value="always">Always show</option>' +
+              '    <option value="fixed">Fixed date range</option>' +
+              '    <option value="annual">Annual (recurring)</option>' +
+              '    <option value="weekly">Weekly (days of week)</option>' +
+              '    <option value="daily">Daily (time window)</option>' +
+              '  </select>' +
+              '  <div class="msg-sch-panel msg-sch-fixed" style="display:none">' +
+              '    <div style="display:flex;gap:12px;flex-wrap:wrap">' +
+              '      <div class="inputContainer" style="flex:1;min-width:200px">' +
+              '        <label class="inputLabel inputLabelUnfocused">Start</label>' +
+              '        <input is="emby-input" type="datetime-local" class="msg-fixed-start">' +
+              '      </div>' +
+              '      <div class="inputContainer" style="flex:1;min-width:200px">' +
+              '        <label class="inputLabel inputLabelUnfocused">End</label>' +
+              '        <input is="emby-input" type="datetime-local" class="msg-fixed-end">' +
+              '      </div>' +
+              '    </div>' +
+              '  </div>' +
+              '  <div class="msg-sch-panel msg-sch-annual" style="display:none">' +
+              '    <div class="msg-annual-presets" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>' +
+              '    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:8px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">From</span>' +
+              '      <input is="emby-input" type="number" class="msg-annual-ms" min="1" max="12" placeholder="Mo" style="width:60px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">/</span>' +
+              '      <input is="emby-input" type="number" class="msg-annual-ds" min="1" max="31" placeholder="Dd" style="width:60px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">To</span>' +
+              '      <input is="emby-input" type="number" class="msg-annual-me" min="1" max="12" placeholder="Mo" style="width:60px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">/</span>' +
+              '      <input is="emby-input" type="number" class="msg-annual-de" min="1" max="31" placeholder="Dd" style="width:60px">' +
+              '    </div>' +
+              '    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+              '      <span style="font-size:0.85em;opacity:0.7">Time (optional)</span>' +
+              '      <input is="emby-input" type="time" class="msg-annual-time-start" style="width:110px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">–</span>' +
+              '      <input is="emby-input" type="time" class="msg-annual-time-end" style="width:110px">' +
+              '    </div>' +
+              '  </div>' +
+              '  <div class="msg-sch-panel msg-sch-weekly" style="display:none">' +
+              '    <div class="msg-sch-days" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div>' +
+              '    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+              '      <span style="font-size:0.85em;opacity:0.7">Time (optional)</span>' +
+              '      <input is="emby-input" type="time" class="msg-weekly-time-start" style="width:110px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">–</span>' +
+              '      <input is="emby-input" type="time" class="msg-weekly-time-end" style="width:110px">' +
+              '    </div>' +
+              '  </div>' +
+              '  <div class="msg-sch-panel msg-sch-daily" style="display:none">' +
+              '    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+              '      <span style="font-size:0.85em;opacity:0.7">Time window</span>' +
+              '      <input is="emby-input" type="time" class="msg-daily-time-start" style="width:110px">' +
+              '      <span style="font-size:0.85em;opacity:0.7">–</span>' +
+              '      <input is="emby-input" type="time" class="msg-daily-time-end" style="width:110px">' +
+              '    </div>' +
+              '  </div>' +
+              '</div>'
+            );
+          }
+
+          function wireScheduleEditor(detail) {
+            var typeSelect = detail.querySelector('.msg-sch-type');
+            var panels = detail.querySelectorAll('.msg-sch-panel');
+
+            function showPanel(type) {
+              panels.forEach(function (p) {
+                p.style.display = 'none';
+              });
+              var active = detail.querySelector('.msg-sch-' + type);
+              if (active) active.style.display = '';
+            }
+
+            typeSelect.addEventListener('change', function () {
+              showPanel(this.value);
+            });
+
+            // Build annual preset shortcuts
+            var annualPresets = detail.querySelector('.msg-annual-presets');
+            if (annualPresets) {
+              ANNUAL_PRESETS.forEach(function (ap) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = ap.label;
+                btn.style.cssText =
+                  'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:inherit;cursor:pointer;font-size:0.9em;padding:5px 10px';
+                btn.addEventListener('click', function () {
+                  detail.querySelector('.msg-annual-ms').value = ap.monthStart;
+                  detail.querySelector('.msg-annual-ds').value = ap.dayStart;
+                  detail.querySelector('.msg-annual-me').value = ap.monthEnd;
+                  detail.querySelector('.msg-annual-de').value = ap.dayEnd;
+                });
+                annualPresets.appendChild(btn);
+              });
+            }
+
+            // Build day-of-week toggles
+            var daysContainer = detail.querySelector('.msg-sch-days');
+            if (daysContainer) {
+              ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(
+                function (label, idx) {
+                  var btn = document.createElement('button');
+                  btn.type = 'button';
+                  btn.className = 'msg-sch-day-btn';
+                  btn.dataset.day = idx;
+                  btn.textContent = label;
+                  btn.addEventListener('click', function () {
+                    btn.classList.toggle('active');
+                  });
+                  daysContainer.appendChild(btn);
+                }
+              );
+            }
+          }
+
+          function populateSchedule(detail, schedule) {
+            var typeSelect = detail.querySelector('.msg-sch-type');
+            var panels = detail.querySelectorAll('.msg-sch-panel');
+            var type = schedule && schedule.type ? schedule.type : 'always';
+            typeSelect.value = type;
+            panels.forEach(function (p) {
+              p.style.display = 'none';
+            });
+            var active = detail.querySelector('.msg-sch-' + type);
+            if (active) active.style.display = '';
+
+            if (type === 'fixed') {
+              detail.querySelector('.msg-fixed-start').value = toInputDate(
+                schedule.fixedStart
+              );
+              detail.querySelector('.msg-fixed-end').value = toInputDate(
+                schedule.fixedEnd
+              );
+            } else if (type === 'annual') {
+              detail.querySelector('.msg-annual-ms').value =
+                schedule.monthStart || '';
+              detail.querySelector('.msg-annual-ds').value =
+                schedule.dayStart || '';
+              detail.querySelector('.msg-annual-me').value =
+                schedule.monthEnd || '';
+              detail.querySelector('.msg-annual-de').value =
+                schedule.dayEnd || '';
+              detail.querySelector('.msg-annual-time-start').value =
+                schedule.timeStart || '';
+              detail.querySelector('.msg-annual-time-end').value =
+                schedule.timeEnd || '';
+            } else if (type === 'weekly') {
+              var days = schedule.weekDays || [];
+              detail
+                .querySelectorAll('.msg-sch-day-btn')
+                .forEach(function (btn) {
+                  btn.classList.toggle(
+                    'active',
+                    days.indexOf(parseInt(btn.dataset.day)) !== -1
+                  );
+                });
+              detail.querySelector('.msg-weekly-time-start').value =
+                schedule.timeStart || '';
+              detail.querySelector('.msg-weekly-time-end').value =
+                schedule.timeEnd || '';
+            } else if (type === 'daily') {
+              detail.querySelector('.msg-daily-time-start').value =
+                schedule.timeStart || '';
+              detail.querySelector('.msg-daily-time-end').value =
+                schedule.timeEnd || '';
+            }
+          }
+
+          function collectSchedule(detail) {
+            var type = detail.querySelector('.msg-sch-type').value || 'always';
+            if (type === 'always') return { type: 'always' };
+            if (type === 'fixed') {
+              return {
+                type: 'fixed',
+                fixedStart: fromInputDate(
+                  detail.querySelector('.msg-fixed-start').value
+                ),
+                fixedEnd: fromInputDate(
+                  detail.querySelector('.msg-fixed-end').value
+                )
+              };
+            }
+            if (type === 'annual') {
+              return {
+                type: 'annual',
+                monthStart:
+                  parseInt(detail.querySelector('.msg-annual-ms').value) ||
+                  null,
+                dayStart:
+                  parseInt(detail.querySelector('.msg-annual-ds').value) ||
+                  null,
+                monthEnd:
+                  parseInt(detail.querySelector('.msg-annual-me').value) ||
+                  null,
+                dayEnd:
+                  parseInt(detail.querySelector('.msg-annual-de').value) ||
+                  null,
+                timeStart:
+                  detail.querySelector('.msg-annual-time-start').value || null,
+                timeEnd:
+                  detail.querySelector('.msg-annual-time-end').value || null
+              };
+            }
+            if (type === 'weekly') {
+              var days = [];
+              detail
+                .querySelectorAll('.msg-sch-day-btn.active')
+                .forEach(function (btn) {
+                  days.push(parseInt(btn.dataset.day));
+                });
+              return {
+                type: 'weekly',
+                weekDays: days,
+                timeStart:
+                  detail.querySelector('.msg-weekly-time-start').value || null,
+                timeEnd:
+                  detail.querySelector('.msg-weekly-time-end').value || null
+              };
+            }
+            if (type === 'daily') {
+              return {
+                type: 'daily',
+                timeStart:
+                  detail.querySelector('.msg-daily-time-start').value || null,
+                timeEnd:
+                  detail.querySelector('.msg-daily-time-end').value || null
+              };
+            }
+            return { type: 'always' };
           }
 
           function buildPresetButtons(
@@ -882,16 +1186,7 @@
               '  </div>' +
               '</div>' +
               '<div class="msg-presets jf-preset-container" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
-              '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
-              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
-              '    <label class="inputLabel inputLabelUnfocused">Start Date (optional)</label>' +
-              '    <input is="emby-input" type="datetime-local" class="msg-start">' +
-              '  </div>' +
-              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
-              '    <label class="inputLabel inputLabelUnfocused">End Date (optional)</label>' +
-              '    <input is="emby-input" type="datetime-local" class="msg-end">' +
-              '  </div>' +
-              '</div>';
+              getScheduleDetailHtml();
 
             row.appendChild(summary);
             row.appendChild(detail);
@@ -907,10 +1202,9 @@
             colorPicker.value = toHex6(color);
             colorText.value = color;
             textInput.value = msg.text || '';
-            detail.querySelector('.msg-start').value = toInputDate(
-              msg.startDate
-            );
-            detail.querySelector('.msg-end').value = toInputDate(msg.endDate);
+
+            wireScheduleEditor(detail);
+            populateSchedule(detail, msg.schedule || null);
 
             syncColorPair(bgPicker, bgText);
             syncColorPair(colorPicker, colorText);
@@ -1061,16 +1355,7 @@
               '  </div>' +
               '</div>' +
               '<div class="msg-presets jf-preset-container" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
-              '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
-              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
-              '    <label class="inputLabel inputLabelUnfocused">Start Date (optional)</label>' +
-              '    <input is="emby-input" type="datetime-local" class="msg-start">' +
-              '  </div>' +
-              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
-              '    <label class="inputLabel inputLabelUnfocused">End Date (optional)</label>' +
-              '    <input is="emby-input" type="datetime-local" class="msg-end">' +
-              '  </div>' +
-              '</div>';
+              getScheduleDetailHtml();
 
             row.appendChild(summary);
             row.appendChild(detail);
@@ -1086,10 +1371,9 @@
             colorPicker.value = toHex6(color);
             colorText.value = color;
             textInput.value = entry.text || '';
-            detail.querySelector('.msg-start').value = toInputDate(
-              entry.startDate
-            );
-            detail.querySelector('.msg-end').value = toInputDate(entry.endDate);
+
+            wireScheduleEditor(detail);
+            populateSchedule(detail, entry.schedule || null);
 
             syncColorPair(bgPicker, bgText);
             syncColorPair(colorPicker, colorText);
@@ -1180,10 +1464,7 @@
                 text: text,
                 bg: detail.querySelector('.msg-bg').value || '#2e7d32',
                 color: detail.querySelector('.msg-color').value || '#ffffff',
-                startDate: fromInputDate(
-                  detail.querySelector('.msg-start').value
-                ),
-                endDate: fromInputDate(detail.querySelector('.msg-end').value),
+                schedule: collectSchedule(detail),
                 presetLabel:
                   label &&
                   currentPresets.some(function (p) {
@@ -1211,12 +1492,7 @@
                   text: detail.querySelector('.msg-text').value,
                   bg: detail.querySelector('.msg-bg').value || '#1976d2',
                   color: detail.querySelector('.msg-color').value || '#ffffff',
-                  startDate: fromInputDate(
-                    detail.querySelector('.msg-start').value
-                  ),
-                  endDate: fromInputDate(
-                    detail.querySelector('.msg-end').value
-                  ),
+                  schedule: collectSchedule(detail),
                   presetLabel:
                     label &&
                     currentPresets.some(function (p) {

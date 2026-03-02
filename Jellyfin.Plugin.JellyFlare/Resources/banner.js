@@ -23,10 +23,46 @@
         return /\b(dashboard|configurationpage|users|useredit|userprofiles|networking|devices|playback|dlna|notifications|libraries|metadata|subtitles|log|scheduledtasks|apikeys|activity|plugins|encodingsettings|streamingsettings)\b/.test(window.location.hash);
     }
 
+    function checkTimeWindow(now, timeStart, timeEnd) {
+        if (!timeStart && !timeEnd) return true;
+        var nowMins = now.getHours() * 60 + now.getMinutes();
+        if (timeStart) {
+            var sp = timeStart.split(':');
+            if (nowMins < parseInt(sp[0]) * 60 + parseInt(sp[1])) return false;
+        }
+        if (timeEnd) {
+            var ep = timeEnd.split(':');
+            if (nowMins > parseInt(ep[0]) * 60 + parseInt(ep[1])) return false;
+        }
+        return true;
+    }
+
     function isInSchedule(msg) {
+        var sch = msg.schedule;
+        if (!sch || !sch.type || sch.type === 'always') return true;
         var now = new Date();
-        if (msg.startDate) { var s = new Date(msg.startDate); if (isNaN(s) || now < s) return false; }
-        if (msg.endDate) { var e = new Date(msg.endDate); if (isNaN(e) || now > e) return false; }
+        if (sch.type === 'fixed') {
+            if (sch.fixedStart) { var s = new Date(sch.fixedStart); if (isNaN(s) || now < s) return false; }
+            if (sch.fixedEnd) { var e = new Date(sch.fixedEnd); if (isNaN(e) || now > e) return false; }
+            return true;
+        }
+        if (sch.type === 'annual') {
+            var ms = sch.monthStart, ds = sch.dayStart, me = sch.monthEnd, de = sch.dayEnd;
+            if (!ms || !ds || !me || !de) return checkTimeWindow(now, sch.timeStart, sch.timeEnd);
+            var nowMD = (now.getMonth() + 1) * 100 + now.getDate();
+            var startMD = ms * 100 + ds, endMD = me * 100 + de;
+            var inRange = startMD <= endMD
+                ? nowMD >= startMD && nowMD <= endMD
+                : nowMD >= startMD || nowMD <= endMD;
+            return inRange && checkTimeWindow(now, sch.timeStart, sch.timeEnd);
+        }
+        if (sch.type === 'weekly') {
+            if (!sch.weekDays || sch.weekDays.indexOf(now.getDay()) === -1) return false;
+            return checkTimeWindow(now, sch.timeStart, sch.timeEnd);
+        }
+        if (sch.type === 'daily') {
+            return checkTimeWindow(now, sch.timeStart, sch.timeEnd);
+        }
         return true;
     }
 

@@ -9,7 +9,7 @@ Messages are managed entirely through the Jellyfin admin dashboard — no file e
 
 - Rotating messages with configurable display and pause durations (enable/disable without clearing the list)
 - Per-message background and text colour with preset palette
-- Optional date-range scheduling per message (show only between two dates/times)
+- Flexible scheduling per message: always, fixed date range, annual (e.g. Christmas Dec 20–Jan 5), weekly (specific days of week), or daily (time window)
 - Permanent banner library: save multiple permanent banners and select the active one with a radio button; the active entry supersedes all rotation messages when enabled
 - Configurable dismiss controls: show/hide the × button and the "hide all" button, with individual font-size and a custom label for the latter
 - Option to hide the banner while browsing the admin dashboard
@@ -61,33 +61,46 @@ Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
 A library of permanent banners that take priority over all rotation messages.
 Select the active entry with its radio button; use the enable toggle to pause without losing any entries.
 
-| Field             | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| Enable            | Toggle the permanent banner on/off (all entries) |
-| Radio button      | Select which entry is currently active           |
-| Text              | Message to display                               |
-| Background colour | CSS colour value, e.g. `#2e7d32`                 |
-| Text colour       | CSS colour value, e.g. `#fff`                    |
-| Start date        | Optional — only show from this date/time         |
-| End date          | Optional — stop showing after this date/time     |
+| Field             | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
+| Enable            | Toggle the permanent banner on/off (all entries)                 |
+| Radio button      | Select which entry is currently active                           |
+| Text              | Message to display                                               |
+| Background colour | CSS colour value, e.g. `#2e7d32`                                 |
+| Text colour       | CSS colour value, e.g. `#fff`                                    |
+| Schedule          | When to show this entry — see [schedule types](#schedules) below |
 
 Each row is collapsed by default — click the row body (not the radio) to expand and edit.
 Rows with empty text are ignored on save. The `activeIndex` stored in config tracks which entry is selected.
 
 ### Rotation tab
 
-| Field             | Description                                  |
-| ----------------- | -------------------------------------------- |
-| Enable            | Toggle all rotation banners on/off           |
-| Text              | Message to display                           |
-| Background colour | CSS colour value, e.g. `#1976d2`             |
-| Text colour       | CSS colour value, e.g. `#fff`                |
-| Start date        | Optional — only show from this date/time     |
-| End date          | Optional — stop showing after this date/time |
+| Field             | Description                                                        |
+| ----------------- | ------------------------------------------------------------------ |
+| Enable            | Toggle all rotation banners on/off                                 |
+| Text              | Message to display                                                 |
+| Background colour | CSS colour value, e.g. `#1976d2`                                   |
+| Text colour       | CSS colour value, e.g. `#fff`                                      |
+| Schedule          | When to show this message — see [schedule types](#schedules) below |
 
 Each message row has its own enable checkbox in the summary bar — uncheck to pause a single message without removing it.
 Messages are shown in random order. Each row is collapsed by default — click the row to expand and edit.
-Messages that are disabled or whose date range has not started or has already passed are silently skipped.
+Messages that are disabled or outside their schedule are silently skipped.
+
+### Schedules
+
+Each message and permanent entry has a **Schedule** selector with five options:
+
+| Type   | When it shows                                       | Fields                                     |
+| ------ | --------------------------------------------------- | ------------------------------------------ |
+| Always | Always visible (default)                            | —                                          |
+| Fixed  | Between two specific datetimes                      | Start, End (both optional)                 |
+| Annual | Same calendar span every year (e.g. Dec 20 – Jan 5) | From Mo/Dd, To Mo/Dd; optional time window |
+| Weekly | On specific days of the week                        | Day toggles (Su–Sa); optional time window  |
+| Daily  | Every day within a time window                      | Time start – Time end                      |
+
+Annual spans that cross year-end (e.g. December → January) are supported automatically.
+The **Annual** panel includes one-click shortcuts for common holidays (Christmas, New Year's, Thanksgiving, Halloween, Valentine's, Summer, Easter).
 
 ### Settings tab
 

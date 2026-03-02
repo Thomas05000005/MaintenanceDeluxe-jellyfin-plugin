@@ -5,6 +5,53 @@ using MediaBrowser.Model.Plugins;
 namespace Jellyfin.Plugin.JellyFlare.Configuration;
 
 /// <summary>
+/// Schedule definition for a banner message or permanent entry.
+/// Supported types: "always" | "fixed" | "annual" | "weekly" | "daily".
+/// </summary>
+public class BannerSchedule
+{
+    /// <summary>Gets or sets the schedule type ("always", "fixed", "annual", "weekly", "daily").</summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "always";
+
+    /// <summary>Gets or sets the fixed-range start datetime string ("YYYY-MM-DD HH:MM").</summary>
+    [JsonPropertyName("fixedStart")]
+    public string? FixedStart { get; set; }
+
+    /// <summary>Gets or sets the fixed-range end datetime string ("YYYY-MM-DD HH:MM").</summary>
+    [JsonPropertyName("fixedEnd")]
+    public string? FixedEnd { get; set; }
+
+    /// <summary>Gets or sets the annual range start month (1–12).</summary>
+    [JsonPropertyName("monthStart")]
+    public int? MonthStart { get; set; }
+
+    /// <summary>Gets or sets the annual range start day (1–31).</summary>
+    [JsonPropertyName("dayStart")]
+    public int? DayStart { get; set; }
+
+    /// <summary>Gets or sets the annual range end month (1–12).</summary>
+    [JsonPropertyName("monthEnd")]
+    public int? MonthEnd { get; set; }
+
+    /// <summary>Gets or sets the annual range end day (1–31).</summary>
+    [JsonPropertyName("dayEnd")]
+    public int? DayEnd { get; set; }
+
+    /// <summary>Gets or sets the days of week for weekly schedule (0 = Sun … 6 = Sat).</summary>
+    [JsonPropertyName("weekDays")]
+    public List<int> WeekDays { get; set; } = new();
+
+    /// <summary>Gets or sets the time window start ("HH:MM"), used by annual, weekly, daily.</summary>
+    [JsonPropertyName("timeStart")]
+    public string? TimeStart { get; set; }
+
+    /// <summary>Gets or sets the time window end ("HH:MM"), used by annual, weekly, daily.</summary>
+    [JsonPropertyName("timeEnd")]
+    public string? TimeEnd { get; set; }
+}
+
+/// <summary>
 /// A named colour preset available in the message editors.
 /// </summary>
 public class ColorPreset
@@ -39,14 +86,6 @@ public class BannerMessage
     [JsonPropertyName("color")]
     public string Color { get; set; } = "#fff";
 
-    /// <summary>Gets or sets the optional display start date ("YYYY-MM-DD HH:MM").</summary>
-    [JsonPropertyName("startDate")]
-    public string? StartDate { get; set; }
-
-    /// <summary>Gets or sets the optional display end date ("YYYY-MM-DD HH:MM").</summary>
-    [JsonPropertyName("endDate")]
-    public string? EndDate { get; set; }
-
     /// <summary>Gets or sets whether this message participates in rotation. Defaults to true.</summary>
     [JsonPropertyName("enabled")]
     public bool Enabled { get; set; } = true;
@@ -54,6 +93,10 @@ public class BannerMessage
     /// <summary>Gets or sets the label of the last preset applied to this message (null if unset or preset deleted).</summary>
     [JsonPropertyName("presetLabel")]
     public string? PresetLabel { get; set; }
+
+    /// <summary>Gets or sets the display schedule for this message (null = always show).</summary>
+    [JsonPropertyName("schedule")]
+    public BannerSchedule? Schedule { get; set; }
 }
 
 /// <summary>
@@ -73,17 +116,13 @@ public class PermanentEntry
     [JsonPropertyName("color")]
     public string Color { get; set; } = "#fff";
 
-    /// <summary>Gets or sets the optional display start date.</summary>
-    [JsonPropertyName("startDate")]
-    public string? StartDate { get; set; }
-
-    /// <summary>Gets or sets the optional display end date.</summary>
-    [JsonPropertyName("endDate")]
-    public string? EndDate { get; set; }
-
     /// <summary>Gets or sets the label of the last preset applied to this entry (null if unset or preset deleted).</summary>
     [JsonPropertyName("presetLabel")]
     public string? PresetLabel { get; set; }
+
+    /// <summary>Gets or sets the display schedule for this entry (null = always show).</summary>
+    [JsonPropertyName("schedule")]
+    public BannerSchedule? Schedule { get; set; }
 }
 
 /// <summary>

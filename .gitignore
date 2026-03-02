@@ -6,6 +6,7 @@ bin/
 obj/
 *.user
 .vs/
+.config/
 
 # docker testing
 docker/config/
