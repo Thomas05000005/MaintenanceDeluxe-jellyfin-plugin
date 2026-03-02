@@ -33,7 +33,7 @@
     // --- Shuffle (Fisher-Yates) ---
     function buildQueue() {
         var eligible = CONFIG.rotationMessages.filter(function (m) {
-            return m.text && isInSchedule(m) && !dismissedMessages.has(m.text);
+            return m.text && m.enabled !== false && isInSchedule(m) && !dismissedMessages.has(m.text);
         });
         for (var i = eligible.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));

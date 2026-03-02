@@ -47,6 +47,10 @@ public class BannerMessage
     [JsonPropertyName("endDate")]
     public string? EndDate { get; set; }
 
+    /// <summary>Gets or sets whether this message participates in rotation. Defaults to true.</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Gets or sets the label of the last preset applied to this message (null if unset or preset deleted).</summary>
     [JsonPropertyName("presetLabel")]
     public string? PresetLabel { get; set; }

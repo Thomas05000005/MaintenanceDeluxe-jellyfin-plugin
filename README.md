@@ -81,8 +81,9 @@ Use the toggle to pause it without losing your text.
 | Start date        | Optional — only show from this date/time     |
 | End date          | Optional — stop showing after this date/time |
 
-Messages are shown in random order. Each row is collapsed by default — click to expand and edit.
-Messages whose date range has not started or has already passed are silently skipped.
+Each message row has its own enable checkbox in the summary bar — uncheck to pause a single message without removing it.
+Messages are shown in random order. Each row is collapsed by default — click the row to expand and edit.
+Messages that are disabled or whose date range has not started or has already passed are silently skipped.
 
 ### Settings tab
 

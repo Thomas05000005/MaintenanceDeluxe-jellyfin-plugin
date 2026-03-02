@@ -54,8 +54,8 @@
         .jf-msg-summary {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 10px 12px;
+          gap: 12px;
+          padding: 14px 16px;
           cursor: pointer;
           user-select: none;
         }
@@ -63,14 +63,19 @@
           background: rgba(255, 255, 255, 0.04);
         }
         .jf-msg-swatch {
+          width: 22px;
+          height: 22px;
+          border-radius: 4px;
+          flex-shrink: 0;
+        }
+        .jf-msg-summary input[type="checkbox"] {
           width: 18px;
           height: 18px;
-          border-radius: 3px;
           flex-shrink: 0;
         }
         .jf-msg-preview {
           flex: 1;
-          font-size: 13px;
+          font-size: 15px;
           opacity: 0.85;
           overflow: hidden;
           white-space: nowrap;
@@ -78,7 +83,7 @@
         }
         .jf-msg-chevron {
           opacity: 0.5;
-          font-size: 11px;
+          font-size: 14px;
           flex-shrink: 0;
         }
         .jf-msg-row.expanded .jf-msg-chevron::after {
@@ -93,7 +98,7 @@
           color: inherit;
           cursor: pointer;
           opacity: 0.4;
-          font-size: 16px;
+          font-size: 20px;
           padding: 0 4px;
           line-height: 1;
           flex-shrink: 0;
@@ -877,6 +882,7 @@
             msg = msg || {};
             var bg = msg.bg || '#1976d2';
             var color = msg.color || '#ffffff';
+            var enabled = msg.enabled !== false;
             var selectedPresetLabel = msg.presetLabel || null;
 
             var row = document.createElement('div');
@@ -889,10 +895,22 @@
             var swatch = document.createElement('span');
             swatch.className = 'jf-msg-swatch';
             swatch.style.background = bg;
+            if (!enabled) swatch.style.opacity = '0.35';
+
+            var enabledCheckbox = document.createElement('input');
+            enabledCheckbox.type = 'checkbox';
+            enabledCheckbox.className = 'msg-enabled';
+            enabledCheckbox.checked = enabled;
+            enabledCheckbox.title = 'Enable this message';
+            enabledCheckbox.style.cssText = 'flex-shrink:0;cursor:pointer;margin:0';
+            enabledCheckbox.addEventListener('click', function (e) {
+              e.stopPropagation();
+            });
 
             var preview = document.createElement('span');
             preview.className = 'jf-msg-preview';
             preview.textContent = msg.text || '(new message)';
+            if (!enabled) preview.style.opacity = '0.35';
 
             var chevron = document.createElement('span');
             chevron.className = 'jf-msg-chevron';
@@ -903,7 +921,14 @@
             removeBtn.innerHTML = '✕';
             removeBtn.title = 'Remove message';
 
+            enabledCheckbox.addEventListener('change', function () {
+              var on = this.checked;
+              preview.style.opacity = on ? '' : '0.35';
+              swatch.style.opacity = on ? '' : '0.35';
+            });
+
             summary.appendChild(swatch);
+            summary.appendChild(enabledCheckbox);
             summary.appendChild(preview);
             summary.appendChild(chevron);
             summary.appendChild(removeBtn);
@@ -1043,7 +1068,9 @@
               .map(function (row) {
                 var detail = row.querySelector('.jf-msg-detail');
                 var label = row._presetLabel || null;
+                var enabledEl = row.querySelector('.msg-enabled');
                 return {
+                  enabled: enabledEl ? enabledEl.checked : true,
                   text: detail.querySelector('.msg-text').value,
                   bg: detail.querySelector('.msg-bg').value || '#1976d2',
                   color: detail.querySelector('.msg-color').value || '#ffffff',
