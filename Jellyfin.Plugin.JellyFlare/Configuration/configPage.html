@@ -68,7 +68,8 @@
           border-radius: 4px;
           flex-shrink: 0;
         }
-        .jf-msg-summary input[type="checkbox"] {
+        .jf-msg-summary input[type="checkbox"],
+        .jf-msg-summary input[type="radio"] {
           width: 18px;
           height: 18px;
           flex-shrink: 0;
@@ -169,133 +170,21 @@
                 </label>
               </div>
 
-              <div class="inputContainer">
-                <label
-                  class="inputLabel inputLabelUnfocused"
-                  for="permanentText"
-                  >Text</label
-                >
-                <input
-                  id="permanentText"
-                  is="emby-input"
-                  type="text"
-                  placeholder="e.g. 🔴 Server in maintenance until 23:00"
-                />
-                <div class="fieldDescription">
-                  When filled in, this banner shows permanently and suppresses
-                  all rotation messages. Clear or disable to restore rotation.
-                </div>
+              <div class="fieldDescription" style="margin-bottom: 12px">
+                Select the active banner with its radio button. Rows with empty
+                text are ignored on save.
               </div>
 
-              <div
-                style="
-                  display: flex;
-                  gap: 24px;
-                  flex-wrap: wrap;
-                  margin-bottom: 8px;
-                "
+              <div id="permanentList"></div>
+
+              <button
+                is="emby-button"
+                type="button"
+                id="addPermanentEntry"
+                class="raised"
               >
-                <div>
-                  <div
-                    style="font-size: 0.85em; opacity: 0.7; margin-bottom: 4px"
-                  >
-                    Background
-                  </div>
-                  <div style="display: flex; gap: 6px; align-items: center">
-                    <input
-                      type="color"
-                      id="permanentBgPicker"
-                      style="
-                        height: 34px;
-                        width: 46px;
-                        border: none;
-                        padding: 2px;
-                        cursor: pointer;
-                        border-radius: 4px;
-                      "
-                    />
-                    <input
-                      id="permanentBgText"
-                      is="emby-input"
-                      type="text"
-                      maxlength="7"
-                      style="width: 84px"
-                      placeholder="#2e7d32"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div
-                    style="font-size: 0.85em; opacity: 0.7; margin-bottom: 4px"
-                  >
-                    Text Color
-                  </div>
-                  <div style="display: flex; gap: 6px; align-items: center">
-                    <input
-                      type="color"
-                      id="permanentColorPicker"
-                      style="
-                        height: 34px;
-                        width: 46px;
-                        border: none;
-                        padding: 2px;
-                        cursor: pointer;
-                        border-radius: 4px;
-                      "
-                    />
-                    <input
-                      id="permanentColorText"
-                      is="emby-input"
-                      type="text"
-                      maxlength="7"
-                      style="width: 84px"
-                      placeholder="#ffffff"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div style="margin-bottom: 12px">
-                <div
-                  style="font-size: 0.85em; opacity: 0.7; margin-bottom: 6px"
-                >
-                  Color presets
-                </div>
-                <div
-                  id="permanentPresets"
-                  class="jf-preset-container"
-                  style="display: flex; flex-wrap: wrap; gap: 6px"
-                ></div>
-              </div>
-
-              <div style="display: flex; gap: 12px; flex-wrap: wrap">
-                <div class="inputContainer" style="flex: 1; min-width: 200px">
-                  <label
-                    class="inputLabel inputLabelUnfocused"
-                    for="permanentStart"
-                  >
-                    Start Date (optional)
-                  </label>
-                  <input
-                    id="permanentStart"
-                    is="emby-input"
-                    type="datetime-local"
-                  />
-                </div>
-                <div class="inputContainer" style="flex: 1; min-width: 200px">
-                  <label
-                    class="inputLabel inputLabelUnfocused"
-                    for="permanentEnd"
-                  >
-                    End Date (optional)
-                  </label>
-                  <input
-                    id="permanentEnd"
-                    is="emby-input"
-                    type="datetime-local"
-                  />
-                </div>
-              </div>
+                <span>+ Add Entry</span>
+              </button>
             </div>
             <!-- /panel: permanent -->
 
@@ -1061,10 +950,220 @@
             return row;
           }
 
+          // ── collapsible permanent entry row ──────────────────────
+
+          function createPermanentRow(entry, isActive) {
+            entry = entry || {};
+            var bg = entry.bg || '#2e7d32';
+            var color = entry.color || '#ffffff';
+            var selectedPresetLabel = entry.presetLabel || null;
+            isActive = !!isActive;
+
+            var row = document.createElement('div');
+            row.className = 'jf-msg-row jf-perm-row' + (isActive ? ' expanded' : '');
+
+            // Summary bar
+            var summary = document.createElement('div');
+            summary.className = 'jf-msg-summary';
+
+            var radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'permanentActive';
+            radio.className = 'perm-active-radio';
+            radio.checked = isActive;
+            radio.title = 'Use this entry as the active permanent banner';
+            radio.style.cssText = 'flex-shrink:0;cursor:pointer;margin:0';
+            radio.addEventListener('click', function (e) {
+              e.stopPropagation();
+            });
+
+            var swatch = document.createElement('span');
+            swatch.className = 'jf-msg-swatch';
+            swatch.style.background = bg;
+
+            var preview = document.createElement('span');
+            preview.className = 'jf-msg-preview';
+            preview.textContent = entry.text || '(new entry)';
+
+            var chevron = document.createElement('span');
+            chevron.className = 'jf-msg-chevron';
+
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'jf-msg-remove-btn';
+            removeBtn.innerHTML = '&#x2715;';
+            removeBtn.title = 'Remove entry';
+
+            summary.appendChild(radio);
+            summary.appendChild(swatch);
+            summary.appendChild(preview);
+            summary.appendChild(chevron);
+            summary.appendChild(removeBtn);
+
+            // Detail area
+            var detail = document.createElement('div');
+            detail.className = 'jf-msg-detail';
+            detail.innerHTML =
+              '<div class="inputContainer">' +
+              '  <label class="inputLabel inputLabelUnfocused">Text</label>' +
+              '  <input is="emby-input" type="text" class="msg-text"' +
+              '         placeholder="e.g. \uD83D\uDD34 Server in maintenance until 23:00">' +
+              '</div>' +
+              '<div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:8px">' +
+              '  <div>' +
+              '    <div style="font-size:0.85em;opacity:0.7;margin-bottom:4px">Background</div>' +
+              '    <div style="display:flex;gap:6px;align-items:center">' +
+              '      <input type="color" class="msg-bg-picker"' +
+              '             style="height:34px;width:46px;border:none;padding:2px;cursor:pointer;border-radius:4px">' +
+              '      <input is="emby-input" type="text" class="msg-bg"' +
+              '             maxlength="7" style="width:84px" placeholder="#2e7d32">' +
+              '    </div>' +
+              '  </div>' +
+              '  <div>' +
+              '    <div style="font-size:0.85em;opacity:0.7;margin-bottom:4px">Text Color</div>' +
+              '    <div style="display:flex;gap:6px;align-items:center">' +
+              '      <input type="color" class="msg-color-picker"' +
+              '             style="height:34px;width:46px;border:none;padding:2px;cursor:pointer;border-radius:4px">' +
+              '      <input is="emby-input" type="text" class="msg-color"' +
+              '             maxlength="7" style="width:84px" placeholder="#ffffff">' +
+              '    </div>' +
+              '  </div>' +
+              '</div>' +
+              '<div class="msg-presets jf-preset-container" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
+              '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
+              '    <label class="inputLabel inputLabelUnfocused">Start Date (optional)</label>' +
+              '    <input is="emby-input" type="datetime-local" class="msg-start">' +
+              '  </div>' +
+              '  <div class="inputContainer" style="flex:1;min-width:200px">' +
+              '    <label class="inputLabel inputLabelUnfocused">End Date (optional)</label>' +
+              '    <input is="emby-input" type="datetime-local" class="msg-end">' +
+              '  </div>' +
+              '</div>';
+
+            row.appendChild(summary);
+            row.appendChild(detail);
+
+            var bgPicker = detail.querySelector('.msg-bg-picker');
+            var bgText = detail.querySelector('.msg-bg');
+            var colorPicker = detail.querySelector('.msg-color-picker');
+            var colorText = detail.querySelector('.msg-color');
+            var textInput = detail.querySelector('.msg-text');
+
+            bgPicker.value = toHex6(bg);
+            bgText.value = bg;
+            colorPicker.value = toHex6(color);
+            colorText.value = color;
+            textInput.value = entry.text || '';
+            detail.querySelector('.msg-start').value = toInputDate(entry.startDate);
+            detail.querySelector('.msg-end').value = toInputDate(entry.endDate);
+
+            syncColorPair(bgPicker, bgText);
+            syncColorPair(colorPicker, colorText);
+
+            row._presetLabel = selectedPresetLabel;
+            function getPreset() {
+              return selectedPresetLabel;
+            }
+            function setPreset(label) {
+              selectedPresetLabel = label;
+              row._presetLabel = label;
+              for (var _i = 0; _i < currentPresets.length; _i++) {
+                if (currentPresets[_i].label === label) {
+                  swatch.style.background = currentPresets[_i].bg;
+                  break;
+                }
+              }
+            }
+            function clearPreset() {
+              if (!selectedPresetLabel) return;
+              selectedPresetLabel = null;
+              row._presetLabel = null;
+              var pc = detail.querySelector('.jf-preset-container');
+              if (pc && pc._rebuild) pc._rebuild();
+            }
+
+            buildPresetButtons(
+              detail.querySelector('.jf-preset-container'),
+              bgPicker,
+              bgText,
+              colorPicker,
+              colorText,
+              getPreset,
+              setPreset
+            );
+
+            // Live-update summary as user edits
+            textInput.addEventListener('input', function () {
+              preview.textContent = this.value || '(new entry)';
+            });
+            bgText.addEventListener('input', function () {
+              var h = toHex6(this.value);
+              if (/^#[0-9a-fA-F]{6}$/.test(h)) swatch.style.background = h;
+              clearPreset();
+            });
+            bgPicker.addEventListener('input', function () {
+              swatch.style.background = this.value;
+              clearPreset();
+            });
+            colorText.addEventListener('input', function () {
+              clearPreset();
+            });
+            colorPicker.addEventListener('input', function () {
+              clearPreset();
+            });
+
+            // Toggle expand / collapse (ignore clicks on remove btn and radio)
+            summary.addEventListener('click', function (e) {
+              if (e.target === removeBtn || e.target === radio) return;
+              row.classList.toggle('expanded');
+            });
+
+            removeBtn.addEventListener('click', function () {
+              row.parentNode.removeChild(row);
+            });
+
+            return row;
+          }
+
+          // ── collect permanent entries from DOM ────────────────────
+
+          function collectPermanentEntries() {
+            var rawRows = Array.from(document.querySelectorAll('.jf-perm-row'));
+            var activeRawIdx = -1;
+            rawRows.forEach(function (r, i) {
+              if (r.querySelector('.perm-active-radio').checked) activeRawIdx = i;
+            });
+            var entries = [];
+            var activeIndex = -1;
+            rawRows.forEach(function (row, i) {
+              var detail = row.querySelector('.jf-msg-detail');
+              var text = detail.querySelector('.msg-text').value;
+              if (text.trim() === '') return;
+              var label = row._presetLabel || null;
+              if (i === activeRawIdx) activeIndex = entries.length;
+              entries.push({
+                text: text,
+                bg: detail.querySelector('.msg-bg').value || '#2e7d32',
+                color: detail.querySelector('.msg-color').value || '#ffffff',
+                startDate: fromInputDate(detail.querySelector('.msg-start').value),
+                endDate: fromInputDate(detail.querySelector('.msg-end').value),
+                presetLabel:
+                  label &&
+                  currentPresets.some(function (p) {
+                    return p.label === label;
+                  })
+                    ? label
+                    : null
+              });
+            });
+            return { activeIndex: activeIndex, entries: entries };
+          }
+
           // ── collect rotation messages from DOM ────────────────────
 
           function collectMessages() {
-            return Array.from(document.querySelectorAll('.jf-msg-row'))
+            return Array.from(document.querySelectorAll('.jf-msg-row:not(.jf-perm-row)'))
               .map(function (row) {
                 var detail = row.querySelector('.jf-msg-detail');
                 var label = row._presetLabel || null;
@@ -1137,25 +1236,15 @@
             });
 
             var po = config.permanentOverride || {};
-            var poBg = po.bg || '#2e7d32';
-            var poCol = po.color || '#ffffff';
-
             document.getElementById('permanentEnabled').checked =
               po.enabled !== false;
-            document.getElementById('permanentText').value = po.text || '';
-            document.getElementById('permanentBgPicker').value = toHex6(poBg);
-            document.getElementById('permanentBgText').value = poBg;
-            document.getElementById('permanentColorPicker').value =
-              toHex6(poCol);
-            document.getElementById('permanentColorText').value = poCol;
-            document.getElementById('permanentStart').value = toInputDate(
-              po.startDate
-            );
-            document.getElementById('permanentEnd').value = toInputDate(
-              po.endDate
-            );
-
-            permanentSelectedPreset = po.presetLabel || null;
+            var permList = document.getElementById('permanentList');
+            permList.innerHTML = '';
+            var permEntries = po.entries || [];
+            var activeIdx = po.activeIndex != null ? po.activeIndex : -1;
+            permEntries.forEach(function (entry, i) {
+              permList.appendChild(createPermanentRow(entry, i === activeIdx));
+            });
 
             document.getElementById('rotationEnabled').checked =
               config.rotationEnabled !== false;
@@ -1172,7 +1261,6 @@
 
           // ── one-time DOM setup ────────────────────────────────────
 
-          var permanentSelectedPreset = null;
           var _initialized = false;
 
           function initDom() {
@@ -1185,43 +1273,13 @@
               });
             });
 
-            syncColorPair(
-              document.getElementById('permanentBgPicker'),
-              document.getElementById('permanentBgText')
-            );
-            syncColorPair(
-              document.getElementById('permanentColorPicker'),
-              document.getElementById('permanentColorText')
-            );
-
-            buildPresetButtons(
-              document.getElementById('permanentPresets'),
-              document.getElementById('permanentBgPicker'),
-              document.getElementById('permanentBgText'),
-              document.getElementById('permanentColorPicker'),
-              document.getElementById('permanentColorText'),
-              function () {
-                return permanentSelectedPreset;
-              },
-              function (label) {
-                permanentSelectedPreset = label;
-              }
-            );
-
-            [
-              'permanentBgPicker',
-              'permanentBgText',
-              'permanentColorPicker',
-              'permanentColorText'
-            ].forEach(function (id) {
-              document
-                .getElementById(id)
-                .addEventListener('input', function () {
-                  permanentSelectedPreset = null;
-                  var pc = document.getElementById('permanentPresets');
-                  if (pc && pc._rebuild) pc._rebuild();
-                });
-            });
+            document
+              .getElementById('addPermanentEntry')
+              .addEventListener('click', function () {
+                document
+                  .getElementById('permanentList')
+                  .appendChild(createPermanentRow(null, false));
+              });
 
             document
               .getElementById('addPreset')
@@ -1321,18 +1379,8 @@
                 )
                   return;
                 // Permanent tab
-                document.getElementById('permanentEnabled').checked = true;
-                document.getElementById('permanentText').value = '';
-                document.getElementById('permanentBgPicker').value = '#2e7d32';
-                document.getElementById('permanentBgText').value = '#2e7d32';
-                document.getElementById('permanentColorPicker').value =
-                  '#ffffff';
-                document.getElementById('permanentColorText').value = '#ffffff';
-                document.getElementById('permanentStart').value = '';
-                document.getElementById('permanentEnd').value = '';
-                permanentSelectedPreset = null;
-                var permPc = document.getElementById('permanentPresets');
-                if (permPc && permPc._rebuild) permPc._rebuild();
+                document.getElementById('permanentEnabled').checked = false;
+                document.getElementById('permanentList').innerHTML = '';
                 // Rotation tab
                 document.getElementById('rotationEnabled').checked = true;
                 document.getElementById('messageList').innerHTML = '';
@@ -1400,6 +1448,7 @@
                   );
                   return;
                 }
+                var permData = collectPermanentEntries();
                 var config = {
                   showInDashboard:
                     document.getElementById('showInDashboard').checked,
@@ -1436,26 +1485,8 @@
                   permanentOverride: {
                     enabled:
                       document.getElementById('permanentEnabled').checked,
-                    text: document.getElementById('permanentText').value,
-                    bg:
-                      document.getElementById('permanentBgText').value ||
-                      '#2e7d32',
-                    color:
-                      document.getElementById('permanentColorText').value ||
-                      '#ffffff',
-                    startDate: fromInputDate(
-                      document.getElementById('permanentStart').value
-                    ),
-                    endDate: fromInputDate(
-                      document.getElementById('permanentEnd').value
-                    ),
-                    presetLabel:
-                      permanentSelectedPreset &&
-                      currentPresets.some(function (p) {
-                        return p.label === permanentSelectedPreset;
-                      })
-                        ? permanentSelectedPreset
-                        : null
+                    activeIndex: permData.activeIndex,
+                    entries: permData.entries
                   },
                   rotationMessages: collectMessages()
                 };

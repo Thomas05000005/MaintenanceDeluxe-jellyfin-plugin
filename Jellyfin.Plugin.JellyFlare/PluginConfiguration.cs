@@ -57,15 +57,11 @@ public class BannerMessage
 }
 
 /// <summary>
-/// A permanent override banner that takes priority over all rotation messages.
+/// A single entry in the permanent banner library.
 /// </summary>
-public class PermanentOverride
+public class PermanentEntry
 {
-    /// <summary>Gets or sets whether the permanent override banner is enabled.</summary>
-    [JsonPropertyName("enabled")]
-    public bool Enabled { get; set; } = true;
-
-    /// <summary>Gets or sets the message text. Empty string disables the override.</summary>
+    /// <summary>Gets or sets the message text.</summary>
     [JsonPropertyName("text")]
     public string Text { get; set; } = string.Empty;
 
@@ -85,9 +81,27 @@ public class PermanentOverride
     [JsonPropertyName("endDate")]
     public string? EndDate { get; set; }
 
-    /// <summary>Gets or sets the label of the last preset applied to this banner (null if unset or preset deleted).</summary>
+    /// <summary>Gets or sets the label of the last preset applied to this entry (null if unset or preset deleted).</summary>
     [JsonPropertyName("presetLabel")]
     public string? PresetLabel { get; set; }
+}
+
+/// <summary>
+/// The permanent banner configuration: a library of entries with one active selection.
+/// </summary>
+public class PermanentOverride
+{
+    /// <summary>Gets or sets whether the permanent override banner is enabled.</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = false;
+
+    /// <summary>Gets or sets the index of the active entry in <see cref="Entries"/>. -1 means none selected.</summary>
+    [JsonPropertyName("activeIndex")]
+    public int ActiveIndex { get; set; } = -1;
+
+    /// <summary>Gets or sets the library of permanent banner entries.</summary>
+    [JsonPropertyName("entries")]
+    public List<PermanentEntry> Entries { get; set; } = new();
 }
 
 /// <summary>

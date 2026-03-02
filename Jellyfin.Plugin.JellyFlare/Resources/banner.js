@@ -193,10 +193,14 @@
         if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); return; }
 
         // Permanent override
-        if (CONFIG.permanentOverride.enabled !== false && CONFIG.permanentOverride.text && isInSchedule(CONFIG.permanentOverride)) {
-            showBanner(CONFIG.permanentOverride, true);
-            rotationTimer = setTimeout(tick, CONFIG.displayDuration * 1000);
-            return;
+        var po = CONFIG.permanentOverride;
+        if (po && po.enabled !== false && po.activeIndex >= 0) {
+            var entry = po.entries && po.entries[po.activeIndex];
+            if (entry && entry.text && isInSchedule(entry)) {
+                showBanner(entry, true);
+                rotationTimer = setTimeout(tick, CONFIG.displayDuration * 1000);
+                return;
+            }
         }
 
         if (dismissAll || CONFIG.rotationEnabled === false) { hideBanner(); return; }

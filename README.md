@@ -10,7 +10,7 @@ Messages are managed entirely through the Jellyfin admin dashboard — no file e
 - Rotating messages with configurable display and pause durations (enable/disable without clearing the list)
 - Per-message background and text colour with preset palette
 - Optional date-range scheduling per message (show only between two dates/times)
-- Permanent override banner that supersedes all rotation messages when active (toggle on/off without losing the text)
+- Permanent banner library: save multiple permanent banners and select the active one with a radio button; the active entry supersedes all rotation messages when enabled
 - Configurable dismiss controls: show/hide the × button and the "hide all" button, with individual font-size and a custom label for the latter
 - Option to hide the banner while browsing the admin dashboard
 - Admin configuration page with tabbed layout (Permanent / Rotation / Settings) accessible from the Jellyfin dashboard sidebar
@@ -58,17 +58,21 @@ Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
 
 ### Permanent tab
 
-A single banner that takes priority over all rotation messages.
-Use the toggle to pause it without losing your text.
+A library of permanent banners that take priority over all rotation messages.
+Select the active entry with its radio button; use the enable toggle to pause without losing any entries.
 
-| Field             | Description                                  |
-| ----------------- | -------------------------------------------- |
-| Enable            | Toggle the permanent banner on/off           |
-| Text              | Message to display                           |
-| Background colour | CSS colour value, e.g. `#2e7d32`             |
-| Text colour       | CSS colour value, e.g. `#fff`                |
-| Start date        | Optional — only show from this date/time     |
-| End date          | Optional — stop showing after this date/time |
+| Field             | Description                                                    |
+| ----------------- | -------------------------------------------------------------- |
+| Enable            | Toggle the permanent banner on/off (all entries)               |
+| Radio button      | Select which entry is currently active                         |
+| Text              | Message to display                                             |
+| Background colour | CSS colour value, e.g. `#2e7d32`                               |
+| Text colour       | CSS colour value, e.g. `#fff`                                  |
+| Start date        | Optional — only show from this date/time                       |
+| End date          | Optional — stop showing after this date/time                   |
+
+Each row is collapsed by default — click the row body (not the radio) to expand and edit.
+Rows with empty text are ignored on save. The `activeIndex` stored in config tracks which entry is selected.
 
 ### Rotation tab
 
