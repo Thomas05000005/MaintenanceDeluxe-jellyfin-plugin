@@ -193,7 +193,7 @@
             return;
         }
 
-        if (dismissAll) { hideBanner(); return; }
+        if (dismissAll || CONFIG.rotationEnabled === false) { hideBanner(); return; }
 
         // Currently showing a message → go to pause
         if (!isInPause && currentMessage) {

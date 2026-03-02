@@ -75,6 +75,7 @@ public class PluginConfiguration : BasePluginConfiguration
         ShowDismissAll = true;
         DismissAllText = "hide all";
         PermanentOverride = new PermanentOverride();
+        RotationEnabled = true;
         RotationMessages = new List<BannerMessage>();
     }
 
@@ -101,6 +102,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the permanent override banner (shown when Text is non-empty).</summary>
     [JsonPropertyName("permanentOverride")]
     public PermanentOverride PermanentOverride { get; set; }
+
+    /// <summary>Gets or sets whether rotation messages are enabled.</summary>
+    [JsonPropertyName("rotationEnabled")]
+    public bool RotationEnabled { get; set; }
 
     /// <summary>Gets or sets the messages shown in random rotation.</summary>
     [JsonPropertyName("rotationMessages")]

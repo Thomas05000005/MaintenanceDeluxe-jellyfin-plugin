@@ -30,13 +30,19 @@
           font-size: 14px;
           transition: opacity 0.15s;
         }
-        .jf-tab:hover { opacity: 0.85; }
+        .jf-tab:hover {
+          opacity: 0.85;
+        }
         .jf-tab.active {
           opacity: 1;
           border-bottom-color: var(--accent-color, #52b54b);
         }
-        .jf-panel { display: none; }
-        .jf-panel.active { display: block; }
+        .jf-panel {
+          display: none;
+        }
+        .jf-panel.active {
+          display: block;
+        }
 
         /* ── Collapsible message rows ───────────────────────────────── */
         .jf-msg-row {
@@ -53,7 +59,9 @@
           cursor: pointer;
           user-select: none;
         }
-        .jf-msg-summary:hover { background: rgba(255, 255, 255, 0.04); }
+        .jf-msg-summary:hover {
+          background: rgba(255, 255, 255, 0.04);
+        }
         .jf-msg-swatch {
           width: 18px;
           height: 18px;
@@ -68,9 +76,17 @@
           white-space: nowrap;
           text-overflow: ellipsis;
         }
-        .jf-msg-chevron { opacity: 0.5; font-size: 11px; flex-shrink: 0; }
-        .jf-msg-row.expanded .jf-msg-chevron::after       { content: '▲'; }
-        .jf-msg-row:not(.expanded) .jf-msg-chevron::after { content: '▼'; }
+        .jf-msg-chevron {
+          opacity: 0.5;
+          font-size: 11px;
+          flex-shrink: 0;
+        }
+        .jf-msg-row.expanded .jf-msg-chevron::after {
+          content: '▲';
+        }
+        .jf-msg-row:not(.expanded) .jf-msg-chevron::after {
+          content: '▼';
+        }
         .jf-msg-remove-btn {
           background: none;
           border: none;
@@ -82,13 +98,18 @@
           line-height: 1;
           flex-shrink: 0;
         }
-        .jf-msg-remove-btn:hover { opacity: 1; color: #e57373; }
+        .jf-msg-remove-btn:hover {
+          opacity: 1;
+          color: #e57373;
+        }
         .jf-msg-detail {
           padding: 14px;
           border-top: 1px solid rgba(255, 255, 255, 0.08);
           display: none;
         }
-        .jf-msg-row.expanded .jf-msg-detail { display: block; }
+        .jf-msg-row.expanded .jf-msg-detail {
+          display: block;
+        }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -103,19 +124,19 @@
 
             <!-- ── Tab strip ───────────────────────────────────────── -->
             <div class="jf-tab-strip">
-              <button type="button" class="jf-tab active" data-tab="permanent">Permanent</button>
-              <button type="button" class="jf-tab" data-tab="rotation">Rotation</button>
-              <button type="button" class="jf-tab" data-tab="settings">Settings</button>
+              <button type="button" class="jf-tab active" data-tab="permanent">
+                Permanent
+              </button>
+              <button type="button" class="jf-tab" data-tab="rotation">
+                Rotation
+              </button>
+              <button type="button" class="jf-tab" data-tab="settings">
+                Settings
+              </button>
             </div>
 
             <!-- ══ Tab: Permanent ══════════════════════════════════════ -->
             <div class="jf-panel active" data-panel="permanent">
-              <div class="fieldDescription" style="margin-bottom: 12px">
-                When <em>Text</em> is filled in, this banner shows permanently
-                and suppresses all rotation messages. Clear the text or disable
-                the banner to restore rotation messages.
-              </div>
-
               <div class="checkboxContainer checkboxContainer-withDescription">
                 <label class="emby-checkbox-label">
                   <input
@@ -139,6 +160,10 @@
                   type="text"
                   placeholder="e.g. 🔴 Server in maintenance until 23:00"
                 />
+                <div class="fieldDescription">
+                  When filled in, this banner shows permanently and suppresses
+                  all rotation messages. Clear or disable to restore rotation.
+                </div>
               </div>
 
               <div
@@ -254,6 +279,17 @@
 
             <!-- ══ Tab: Rotation ═══════════════════════════════════════ -->
             <div class="jf-panel" data-panel="rotation">
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="rotationEnabled"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Enable rotation banners</span>
+                </label>
+              </div>
+
               <div class="fieldDescription" style="margin-bottom: 12px">
                 Messages shown in random rotation. Use dates to schedule
                 visibility. Rows with empty text are ignored on save.
@@ -376,13 +412,13 @@
         (function () {
           var COLOR_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
-            { label: '🔴 Alert',       bg: '#d32f2f', color: '#ffffff' },
-            { label: '✅ Resolved',    bg: '#2e7d32', color: '#ffffff' },
-            { label: 'ℹ️ Info',        bg: '#1976d2', color: '#ffffff' },
-            { label: '🟣 Purple',      bg: '#7b1fa2', color: '#ffffff' },
-            { label: '🎬 Cinema',      bg: '#e91e63', color: '#ffffff' },
-            { label: '🍿 Fun',         bg: '#ff5722', color: '#ffffff' },
-            { label: '⚫ Dark',        bg: '#212121', color: '#ffffff' }
+            { label: '🔴 Alert', bg: '#d32f2f', color: '#ffffff' },
+            { label: '✅ Resolved', bg: '#2e7d32', color: '#ffffff' },
+            { label: 'ℹ️ Info', bg: '#1976d2', color: '#ffffff' },
+            { label: '🟣 Purple', bg: '#7b1fa2', color: '#ffffff' },
+            { label: '🎬 Cinema', bg: '#e91e63', color: '#ffffff' },
+            { label: '🍿 Fun', bg: '#ff5722', color: '#ffffff' },
+            { label: '⚫ Dark', bg: '#212121', color: '#ffffff' }
           ];
 
           // ── tab switching ─────────────────────────────────────────
@@ -411,9 +447,12 @@
             if (/^#[0-9a-fA-F]{3}$/.test(color))
               return (
                 '#' +
-                color[1] + color[1] +
-                color[2] + color[2] +
-                color[3] + color[3]
+                color[1] +
+                color[1] +
+                color[2] +
+                color[2] +
+                color[3] +
+                color[3]
               );
             return color;
           }
@@ -441,14 +480,18 @@
               btn.type = 'button';
               btn.textContent = p.label;
               btn.style.cssText =
-                'background:' + p.bg + ';color:' + p.color + ';' +
+                'background:' +
+                p.bg +
+                ';color:' +
+                p.color +
+                ';' +
                 'border:none;border-radius:4px;padding:5px 10px;' +
                 'font-size:0.8em;cursor:pointer;white-space:nowrap';
               btn.addEventListener('click', function () {
-                bgPicker.value    = p.bg;
-                bgText.value      = p.bg;
+                bgPicker.value = p.bg;
+                bgText.value = p.bg;
                 colorPicker.value = p.color;
-                colorText.value   = p.color;
+                colorText.value = p.color;
               });
               container.appendChild(btn);
             });
@@ -458,7 +501,7 @@
 
           function createMessageRow(msg, startExpanded) {
             msg = msg || {};
-            var bg    = msg.bg    || '#1976d2';
+            var bg = msg.bg || '#1976d2';
             var color = msg.color || '#ffffff';
 
             var row = document.createElement('div');
@@ -534,25 +577,30 @@
             row.appendChild(summary);
             row.appendChild(detail);
 
-            var bgPicker    = detail.querySelector('.msg-bg-picker');
-            var bgText      = detail.querySelector('.msg-bg');
+            var bgPicker = detail.querySelector('.msg-bg-picker');
+            var bgText = detail.querySelector('.msg-bg');
             var colorPicker = detail.querySelector('.msg-color-picker');
-            var colorText   = detail.querySelector('.msg-color');
-            var textInput   = detail.querySelector('.msg-text');
+            var colorText = detail.querySelector('.msg-color');
+            var textInput = detail.querySelector('.msg-text');
 
-            bgPicker.value    = toHex6(bg);
-            bgText.value      = bg;
+            bgPicker.value = toHex6(bg);
+            bgText.value = bg;
             colorPicker.value = toHex6(color);
-            colorText.value   = color;
-            textInput.value   = msg.text || '';
-            detail.querySelector('.msg-start').value = toInputDate(msg.startDate);
-            detail.querySelector('.msg-end').value   = toInputDate(msg.endDate);
+            colorText.value = color;
+            textInput.value = msg.text || '';
+            detail.querySelector('.msg-start').value = toInputDate(
+              msg.startDate
+            );
+            detail.querySelector('.msg-end').value = toInputDate(msg.endDate);
 
             syncColorPair(bgPicker, bgText);
             syncColorPair(colorPicker, colorText);
             buildPresetButtons(
               detail.querySelector('.msg-presets'),
-              bgPicker, bgText, colorPicker, colorText
+              bgPicker,
+              bgText,
+              colorPicker,
+              colorText
             );
 
             // Live-update summary as user edits
@@ -587,14 +635,18 @@
               .map(function (row) {
                 var detail = row.querySelector('.jf-msg-detail');
                 return {
-                  text:      detail.querySelector('.msg-text').value,
-                  bg:        detail.querySelector('.msg-bg').value    || '#1976d2',
-                  color:     detail.querySelector('.msg-color').value || '#ffffff',
-                  startDate: fromInputDate(detail.querySelector('.msg-start').value),
-                  endDate:   fromInputDate(detail.querySelector('.msg-end').value)
+                  text: detail.querySelector('.msg-text').value,
+                  bg: detail.querySelector('.msg-bg').value || '#1976d2',
+                  color: detail.querySelector('.msg-color').value || '#ffffff',
+                  startDate: fromInputDate(
+                    detail.querySelector('.msg-start').value
+                  ),
+                  endDate: fromInputDate(detail.querySelector('.msg-end').value)
                 };
               })
-              .filter(function (m) { return m.text.trim() !== ''; });
+              .filter(function (m) {
+                return m.text.trim() !== '';
+              });
           }
 
           // ── populate form from config ─────────────────────────────
@@ -614,18 +666,27 @@
             document.getElementById('dismissAllTextContainer').style.display =
               showDismissAll ? '' : 'none';
 
-            var po    = config.permanentOverride || {};
-            var poBg  = po.bg    || '#2e7d32';
+            var po = config.permanentOverride || {};
+            var poBg = po.bg || '#2e7d32';
             var poCol = po.color || '#ffffff';
 
-            document.getElementById('permanentEnabled').checked   = po.enabled !== false;
-            document.getElementById('permanentText').value        = po.text || '';
-            document.getElementById('permanentBgPicker').value    = toHex6(poBg);
-            document.getElementById('permanentBgText').value      = poBg;
-            document.getElementById('permanentColorPicker').value = toHex6(poCol);
-            document.getElementById('permanentColorText').value   = poCol;
-            document.getElementById('permanentStart').value       = toInputDate(po.startDate);
-            document.getElementById('permanentEnd').value         = toInputDate(po.endDate);
+            document.getElementById('permanentEnabled').checked =
+              po.enabled !== false;
+            document.getElementById('permanentText').value = po.text || '';
+            document.getElementById('permanentBgPicker').value = toHex6(poBg);
+            document.getElementById('permanentBgText').value = poBg;
+            document.getElementById('permanentColorPicker').value =
+              toHex6(poCol);
+            document.getElementById('permanentColorText').value = poCol;
+            document.getElementById('permanentStart').value = toInputDate(
+              po.startDate
+            );
+            document.getElementById('permanentEnd').value = toInputDate(
+              po.endDate
+            );
+
+            document.getElementById('rotationEnabled').checked =
+              config.rotationEnabled !== false;
 
             var list = document.getElementById('messageList');
             list.innerHTML = '';
@@ -703,6 +764,8 @@
                   dismissAllText:
                     document.getElementById('dismissAllText').value ||
                     'hide all',
+                  rotationEnabled:
+                    document.getElementById('rotationEnabled').checked,
                   permanentOverride: {
                     enabled:
                       document.getElementById('permanentEnabled').checked,
@@ -746,11 +809,11 @@
             .getElementById('JellyFlareConfigPage')
             .addEventListener('pageshow', function () {
               initDom();
-              ApiClient.getJSON(
-                ApiClient.getUrl('JellyFlare/config')
-              ).then(function (config) {
-                populatePage(config);
-              });
+              ApiClient.getJSON(ApiClient.getUrl('JellyFlare/config')).then(
+                function (config) {
+                  populatePage(config);
+                }
+              );
             });
         })();
       </script>
