@@ -239,6 +239,10 @@
         .then(function (r) { return r.json(); })
         .then(function (config) {
             CONFIG = config;
+            // Apply control visibility
+            if (CONFIG.showDismissButton === false) closeBtn.style.display = "none";
+            if (CONFIG.showDismissAll === false) dismissAllBtn.style.display = "none";
+            dismissAllBtn.textContent = CONFIG.dismissAllText || "hide all";
             // Insert banner now: SPA has finished mounting so the div won't be evicted.
             if (!banner.isConnected) { document.body.prepend(banner); }
             tick();

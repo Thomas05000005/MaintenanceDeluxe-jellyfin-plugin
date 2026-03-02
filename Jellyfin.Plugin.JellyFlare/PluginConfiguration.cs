@@ -71,6 +71,9 @@ public class PluginConfiguration : BasePluginConfiguration
     {
         DisplayDuration = 120;
         PauseDuration = 60;
+        ShowDismissButton = true;
+        ShowDismissAll = true;
+        DismissAllText = "hide all";
         PermanentOverride = new PermanentOverride();
         RotationMessages = new List<BannerMessage>();
     }
@@ -82,6 +85,18 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the pause (seconds) between messages. 0 = no pause.</summary>
     [JsonPropertyName("pauseDuration")]
     public int PauseDuration { get; set; }
+
+    /// <summary>Gets or sets whether the dismiss (×) button is shown on rotation banners.</summary>
+    [JsonPropertyName("showDismissButton")]
+    public bool ShowDismissButton { get; set; }
+
+    /// <summary>Gets or sets whether the "hide all" button is shown on rotation banners.</summary>
+    [JsonPropertyName("showDismissAll")]
+    public bool ShowDismissAll { get; set; }
+
+    /// <summary>Gets or sets the label text of the "hide all" button.</summary>
+    [JsonPropertyName("dismissAllText")]
+    public string DismissAllText { get; set; }
 
     /// <summary>Gets or sets the permanent override banner (shown when Text is non-empty).</summary>
     [JsonPropertyName("permanentOverride")]

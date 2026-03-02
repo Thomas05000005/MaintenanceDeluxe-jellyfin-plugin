@@ -56,6 +56,46 @@
               </div>
             </div>
 
+            <!-- ── Controls ──────────────────────────────────── -->
+            <h3 class="sectionTitle" style="margin-top: 1.5em">Controls</h3>
+
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input
+                  id="showDismissButton"
+                  is="emby-checkbox"
+                  type="checkbox"
+                />
+                <span>Show dismiss button (X)</span>
+              </label>
+            </div>
+
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input
+                  id="showDismissAll"
+                  is="emby-checkbox"
+                  type="checkbox"
+                />
+                <span>Show "hide all" button</span>
+              </label>
+            </div>
+
+            <div class="inputContainer" id="dismissAllTextContainer">
+              <label
+                class="inputLabel inputLabelUnfocused"
+                for="dismissAllText"
+              >
+                "Hide all" button label
+              </label>
+              <input
+                id="dismissAllText"
+                is="emby-input"
+                type="text"
+                placeholder="hide all"
+              />
+            </div>
+
             <!-- ── Permanent Banner ───────────────────────────── -->
             <h3 class="sectionTitle" style="margin-top: 1.5em">
               Permanent Banner
@@ -426,6 +466,15 @@
             document.getElementById('pauseDuration').value =
               config.pauseDuration != null ? config.pauseDuration : 60;
 
+            document.getElementById('showDismissButton').checked =
+              config.showDismissButton !== false;
+            var showDismissAll = config.showDismissAll !== false;
+            document.getElementById('showDismissAll').checked = showDismissAll;
+            document.getElementById('dismissAllText').value =
+              config.dismissAllText || 'hide all';
+            document.getElementById('dismissAllTextContainer').style.display =
+              showDismissAll ? '' : 'none';
+
             var po = config.permanentOverride || {};
             var poBg = po.bg || '#2e7d32';
             var poColor = po.color || '#ffffff';
@@ -478,6 +527,13 @@
             );
 
             document
+              .getElementById('showDismissAll')
+              .addEventListener('change', function () {
+                document.getElementById('dismissAllTextContainer').style.display =
+                  this.checked ? '' : 'none';
+              });
+
+            document
               .getElementById('addMessage')
               .addEventListener('click', function () {
                 document
@@ -500,6 +556,12 @@
                       document.getElementById('pauseDuration').value,
                       10
                     ) || 0,
+                  showDismissButton:
+                    document.getElementById('showDismissButton').checked,
+                  showDismissAll:
+                    document.getElementById('showDismissAll').checked,
+                  dismissAllText:
+                    document.getElementById('dismissAllText').value || 'hide all',
                   permanentOverride: {
                     enabled:
                       document.getElementById('permanentEnabled').checked,
