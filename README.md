@@ -61,15 +61,15 @@ Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
 A library of permanent banners that take priority over all rotation messages.
 Select the active entry with its radio button; use the enable toggle to pause without losing any entries.
 
-| Field             | Description                                                    |
-| ----------------- | -------------------------------------------------------------- |
-| Enable            | Toggle the permanent banner on/off (all entries)               |
-| Radio button      | Select which entry is currently active                         |
-| Text              | Message to display                                             |
-| Background colour | CSS colour value, e.g. `#2e7d32`                               |
-| Text colour       | CSS colour value, e.g. `#fff`                                  |
-| Start date        | Optional — only show from this date/time                       |
-| End date          | Optional — stop showing after this date/time                   |
+| Field             | Description                                      |
+| ----------------- | ------------------------------------------------ |
+| Enable            | Toggle the permanent banner on/off (all entries) |
+| Radio button      | Select which entry is currently active           |
+| Text              | Message to display                               |
+| Background colour | CSS colour value, e.g. `#2e7d32`                 |
+| Text colour       | CSS colour value, e.g. `#fff`                    |
+| Start date        | Optional — only show from this date/time         |
+| End date          | Optional — stop showing after this date/time     |
 
 Each row is collapsed by default — click the row body (not the radio) to expand and edit.
 Rows with empty text are ignored on save. The `activeIndex` stored in config tracks which entry is selected.
@@ -101,7 +101,7 @@ Messages that are disabled or whose date range has not started or has already pa
 
 | Field                | Default | Description                                   |
 | -------------------- | ------- | --------------------------------------------- |
-| Display duration (s) | 120     | How long each message is shown before cycling |
+| Display duration (s) | 30      | How long each message is shown before cycling |
 | Pause duration (s)   | 60      | Gap between messages (0 = no pause)           |
 
 #### Controls
@@ -111,9 +111,9 @@ Each subsection heading has a small `restore` icon button that resets only that 
 | Field                       | Default    | Description                                     |
 | --------------------------- | ---------- | ----------------------------------------------- |
 | Show dismiss button (×)     | on         | Whether the per-message close button is visible |
-| Dismiss button size (px)    | 18         | Font size of the × button                       |
+| Dismiss button size (px)    | 20         | Font size of the × button                       |
 | Show "hide all" button      | on         | Whether the "hide all" button is visible        |
-| "Hide all" button size (px) | 9          | Font size of the "hide all" button              |
+| "Hide all" button size (px) | 10         | Font size of the "hide all" button              |
 | "Hide all" button label     | `hide all` | Custom label for the "hide all" button          |
 
 #### Presets

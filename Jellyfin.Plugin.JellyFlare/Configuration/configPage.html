@@ -35,7 +35,7 @@
         }
         .jf-tab.active {
           opacity: 1;
-          border-bottom-color: var(--accent-color, #52b54b);
+          border-bottom-color: var(--accent-color, #00a4dc);
         }
         .jf-panel {
           display: none;
@@ -1238,7 +1238,7 @@
               config.showInDashboard !== false;
 
             document.getElementById('displayDuration').value =
-              config.displayDuration != null ? config.displayDuration : 120;
+              config.displayDuration != null ? config.displayDuration : 30;
             document.getElementById('pauseDuration').value =
               config.pauseDuration != null ? config.pauseDuration : 60;
 
@@ -1249,13 +1249,13 @@
               'dismissButtonSizeContainer'
             ).style.display = showDismissButton ? '' : 'none';
             document.getElementById('dismissButtonSize').value =
-              config.dismissButtonSize != null ? config.dismissButtonSize : 18;
+              config.dismissButtonSize != null ? config.dismissButtonSize : 20;
             var showDismissAll = config.showDismissAll !== false;
             document.getElementById('showDismissAll').checked = showDismissAll;
             document.getElementById('dismissAllText').value =
               config.dismissAllText || 'hide all';
             document.getElementById('dismissAllSize').value =
-              config.dismissAllSize != null ? config.dismissAllSize : 9;
+              config.dismissAllSize != null ? config.dismissAllSize : 10;
             document.getElementById('dismissAllTextContainer').style.display =
               showDismissAll ? '' : 'none';
             document.getElementById('dismissAllSizeContainer').style.display =
@@ -1341,7 +1341,7 @@
               .getElementById('resetTiming')
               .addEventListener('click', function () {
                 if (!window.confirm('Reset Timing to defaults?')) return;
-                document.getElementById('displayDuration').value = 120;
+                document.getElementById('displayDuration').value = 30;
                 document.getElementById('pauseDuration').value = 60;
               });
 
@@ -1353,7 +1353,7 @@
                 document.getElementById(
                   'dismissButtonSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissButtonSize').value = 18;
+                document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
                   'dismissAllTextContainer'
@@ -1361,7 +1361,7 @@
                 document.getElementById(
                   'dismissAllSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissAllSize').value = 9;
+                document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
               });
 
@@ -1392,13 +1392,13 @@
                 )
                   return;
                 document.getElementById('showInDashboard').checked = true;
-                document.getElementById('displayDuration').value = 120;
+                document.getElementById('displayDuration').value = 30;
                 document.getElementById('pauseDuration').value = 60;
                 document.getElementById('showDismissButton').checked = true;
                 document.getElementById(
                   'dismissButtonSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissButtonSize').value = 18;
+                document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
                   'dismissAllTextContainer'
@@ -1406,7 +1406,7 @@
                 document.getElementById(
                   'dismissAllSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissAllSize').value = 9;
+                document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
                 var list = document.getElementById('presetList');
                 list.innerHTML = '';
@@ -1433,13 +1433,13 @@
                 document.getElementById('messageList').innerHTML = '';
                 // Settings tab
                 document.getElementById('showInDashboard').checked = true;
-                document.getElementById('displayDuration').value = 120;
+                document.getElementById('displayDuration').value = 30;
                 document.getElementById('pauseDuration').value = 60;
                 document.getElementById('showDismissButton').checked = true;
                 document.getElementById(
                   'dismissButtonSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissButtonSize').value = 18;
+                document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
                   'dismissAllTextContainer'
@@ -1447,7 +1447,7 @@
                 document.getElementById(
                   'dismissAllSizeContainer'
                 ).style.display = '';
-                document.getElementById('dismissAllSize').value = 9;
+                document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
                 var list = document.getElementById('presetList');
                 list.innerHTML = '';
@@ -1503,7 +1503,7 @@
                     parseInt(
                       document.getElementById('displayDuration').value,
                       10
-                    ) || 120,
+                    ) || 30,
                   pauseDuration:
                     parseInt(
                       document.getElementById('pauseDuration').value,
@@ -1515,14 +1515,14 @@
                     parseInt(
                       document.getElementById('dismissButtonSize').value,
                       10
-                    ) || 18,
+                    ) || 20,
                   showDismissAll:
                     document.getElementById('showDismissAll').checked,
                   dismissAllSize:
                     parseInt(
                       document.getElementById('dismissAllSize').value,
                       10
-                    ) || 9,
+                    ) || 10,
                   dismissAllText:
                     document.getElementById('dismissAllText').value ||
                     'hide all',

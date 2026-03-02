@@ -113,12 +113,12 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Initializes a new instance of the <see cref="PluginConfiguration"/> class with defaults.</summary>
     public PluginConfiguration()
     {
-        DisplayDuration = 120;
+        DisplayDuration = 30;
         PauseDuration = 60;
         ShowDismissButton = true;
-        DismissButtonSize = 18;
+        DismissButtonSize = 20;
         ShowDismissAll = true;
-        DismissAllSize = 9;
+        DismissAllSize = 10;
         DismissAllText = "hide all";
         ShowInDashboard = true;
         PermanentOverride = new PermanentOverride();
