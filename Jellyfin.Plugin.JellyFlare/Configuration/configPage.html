@@ -242,6 +242,7 @@
                 </div>
                 <div
                   id="permanentPresets"
+                  class="jf-preset-container"
                   style="display: flex; flex-wrap: wrap; gap: 6px"
                 ></div>
               </div>
@@ -433,6 +434,35 @@
                   max="128"
                 />
               </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5em; margin-bottom: 0.5em">
+                <h3 class="sectionTitle" style="margin: 0">Presets</h3>
+                <button
+                  is="emby-button"
+                  type="button"
+                  id="resetPresets"
+                  class="raised"
+                  style="font-size: 0.8em"
+                >
+                  <span>Reset to defaults</span>
+                </button>
+              </div>
+
+              <div class="fieldDescription" style="margin-bottom: 12px">
+                Changes apply immediately in message editors. Deleting a preset
+                keeps existing message colours but removes the selection indicator.
+              </div>
+
+              <div id="presetList"></div>
+
+              <button
+                is="emby-button"
+                type="button"
+                id="addPreset"
+                class="raised"
+              >
+                <span>+ Add Preset</span>
+              </button>
             </div>
             <!-- /panel: settings -->
 
@@ -455,16 +485,18 @@
       <script type="text/javascript">
         /* global ApiClient, Dashboard */
         (function () {
-          var COLOR_PRESETS = [
+          var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
-            { label: '🔴 Alert', bg: '#d32f2f', color: '#ffffff' },
-            { label: '✅ Resolved', bg: '#2e7d32', color: '#ffffff' },
-            { label: 'ℹ️ Info', bg: '#1976d2', color: '#ffffff' },
-            { label: '🟣 Purple', bg: '#7b1fa2', color: '#ffffff' },
-            { label: '🎬 Cinema', bg: '#e91e63', color: '#ffffff' },
-            { label: '🍿 Fun', bg: '#ff5722', color: '#ffffff' },
-            { label: '⚫ Dark', bg: '#212121', color: '#ffffff' }
+            { label: '🔴 Alert',        bg: '#d32f2f', color: '#ffffff' },
+            { label: '✅ Resolved',     bg: '#2e7d32', color: '#ffffff' },
+            { label: 'ℹ️ Info',         bg: '#1976d2', color: '#ffffff' },
+            { label: '🟣 Purple',       bg: '#7b1fa2', color: '#ffffff' },
+            { label: '🎬 Cinema',       bg: '#e91e63', color: '#ffffff' },
+            { label: '🍿 Fun',          bg: '#ff5722', color: '#ffffff' },
+            { label: '⚫ Dark',         bg: '#212121', color: '#ffffff' }
           ];
+
+          var currentPresets = []; // populated from config in populatePage
 
           // ── tab switching ─────────────────────────────────────────
 
@@ -512,34 +544,184 @@
             });
           }
 
-          function buildPresetButtons(
-            container,
-            bgPicker,
-            bgText,
-            colorPicker,
-            colorText
-          ) {
+          function buildPresetButtons(container, bgPicker, bgText, colorPicker, colorText, getLabel, setLabel) {
             container.innerHTML = '';
-            COLOR_PRESETS.forEach(function (p) {
+            currentPresets.forEach(function (p) {
               var btn = document.createElement('button');
               btn.type = 'button';
               btn.textContent = p.label;
+              var selected = getLabel && getLabel() === p.label;
               btn.style.cssText =
-                'background:' +
-                p.bg +
-                ';color:' +
-                p.color +
-                ';' +
-                'border:none;border-radius:4px;padding:5px 10px;' +
+                'background:' + p.bg + ';color:' + p.color + ';' +
+                'border:' + (selected ? '2px solid rgba(255,255,255,0.8)' : 'none') + ';' +
+                'border-radius:4px;padding:5px 10px;' +
                 'font-size:0.8em;cursor:pointer;white-space:nowrap';
               btn.addEventListener('click', function () {
-                bgPicker.value = p.bg;
+                bgPicker.value = toHex6(p.bg);
                 bgText.value = p.bg;
-                colorPicker.value = p.color;
+                colorPicker.value = toHex6(p.color);
                 colorText.value = p.color;
+                if (setLabel) setLabel(p.label);
+                buildPresetButtons(container, bgPicker, bgText, colorPicker, colorText, getLabel, setLabel);
               });
               container.appendChild(btn);
             });
+            container._rebuild = function () {
+              buildPresetButtons(container, bgPicker, bgText, colorPicker, colorText, getLabel, setLabel);
+            };
+          }
+
+          // ── preset management ─────────────────────────────────────
+
+          function refreshAllPresetButtons() {
+            document.querySelectorAll('.jf-preset-container').forEach(function (c) {
+              if (c._rebuild) c._rebuild();
+            });
+          }
+
+          function collectPresets() {
+            return Array.from(document.querySelectorAll('.jf-preset-row')).map(function (row) {
+              return {
+                label: row.querySelector('.preset-label').value || 'Preset',
+                bg: row.querySelector('.preset-bg').value || '#1976d2',
+                color: row.querySelector('.preset-color').value || '#ffffff'
+              };
+            });
+          }
+
+          function markPresetValidation() {
+            var seen = {};
+            document.querySelectorAll('.jf-preset-row').forEach(function (row) {
+              var inp = row.querySelector('.preset-label');
+              var label = inp.value.trim();
+              var invalid = !label || Object.prototype.hasOwnProperty.call(seen, label);
+              inp.style.outline = invalid ? '2px solid #e57373' : '';
+              if (label) seen[label] = true;
+            });
+          }
+
+          function validatePresets() {
+            var seen = {};
+            var errors = [];
+            document.querySelectorAll('.jf-preset-row').forEach(function (row) {
+              var label = row.querySelector('.preset-label').value.trim();
+              if (!label) {
+                errors.push('empty');
+              } else if (Object.prototype.hasOwnProperty.call(seen, label)) {
+                errors.push('duplicate:' + label);
+              }
+              if (label) seen[label] = true;
+            });
+            return errors;
+          }
+
+          var _presetsChangedTimer = null;
+          function onPresetsChangedDebounced() {
+            clearTimeout(_presetsChangedTimer);
+            _presetsChangedTimer = setTimeout(onPresetsChanged, 150);
+          }
+
+          function onPresetsChanged() {
+            currentPresets = collectPresets();
+            refreshAllPresetButtons();
+            markPresetValidation();
+          }
+
+          function createPresetRow(preset) {
+            preset = preset || {};
+            var bg = preset.bg || '#1976d2';
+            var color = preset.color || '#ffffff';
+
+            var row = document.createElement('div');
+            row.className = 'jf-preset-row';
+            row.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px';
+
+            var swatch = document.createElement('span');
+            swatch.style.cssText = 'background:' + bg + ';width:24px;height:24px;border-radius:3px;flex-shrink:0;display:inline-block;border:1px solid rgba(255,255,255,0.15)';
+
+            var labelInput = document.createElement('input');
+            labelInput.setAttribute('is', 'emby-input');
+            labelInput.type = 'text';
+            labelInput.className = 'preset-label';
+            labelInput.value = preset.label || '';
+            labelInput.placeholder = 'Preset name';
+            labelInput.style.cssText = 'flex:1;min-width:100px';
+
+            var bgLabel = document.createElement('span');
+            bgLabel.textContent = 'Bg';
+            bgLabel.style.cssText = 'font-size:0.75em;opacity:0.6;flex-shrink:0';
+
+            var bgPicker = document.createElement('input');
+            bgPicker.type = 'color';
+            bgPicker.className = 'preset-bg-picker';
+            bgPicker.value = toHex6(bg);
+            bgPicker.style.cssText = 'height:32px;width:42px;border:none;padding:2px;cursor:pointer;border-radius:4px;flex-shrink:0';
+
+            var bgText = document.createElement('input');
+            bgText.setAttribute('is', 'emby-input');
+            bgText.type = 'text';
+            bgText.className = 'preset-bg';
+            bgText.value = bg;
+            bgText.maxLength = 7;
+            bgText.placeholder = '#000000';
+            bgText.style.cssText = 'width:80px;flex-shrink:0';
+
+            var colorLabel = document.createElement('span');
+            colorLabel.textContent = 'Text';
+            colorLabel.style.cssText = 'font-size:0.75em;opacity:0.6;flex-shrink:0';
+
+            var colorPicker = document.createElement('input');
+            colorPicker.type = 'color';
+            colorPicker.className = 'preset-color-picker';
+            colorPicker.value = toHex6(color);
+            colorPicker.style.cssText = 'height:32px;width:42px;border:none;padding:2px;cursor:pointer;border-radius:4px;flex-shrink:0';
+
+            var colorText = document.createElement('input');
+            colorText.setAttribute('is', 'emby-input');
+            colorText.type = 'text';
+            colorText.className = 'preset-color';
+            colorText.value = color;
+            colorText.maxLength = 7;
+            colorText.placeholder = '#ffffff';
+            colorText.style.cssText = 'width:80px;flex-shrink:0';
+
+            var deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'jf-msg-remove-btn';
+            deleteBtn.innerHTML = '&#x2715;';
+            deleteBtn.title = 'Remove preset';
+
+            row.appendChild(swatch);
+            row.appendChild(labelInput);
+            row.appendChild(bgLabel);
+            row.appendChild(bgPicker);
+            row.appendChild(bgText);
+            row.appendChild(colorLabel);
+            row.appendChild(colorPicker);
+            row.appendChild(colorText);
+            row.appendChild(deleteBtn);
+
+            syncColorPair(bgPicker, bgText);
+            syncColorPair(colorPicker, colorText);
+
+            bgPicker.addEventListener('input', function () {
+              swatch.style.background = this.value;
+              onPresetsChangedDebounced();
+            });
+            bgText.addEventListener('input', function () {
+              var h = toHex6(this.value);
+              if (/^#[0-9a-fA-F]{6}$/.test(h)) swatch.style.background = h;
+              onPresetsChangedDebounced();
+            });
+            colorPicker.addEventListener('input', function () { onPresetsChangedDebounced(); });
+            colorText.addEventListener('input', function () { onPresetsChangedDebounced(); });
+            labelInput.addEventListener('input', function () { onPresetsChangedDebounced(); });
+            deleteBtn.addEventListener('click', function () {
+              row.parentNode.removeChild(row);
+              onPresetsChanged(); // immediate on delete
+            });
+
+            return row;
           }
 
           // ── collapsible message row ───────────────────────────────
@@ -548,6 +730,7 @@
             msg = msg || {};
             var bg = msg.bg || '#1976d2';
             var color = msg.color || '#ffffff';
+            var selectedPresetLabel = msg.presetLabel || null;
 
             var row = document.createElement('div');
             row.className = 'jf-msg-row' + (startExpanded ? ' expanded' : '');
@@ -607,7 +790,7 @@
               '    </div>' +
               '  </div>' +
               '</div>' +
-              '<div class="msg-presets" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
+              '<div class="msg-presets jf-preset-container" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
               '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
               '  <div class="inputContainer" style="flex:1;min-width:200px">' +
               '    <label class="inputLabel inputLabelUnfocused">Start Date (optional)</label>' +
@@ -640,12 +823,35 @@
 
             syncColorPair(bgPicker, bgText);
             syncColorPair(colorPicker, colorText);
+
+            row._presetLabel = selectedPresetLabel;
+            function getPreset() { return selectedPresetLabel; }
+            function setPreset(label) {
+              selectedPresetLabel = label;
+              row._presetLabel = label;
+              for (var _i = 0; _i < currentPresets.length; _i++) {
+                if (currentPresets[_i].label === label) {
+                  swatch.style.background = currentPresets[_i].bg;
+                  break;
+                }
+              }
+            }
+            function clearPreset() {
+              if (!selectedPresetLabel) return;
+              selectedPresetLabel = null;
+              row._presetLabel = null;
+              var pc = detail.querySelector('.jf-preset-container');
+              if (pc && pc._rebuild) pc._rebuild();
+            }
+
             buildPresetButtons(
-              detail.querySelector('.msg-presets'),
+              detail.querySelector('.jf-preset-container'),
               bgPicker,
               bgText,
               colorPicker,
-              colorText
+              colorText,
+              getPreset,
+              setPreset
             );
 
             // Live-update summary as user edits
@@ -655,10 +861,14 @@
             bgText.addEventListener('input', function () {
               var h = toHex6(this.value);
               if (/^#[0-9a-fA-F]{6}$/.test(h)) swatch.style.background = h;
+              clearPreset();
             });
             bgPicker.addEventListener('input', function () {
               swatch.style.background = this.value;
+              clearPreset();
             });
+            colorText.addEventListener('input', function () { clearPreset(); });
+            colorPicker.addEventListener('input', function () { clearPreset(); });
 
             // Toggle expand / collapse (ignore clicks on the remove button)
             summary.addEventListener('click', function (e) {
@@ -679,14 +889,14 @@
             return Array.from(document.querySelectorAll('.jf-msg-row'))
               .map(function (row) {
                 var detail = row.querySelector('.jf-msg-detail');
+                var label = row._presetLabel || null;
                 return {
                   text: detail.querySelector('.msg-text').value,
                   bg: detail.querySelector('.msg-bg').value || '#1976d2',
                   color: detail.querySelector('.msg-color').value || '#ffffff',
-                  startDate: fromInputDate(
-                    detail.querySelector('.msg-start').value
-                  ),
-                  endDate: fromInputDate(detail.querySelector('.msg-end').value)
+                  startDate: fromInputDate(detail.querySelector('.msg-start').value),
+                  endDate: fromInputDate(detail.querySelector('.msg-end').value),
+                  presetLabel: label && currentPresets.some(function (p) { return p.label === label; }) ? label : null
                 };
               })
               .filter(function (m) {
@@ -724,6 +934,17 @@
             document.getElementById('dismissAllSizeContainer').style.display =
               showDismissAll ? '' : 'none';
 
+            // ── presets ───────────────────────────────────────────────
+            // Fall back to DEFAULT_PRESETS only on first install (empty list).
+            currentPresets = (config.colorPresets && config.colorPresets.length > 0)
+              ? config.colorPresets
+              : DEFAULT_PRESETS;
+            var presetList = document.getElementById('presetList');
+            presetList.innerHTML = '';
+            currentPresets.forEach(function (p) {
+              presetList.appendChild(createPresetRow(p));
+            });
+
             var po = config.permanentOverride || {};
             var poBg = po.bg || '#2e7d32';
             var poCol = po.color || '#ffffff';
@@ -743,6 +964,8 @@
               po.endDate
             );
 
+            permanentSelectedPreset = po.presetLabel || null;
+
             document.getElementById('rotationEnabled').checked =
               config.rotationEnabled !== false;
 
@@ -751,10 +974,14 @@
             (config.rotationMessages || []).forEach(function (msg) {
               list.appendChild(createMessageRow(msg, false));
             });
+
+            refreshAllPresetButtons();
+            markPresetValidation();
           }
 
           // ── one-time DOM setup ────────────────────────────────────
 
+          var permanentSelectedPreset = null;
           var _initialized = false;
 
           function initDom() {
@@ -781,8 +1008,33 @@
               document.getElementById('permanentBgPicker'),
               document.getElementById('permanentBgText'),
               document.getElementById('permanentColorPicker'),
-              document.getElementById('permanentColorText')
+              document.getElementById('permanentColorText'),
+              function () { return permanentSelectedPreset; },
+              function (label) { permanentSelectedPreset = label; }
             );
+
+            ['permanentBgPicker', 'permanentBgText', 'permanentColorPicker', 'permanentColorText'].forEach(function (id) {
+              document.getElementById(id).addEventListener('input', function () {
+                permanentSelectedPreset = null;
+                var pc = document.getElementById('permanentPresets');
+                if (pc && pc._rebuild) pc._rebuild();
+              });
+            });
+
+            document.getElementById('addPreset').addEventListener('click', function () {
+              document.getElementById('presetList').appendChild(createPresetRow(null));
+              onPresetsChanged();
+            });
+
+            document.getElementById('resetPresets').addEventListener('click', function () {
+              if (!window.confirm('Reset presets to defaults? Your current preset list will be replaced.')) return;
+              var list = document.getElementById('presetList');
+              list.innerHTML = '';
+              DEFAULT_PRESETS.forEach(function (p) {
+                list.appendChild(createPresetRow(p));
+              });
+              onPresetsChanged();
+            });
 
             document
               .getElementById('showDismissButton')
@@ -812,6 +1064,10 @@
               .getElementById('JellyFlareConfigForm')
               .addEventListener('submit', function (e) {
                 e.preventDefault();
+                if (validatePresets().length > 0) {
+                  Dashboard.alert('Cannot save: preset names must be unique and non-empty. Please check the Presets section.');
+                  return;
+                }
                 var config = {
                   showInDashboard:
                     document.getElementById('showInDashboard').checked,
@@ -844,6 +1100,7 @@
                     'hide all',
                   rotationEnabled:
                     document.getElementById('rotationEnabled').checked,
+                  colorPresets: collectPresets(),
                   permanentOverride: {
                     enabled:
                       document.getElementById('permanentEnabled').checked,
@@ -859,7 +1116,8 @@
                     ),
                     endDate: fromInputDate(
                       document.getElementById('permanentEnd').value
-                    )
+                    ),
+                    presetLabel: permanentSelectedPreset && currentPresets.some(function (p) { return p.label === permanentSelectedPreset; }) ? permanentSelectedPreset : null
                   },
                   rotationMessages: collectMessages()
                 };

@@ -5,6 +5,24 @@ using MediaBrowser.Model.Plugins;
 namespace Jellyfin.Plugin.JellyFlare.Configuration;
 
 /// <summary>
+/// A named colour preset available in the message editors.
+/// </summary>
+public class ColorPreset
+{
+    /// <summary>Gets or sets the display label.</summary>
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the background colour.</summary>
+    [JsonPropertyName("bg")]
+    public string Bg { get; set; } = "#1976d2";
+
+    /// <summary>Gets or sets the text colour.</summary>
+    [JsonPropertyName("color")]
+    public string Color { get; set; } = "#ffffff";
+}
+
+/// <summary>
 /// A single JellyFlare message shown in rotation.
 /// </summary>
 public class BannerMessage
@@ -28,6 +46,10 @@ public class BannerMessage
     /// <summary>Gets or sets the optional display end date ("YYYY-MM-DD HH:MM").</summary>
     [JsonPropertyName("endDate")]
     public string? EndDate { get; set; }
+
+    /// <summary>Gets or sets the label of the last preset applied to this message (null if unset or preset deleted).</summary>
+    [JsonPropertyName("presetLabel")]
+    public string? PresetLabel { get; set; }
 }
 
 /// <summary>
@@ -58,6 +80,10 @@ public class PermanentOverride
     /// <summary>Gets or sets the optional display end date.</summary>
     [JsonPropertyName("endDate")]
     public string? EndDate { get; set; }
+
+    /// <summary>Gets or sets the label of the last preset applied to this banner (null if unset or preset deleted).</summary>
+    [JsonPropertyName("presetLabel")]
+    public string? PresetLabel { get; set; }
 }
 
 /// <summary>
@@ -80,6 +106,9 @@ public class PluginConfiguration : BasePluginConfiguration
         PermanentOverride = new PermanentOverride();
         RotationEnabled = true;
         RotationMessages = new List<BannerMessage>();
+        // Empty list — XmlSerializer appends to non-null collections, so defaults
+        // must NOT live here. The config page JS handles the first-run fallback.
+        ColorPresets = new List<ColorPreset>();
     }
 
     /// <summary>Gets or sets how long (seconds) each message is displayed before cycling.</summary>
@@ -125,4 +154,8 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the messages shown in random rotation.</summary>
     [JsonPropertyName("rotationMessages")]
     public List<BannerMessage> RotationMessages { get; set; }
+
+    /// <summary>Gets or sets the colour presets available in the message editors.</summary>
+    [JsonPropertyName("colorPresets")]
+    public List<ColorPreset> ColorPresets { get; set; }
 }
