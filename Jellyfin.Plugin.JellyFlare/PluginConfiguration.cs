@@ -72,7 +72,9 @@ public class PluginConfiguration : BasePluginConfiguration
         DisplayDuration = 120;
         PauseDuration = 60;
         ShowDismissButton = true;
+        DismissButtonSize = 18;
         ShowDismissAll = true;
+        DismissAllSize = 9;
         DismissAllText = "hide all";
         PermanentOverride = new PermanentOverride();
         RotationEnabled = true;
@@ -91,9 +93,17 @@ public class PluginConfiguration : BasePluginConfiguration
     [JsonPropertyName("showDismissButton")]
     public bool ShowDismissButton { get; set; }
 
+    /// <summary>Gets or sets the font size (px) of the dismiss (×) button.</summary>
+    [JsonPropertyName("dismissButtonSize")]
+    public int DismissButtonSize { get; set; }
+
     /// <summary>Gets or sets whether the "hide all" button is shown on rotation banners.</summary>
     [JsonPropertyName("showDismissAll")]
     public bool ShowDismissAll { get; set; }
+
+    /// <summary>Gets or sets the font size (px) of the "hide all" button.</summary>
+    [JsonPropertyName("dismissAllSize")]
+    public int DismissAllSize { get; set; }
 
     /// <summary>Gets or sets the label text of the "hide all" button.</summary>
     [JsonPropertyName("dismissAllText")]

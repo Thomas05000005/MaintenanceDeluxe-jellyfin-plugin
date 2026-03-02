@@ -241,7 +241,9 @@
             CONFIG = config;
             // Apply control visibility
             if (CONFIG.showDismissButton === false) closeBtn.style.display = "none";
+            if (CONFIG.dismissButtonSize) closeBtn.style.fontSize = CONFIG.dismissButtonSize + "px";
             if (CONFIG.showDismissAll === false) dismissAllBtn.style.display = "none";
+            if (CONFIG.dismissAllSize) dismissAllBtn.style.fontSize = CONFIG.dismissAllSize + "px";
             dismissAllBtn.textContent = CONFIG.dismissAllText || "hide all";
             // Insert banner now: SPA has finished mounting so the div won't be evicted.
             if (!banner.isConnected) { document.body.prepend(banner); }

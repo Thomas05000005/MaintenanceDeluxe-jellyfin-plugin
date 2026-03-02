@@ -359,8 +359,24 @@
                     is="emby-checkbox"
                     type="checkbox"
                   />
-                  <span>Show dismiss button (×)</span>
+                  <span>Show dismiss button (X)</span>
                 </label>
+              </div>
+
+              <div class="inputContainer" id="dismissButtonSizeContainer">
+                <label
+                  class="inputLabel inputLabelUnfocused"
+                  for="dismissButtonSize"
+                >
+                  Dismiss button size (px)
+                </label>
+                <input
+                  id="dismissButtonSize"
+                  is="emby-input"
+                  type="number"
+                  min="8"
+                  max="128"
+                />
               </div>
 
               <div class="checkboxContainer checkboxContainer-withDescription">
@@ -386,6 +402,22 @@
                   is="emby-input"
                   type="text"
                   placeholder="hide all"
+                />
+              </div>
+
+              <div class="inputContainer" id="dismissAllSizeContainer">
+                <label
+                  class="inputLabel inputLabelUnfocused"
+                  for="dismissAllSize"
+                >
+                  "Hide all" button size (px)
+                </label>
+                <input
+                  id="dismissAllSize"
+                  is="emby-input"
+                  type="number"
+                  min="8"
+                  max="128"
                 />
               </div>
             </div>
@@ -657,13 +689,23 @@
             document.getElementById('pauseDuration').value =
               config.pauseDuration != null ? config.pauseDuration : 60;
 
+            var showDismissButton = config.showDismissButton !== false;
             document.getElementById('showDismissButton').checked =
-              config.showDismissButton !== false;
+              showDismissButton;
+            document.getElementById(
+              'dismissButtonSizeContainer'
+            ).style.display = showDismissButton ? '' : 'none';
+            document.getElementById('dismissButtonSize').value =
+              config.dismissButtonSize != null ? config.dismissButtonSize : 18;
             var showDismissAll = config.showDismissAll !== false;
             document.getElementById('showDismissAll').checked = showDismissAll;
             document.getElementById('dismissAllText').value =
               config.dismissAllText || 'hide all';
+            document.getElementById('dismissAllSize').value =
+              config.dismissAllSize != null ? config.dismissAllSize : 9;
             document.getElementById('dismissAllTextContainer').style.display =
+              showDismissAll ? '' : 'none';
+            document.getElementById('dismissAllSizeContainer').style.display =
               showDismissAll ? '' : 'none';
 
             var po = config.permanentOverride || {};
@@ -727,11 +769,19 @@
             );
 
             document
-              .getElementById('showDismissAll')
+              .getElementById('showDismissButton')
               .addEventListener('change', function () {
                 document.getElementById(
-                  'dismissAllTextContainer'
+                  'dismissButtonSizeContainer'
                 ).style.display = this.checked ? '' : 'none';
+              });
+
+            document
+              .getElementById('showDismissAll')
+              .addEventListener('change', function () {
+                var v = this.checked ? '' : 'none';
+                document.getElementById('dismissAllTextContainer').style.display = v;
+                document.getElementById('dismissAllSizeContainer').style.display = v;
               });
 
             document
@@ -759,8 +809,18 @@
                     ) || 0,
                   showDismissButton:
                     document.getElementById('showDismissButton').checked,
+                  dismissButtonSize:
+                    parseInt(
+                      document.getElementById('dismissButtonSize').value,
+                      10
+                    ) || 18,
                   showDismissAll:
                     document.getElementById('showDismissAll').checked,
+                  dismissAllSize:
+                    parseInt(
+                      document.getElementById('dismissAllSize').value,
+                      10
+                    ) || 9,
                   dismissAllText:
                     document.getElementById('dismissAllText').value ||
                     'hide all',
