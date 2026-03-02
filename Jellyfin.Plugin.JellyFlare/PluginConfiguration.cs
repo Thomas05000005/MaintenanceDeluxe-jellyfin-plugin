@@ -35,6 +35,10 @@ public class BannerMessage
 /// </summary>
 public class PermanentOverride
 {
+    /// <summary>Gets or sets whether the permanent override banner is enabled.</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Gets or sets the message text. Empty string disables the override.</summary>
     [JsonPropertyName("text")]
     public string Text { get; set; } = string.Empty;

@@ -187,7 +187,7 @@
     // --- Main loop ---
     function tick() {
         // Permanent override
-        if (CONFIG.permanentOverride.text && isInSchedule(CONFIG.permanentOverride)) {
+        if (CONFIG.permanentOverride.enabled !== false && CONFIG.permanentOverride.text && isInSchedule(CONFIG.permanentOverride)) {
             showBanner(CONFIG.permanentOverride, true);
             rotationTimer = setTimeout(tick, CONFIG.displayDuration * 1000);
             return;
