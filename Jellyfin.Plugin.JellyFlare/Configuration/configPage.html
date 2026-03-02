@@ -110,6 +110,20 @@
         .jf-msg-row.expanded .jf-msg-detail {
           display: block;
         }
+
+        /* ── Icon reset button ──────────────────────────────────── */
+        .jf-icon-btn {
+          background: none;
+          border: none;
+          color: inherit;
+          cursor: pointer;
+          opacity: 0.4;
+          padding: 0 2px;
+          line-height: 1;
+          vertical-align: middle;
+          transition: opacity 0.2s;
+        }
+        .jf-icon-btn:hover { opacity: 1; }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -324,7 +338,12 @@
                 </label>
               </div>
 
-              <h3 class="sectionTitle" style="margin-top: 1.5em">Timing</h3>
+              <h3 class="sectionTitle" style="margin-top: 1.5em">
+                Timing
+                <button type="button" class="jf-icon-btn" id="resetTiming" title="Reset to defaults">
+                  <span class="material-icons" style="font-size: 16px">restore</span>
+                </button>
+              </h3>
 
               <div class="inputContainer">
                 <label
@@ -364,7 +383,12 @@
                 </div>
               </div>
 
-              <h3 class="sectionTitle" style="margin-top: 1.5em">Controls</h3>
+              <h3 class="sectionTitle" style="margin-top: 1.5em">
+                Controls
+                <button type="button" class="jf-icon-btn" id="resetControls" title="Reset to defaults">
+                  <span class="material-icons" style="font-size: 16px">restore</span>
+                </button>
+              </h3>
 
               <div class="checkboxContainer checkboxContainer-withDescription">
                 <label class="emby-checkbox-label">
@@ -435,18 +459,12 @@
                 />
               </div>
 
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5em; margin-bottom: 0.5em">
-                <h3 class="sectionTitle" style="margin: 0">Presets</h3>
-                <button
-                  is="emby-button"
-                  type="button"
-                  id="resetPresets"
-                  class="raised"
-                  style="font-size: 0.8em"
-                >
-                  <span>Reset to defaults</span>
+              <h3 class="sectionTitle" style="margin-top: 1.5em">
+                Presets
+                <button type="button" class="jf-icon-btn" id="resetPresets" title="Reset to defaults">
+                  <span class="material-icons" style="font-size: 16px">restore</span>
                 </button>
-              </div>
+              </h3>
 
               <div class="fieldDescription" style="margin-bottom: 12px">
                 Changes apply immediately in message editors. Deleting a preset
@@ -463,6 +481,18 @@
               >
                 <span>+ Add Preset</span>
               </button>
+
+              <div style="margin-top: 2em; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5em">
+                <button
+                  is="emby-button"
+                  type="button"
+                  id="resetAll"
+                  class="raised"
+                  style="background: #c62828; color: #fff"
+                >
+                  <span>Reset all settings</span>
+                </button>
+              </div>
             </div>
             <!-- /panel: settings -->
 
@@ -1026,8 +1056,47 @@
               onPresetsChanged();
             });
 
+            document.getElementById('resetTiming').addEventListener('click', function () {
+              if (!window.confirm('Reset Timing to defaults?')) return;
+              document.getElementById('displayDuration').value = 120;
+              document.getElementById('pauseDuration').value = 60;
+            });
+
+            document.getElementById('resetControls').addEventListener('click', function () {
+              if (!window.confirm('Reset Controls to defaults?')) return;
+              document.getElementById('showDismissButton').checked = true;
+              document.getElementById('dismissButtonSizeContainer').style.display = '';
+              document.getElementById('dismissButtonSize').value = 18;
+              document.getElementById('showDismissAll').checked = true;
+              document.getElementById('dismissAllTextContainer').style.display = '';
+              document.getElementById('dismissAllSizeContainer').style.display = '';
+              document.getElementById('dismissAllSize').value = 9;
+              document.getElementById('dismissAllText').value = 'hide all';
+            });
+
             document.getElementById('resetPresets').addEventListener('click', function () {
               if (!window.confirm('Reset presets to defaults? Your current preset list will be replaced.')) return;
+              var list = document.getElementById('presetList');
+              list.innerHTML = '';
+              DEFAULT_PRESETS.forEach(function (p) {
+                list.appendChild(createPresetRow(p));
+              });
+              onPresetsChanged();
+            });
+
+            document.getElementById('resetAll').addEventListener('click', function () {
+              if (!window.confirm('Reset ALL settings to defaults? This will replace every setting in this tab.')) return;
+              document.getElementById('showInDashboard').checked = true;
+              document.getElementById('displayDuration').value = 120;
+              document.getElementById('pauseDuration').value = 60;
+              document.getElementById('showDismissButton').checked = true;
+              document.getElementById('dismissButtonSizeContainer').style.display = '';
+              document.getElementById('dismissButtonSize').value = 18;
+              document.getElementById('showDismissAll').checked = true;
+              document.getElementById('dismissAllTextContainer').style.display = '';
+              document.getElementById('dismissAllSizeContainer').style.display = '';
+              document.getElementById('dismissAllSize').value = 9;
+              document.getElementById('dismissAllText').value = 'hide all';
               var list = document.getElementById('presetList');
               list.innerHTML = '';
               DEFAULT_PRESETS.forEach(function (p) {
