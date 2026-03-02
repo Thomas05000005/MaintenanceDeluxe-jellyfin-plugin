@@ -68,8 +68,8 @@
           border-radius: 4px;
           flex-shrink: 0;
         }
-        .jf-msg-summary input[type="checkbox"],
-        .jf-msg-summary input[type="radio"] {
+        .jf-msg-summary input[type='checkbox'],
+        .jf-msg-summary input[type='radio'] {
           width: 18px;
           height: 18px;
           flex-shrink: 0;
@@ -488,6 +488,35 @@
             { label: '⚫ Dark', bg: '#212121', color: '#ffffff' }
           ];
 
+          var DEFAULT_PERMANENT_ENTRIES = [
+            {
+              text: "🔴 Server maintenance in a few moments — we'll be back shortly.",
+              bg: '#d32f2f',
+              color: '#ffffff'
+            }
+          ];
+
+          var DEFAULT_ROTATION_MESSAGES = [
+            {
+              text: '🎬 New content is added regularly — check out the Latest section!',
+              bg: '#1976d2',
+              color: '#ffffff',
+              enabled: true
+            },
+            {
+              text: '🍿 Enjoying the server? Requests are welcome — just ask the admin.',
+              bg: '#7b1fa2',
+              color: '#ffffff',
+              enabled: true
+            },
+            {
+              text: 'ℹ️ Having trouble? Reach out to your server administrator.',
+              bg: '#455a64',
+              color: '#ffffff',
+              enabled: true
+            }
+          ];
+
           var currentPresets = []; // populated from config in populatePage
 
           // ── tab switching ─────────────────────────────────────────
@@ -791,7 +820,8 @@
             enabledCheckbox.className = 'msg-enabled';
             enabledCheckbox.checked = enabled;
             enabledCheckbox.title = 'Enable this message';
-            enabledCheckbox.style.cssText = 'flex-shrink:0;cursor:pointer;margin:0';
+            enabledCheckbox.style.cssText =
+              'flex-shrink:0;cursor:pointer;margin:0';
             enabledCheckbox.addEventListener('click', function (e) {
               e.stopPropagation();
             });
@@ -960,7 +990,8 @@
             isActive = !!isActive;
 
             var row = document.createElement('div');
-            row.className = 'jf-msg-row jf-perm-row' + (isActive ? ' expanded' : '');
+            row.className =
+              'jf-msg-row jf-perm-row' + (isActive ? ' expanded' : '');
 
             // Summary bar
             var summary = document.createElement('div');
@@ -1055,7 +1086,9 @@
             colorPicker.value = toHex6(color);
             colorText.value = color;
             textInput.value = entry.text || '';
-            detail.querySelector('.msg-start').value = toInputDate(entry.startDate);
+            detail.querySelector('.msg-start').value = toInputDate(
+              entry.startDate
+            );
             detail.querySelector('.msg-end').value = toInputDate(entry.endDate);
 
             syncColorPair(bgPicker, bgText);
@@ -1132,7 +1165,8 @@
             var rawRows = Array.from(document.querySelectorAll('.jf-perm-row'));
             var activeRawIdx = -1;
             rawRows.forEach(function (r, i) {
-              if (r.querySelector('.perm-active-radio').checked) activeRawIdx = i;
+              if (r.querySelector('.perm-active-radio').checked)
+                activeRawIdx = i;
             });
             var entries = [];
             var activeIndex = -1;
@@ -1146,7 +1180,9 @@
                 text: text,
                 bg: detail.querySelector('.msg-bg').value || '#2e7d32',
                 color: detail.querySelector('.msg-color').value || '#ffffff',
-                startDate: fromInputDate(detail.querySelector('.msg-start').value),
+                startDate: fromInputDate(
+                  detail.querySelector('.msg-start').value
+                ),
                 endDate: fromInputDate(detail.querySelector('.msg-end').value),
                 presetLabel:
                   label &&
@@ -1163,7 +1199,9 @@
           // ── collect rotation messages from DOM ────────────────────
 
           function collectMessages() {
-            return Array.from(document.querySelectorAll('.jf-msg-row:not(.jf-perm-row)'))
+            return Array.from(
+              document.querySelectorAll('.jf-msg-row:not(.jf-perm-row)')
+            )
               .map(function (row) {
                 var detail = row.querySelector('.jf-msg-detail');
                 var label = row._presetLabel || null;
@@ -1240,7 +1278,11 @@
               po.enabled !== false;
             var permList = document.getElementById('permanentList');
             permList.innerHTML = '';
-            var permEntries = po.entries || [];
+            // Fall back to DEFAULT_PERMANENT_ENTRIES only on first install (empty list).
+            var permEntries =
+              po.entries && po.entries.length > 0
+                ? po.entries
+                : DEFAULT_PERMANENT_ENTRIES;
             var activeIdx = po.activeIndex != null ? po.activeIndex : -1;
             permEntries.forEach(function (entry, i) {
               permList.appendChild(createPermanentRow(entry, i === activeIdx));
@@ -1251,7 +1293,12 @@
 
             var list = document.getElementById('messageList');
             list.innerHTML = '';
-            (config.rotationMessages || []).forEach(function (msg) {
+            // Fall back to DEFAULT_ROTATION_MESSAGES only on first install (empty list).
+            var rotationMsgs =
+              config.rotationMessages && config.rotationMessages.length > 0
+                ? config.rotationMessages
+                : DEFAULT_ROTATION_MESSAGES;
+            rotationMsgs.forEach(function (msg) {
               list.appendChild(createMessageRow(msg, false));
             });
 
