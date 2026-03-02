@@ -19,6 +19,10 @@
     function getH() { return window.innerWidth <= 600 ? BANNER_H_MOBILE : BANNER_H; }
     function px(v) { return v + "px"; }
 
+    function isAdminPage() {
+        return /\b(dashboard|configurationpage|users|useredit|userprofiles|networking|devices|playback|dlna|notifications|libraries|metadata|subtitles|log|scheduledtasks|apikeys|activity|plugins|encodingsettings|streamingsettings)\b/.test(window.location.hash);
+    }
+
     function isInSchedule(msg) {
         var now = new Date();
         if (msg.startDate) { var s = new Date(msg.startDate); if (isNaN(s) || now < s) return false; }
@@ -186,6 +190,8 @@
 
     // --- Main loop ---
     function tick() {
+        if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); return; }
+
         // Permanent override
         if (CONFIG.permanentOverride.enabled !== false && CONFIG.permanentOverride.text && isInSchedule(CONFIG.permanentOverride)) {
             showBanner(CONFIG.permanentOverride, true);
@@ -247,6 +253,13 @@
             dismissAllBtn.textContent = CONFIG.dismissAllText || "hide all";
             // Insert banner now: SPA has finished mounting so the div won't be evicted.
             if (!banner.isConnected) { document.body.prepend(banner); }
+            // Re-evaluate on every SPA navigation.
+            window.addEventListener("hashchange", function () {
+                if (CONFIG.showInDashboard === false) {
+                    clearTimeout(rotationTimer);
+                    if (isAdminPage()) { hideBanner(); } else { tick(); }
+                }
+            });
             tick();
         })
         .catch(function (err) {

@@ -310,7 +310,20 @@
 
             <!-- ══ Tab: Settings ═══════════════════════════════════════ -->
             <div class="jf-panel" data-panel="settings">
-              <h3 class="sectionTitle" style="margin-top: 0">Timing</h3>
+              <h3 class="sectionTitle" style="margin-top: 0">Visibility</h3>
+
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="showInDashboard"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show banner in admin dashboard</span>
+                </label>
+              </div>
+
+              <h3 class="sectionTitle" style="margin-top: 1.5em">Timing</h3>
 
               <div class="inputContainer">
                 <label
@@ -684,6 +697,9 @@
           // ── populate form from config ─────────────────────────────
 
           function populatePage(config) {
+            document.getElementById('showInDashboard').checked =
+              config.showInDashboard !== false;
+
             document.getElementById('displayDuration').value =
               config.displayDuration != null ? config.displayDuration : 120;
             document.getElementById('pauseDuration').value =
@@ -797,6 +813,8 @@
               .addEventListener('submit', function (e) {
                 e.preventDefault();
                 var config = {
+                  showInDashboard:
+                    document.getElementById('showInDashboard').checked,
                   displayDuration:
                     parseInt(
                       document.getElementById('displayDuration').value,

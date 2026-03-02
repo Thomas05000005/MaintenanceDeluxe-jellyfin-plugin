@@ -76,6 +76,7 @@ public class PluginConfiguration : BasePluginConfiguration
         ShowDismissAll = true;
         DismissAllSize = 9;
         DismissAllText = "hide all";
+        ShowInDashboard = true;
         PermanentOverride = new PermanentOverride();
         RotationEnabled = true;
         RotationMessages = new List<BannerMessage>();
@@ -112,6 +113,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the permanent override banner (shown when Text is non-empty).</summary>
     [JsonPropertyName("permanentOverride")]
     public PermanentOverride PermanentOverride { get; set; }
+
+    /// <summary>Gets or sets whether the banner is shown while on the admin dashboard.</summary>
+    [JsonPropertyName("showInDashboard")]
+    public bool ShowInDashboard { get; set; }
 
     /// <summary>Gets or sets whether rotation messages are enabled.</summary>
     [JsonPropertyName("rotationEnabled")]
