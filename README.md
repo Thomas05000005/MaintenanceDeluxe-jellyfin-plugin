@@ -101,6 +101,8 @@ Messages whose date range has not started or has already passed are silently ski
 
 #### Controls
 
+Each subsection heading has a small `restore` icon button that resets only that subsection to defaults.
+
 | Field                       | Default    | Description                                     |
 | --------------------------- | ---------- | ----------------------------------------------- |
 | Show dismiss button (×)     | on         | Whether the per-message close button is visible |
@@ -108,6 +110,21 @@ Messages whose date range has not started or has already passed are silently ski
 | Show "hide all" button      | on         | Whether the "hide all" button is visible        |
 | "Hide all" button size (px) | 9          | Font size of the "hide all" button              |
 | "Hide all" button label     | `hide all` | Custom label for the "hide all" button          |
+
+#### Presets
+
+A list of named colour presets available in all message editors. Each preset has a label, background colour, and text colour. Presets can be added, edited, reordered, and deleted. Deleting a preset keeps existing message colours but removes the selection indicator on affected messages.
+
+The `restore` icon next to the **Presets** heading resets the list to the 8 built-in defaults.
+
+#### Danger Zone
+
+| Button               | Scope                                                                       |
+| -------------------- | --------------------------------------------------------------------------- |
+| Reset settings       | Restores Timing, Controls, and Presets to defaults; messages unchanged      |
+| Wipe all plugin data | Clears the permanent banner, all rotation messages, and resets all settings |
+
+Both buttons require confirmation before applying. Changes only take effect after clicking **Save**.
 
 ## Building from source
 
