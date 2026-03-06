@@ -83,19 +83,34 @@ The plugin page has three tabs. See [docs/configuration.md](./docs/configuration
 
 Pin a banner that overrides all rotation messages — useful for outage notices or time-sensitive announcements. Manage a library of entries and switch the active one without losing the others.
 
+<details>
+<summary>Screenshot</summary>
+
 ![Permanent tab](./assets/screenshots/permanent.png)
+
+</details>
 
 ### 🔄 Rotation tab
 
 Manage the pool of rotating messages: add, reorder, enable/disable individual entries, and set display timing. Each message has its own colour, optional URL, and schedule.
 
+<details>
+<summary>Screenshot</summary>
+
 ![Rotation tab](./assets/screenshots/rotation.png)
+
+</details>
 
 ### ⚙️ Settings tab
 
 Control visibility (hide on admin pages), timing (display and pause durations), dismiss buttons (show/hide, size, label), and the named colour preset palette.
 
+<details>
+<summary>Screenshot</summary>
+
 ![Settings tab](./assets/screenshots/settings.png)
+
+</details>
 
 ## Troubleshooting
 
