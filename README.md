@@ -112,4 +112,4 @@ See [docs/development.md](./docs/development.md) for build instructions, the Doc
 
 ## License
 
-GNU General Public License v3 — see [LICENSE](LICENSE). Use, modify, and redistribute freely — but any distributed derivative must also be GPL v3 and open source. Unlike MIT, you cannot incorporate this code into a closed-source project.
+GNU General Public License v3 — see [LICENSE](LICENSE). Use, modify, and redistribute freely — but any distributed derivative must also be GPL v3 and open source.
