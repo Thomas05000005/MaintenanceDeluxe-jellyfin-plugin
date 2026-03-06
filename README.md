@@ -6,7 +6,7 @@ Put announcements where your users will actually see them — a customisable ban
 
 ## Features
 
-![Demo](./assets/demo.gif)
+<img src="./assets/demo.gif" width="100%" alt="Demo" />
 
 - 🔄 Rotating messages with configurable display and pause durations
 - 🎨 Per-message background and text colour with a named preset palette
