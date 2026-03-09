@@ -68,10 +68,10 @@ You can already inject arbitrary CSS or JS into Jellyfin using JS Injector alone
 
 Because maintaining a hand-written script gets old fast. JellyFlare gives you:
 
-- **A proper admin UI** — add, edit, and reorder messages from the dashboard; no file editing, no restarts.
-- **Scheduling** — show a message only during a fixed date range, every Christmas, specific weekdays, or a daily time window; the script handles it automatically.
-- **A permanent-banner library** — save multiple pinned entries and switch the active one in one click.
-- **Persistence** — configuration is stored by Jellyfin and survives upgrades; nothing lives in a file you have to back up manually.
+- **A proper admin UI**: add, edit, and reorder messages from the dashboard; no file editing, no restarts.
+- **Scheduling**: show a message only during a fixed date range, every Christmas, specific weekdays, or a daily time window; the script handles it automatically.
+- **A permanent-banner library**: save multiple pinned entries and switch the active one in one click.
+- **Persistence**: configuration is stored by Jellyfin and survives upgrades; nothing lives in a file you have to back up manually.
 
 If a one-liner banner is all you need, a raw JS Injector script is fine. If you want something you can actually manage, JellyFlare is the upgrade.
 

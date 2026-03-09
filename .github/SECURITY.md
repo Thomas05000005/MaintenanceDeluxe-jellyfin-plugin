@@ -27,8 +27,8 @@ They are documented here for transparency.
 
 JellyFlare does not inject JavaScript directly. It relies on:
 
-- **JS Injector** (n00bcodr) — injects a loader into Jellyfin's served HTML
-- **File Transformation** (IAmParadox27) — performs the in-memory HTML rewrite
+- **JS Injector** (n00bcodr): injects a loader into Jellyfin's served HTML
+- **File Transformation** (IAmParadox27): performs the in-memory HTML rewrite
 
 If either upstream plugin is compromised, all scripts they manage could be affected.
 JellyFlare has no control over this trust chain. Audit upstream plugins independently
