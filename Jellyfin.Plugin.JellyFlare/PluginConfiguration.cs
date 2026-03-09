@@ -177,6 +177,7 @@ public class PluginConfiguration : BasePluginConfiguration
         TextAlign = "center";
         RotationShuffle = true;
         PersistDismiss = false;
+        PermanentDismissible = false;
         TransitionSpeed = "normal";
         FontSize = 14;
         BannerHeight = 36;
@@ -242,6 +243,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets whether individually dismissed messages persist across page reloads via localStorage.</summary>
     [JsonPropertyName("persistDismiss")]
     public bool PersistDismiss { get; set; }
+
+    /// <summary>Gets or sets whether the permanent banner can be dismissed by end-users. Default false.</summary>
+    [JsonPropertyName("permanentDismissible")]
+    public bool PermanentDismissible { get; set; }
 
     /// <summary>Gets or sets the banner fade/slide animation speed: "none" | "fast" | "normal" (default) | "slow".</summary>
     [JsonPropertyName("transitionSpeed")]

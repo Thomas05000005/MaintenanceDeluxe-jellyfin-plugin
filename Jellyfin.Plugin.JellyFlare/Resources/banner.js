@@ -12,6 +12,8 @@
     var rotationTimer = null;
     var dismissedMessages = new Set();
     var dismissAll = false;
+    var permanentDismissed = false;
+    var PERM_DISMISS_KEY = "__permanent__";
     var shuffledQueue = [];
     var currentMessage = null;
     var isPermanent = false;
@@ -213,7 +215,19 @@
 
     // --- Actions ---
     function dismissCurrent() {
-        if (isPermanent || !currentMessage) return;
+        if (isPermanent) {
+            if (!CONFIG.permanentDismissible) return;
+            permanentDismissed = true;
+            if (CONFIG.persistDismiss) {
+                dismissedMessages.add(PERM_DISMISS_KEY);
+                savePersistedDismissed();
+            }
+            isPermanent = false;
+            clearTimeout(rotationTimer);
+            fadeOutThenNext();
+            return;
+        }
+        if (!currentMessage) return;
         dismissedMessages.add(currentMessage.text);
         if (CONFIG && CONFIG.persistDismiss) {
             savePersistedDismissed();
@@ -358,8 +372,11 @@
         dismissAllBtn.style.color = msg.color || "#fff";
 
         banner.classList.remove("off");
-        if (permanent) banner.classList.add("permanent");
+        // Only add .permanent (which hides the close area via CSS) when not dismissible
+        if (permanent && !CONFIG.permanentDismissible) banner.classList.add("permanent");
         else banner.classList.remove("permanent");
+        // Hide "dismiss all" for permanent banners; show it for rotation
+        dismissAllBtn.style.display = (permanent && CONFIG.permanentDismissible) ? 'none' : '';
         document.body.classList.add("jf-banner-active");
 
         // Set up observers to recompute margin when layout changes.
@@ -444,7 +461,7 @@
 
         // Permanent override
         var po = CONFIG.permanentOverride;
-        if (po && po.enabled !== false && po.activeIndex >= 0) {
+        if (po && po.enabled !== false && po.activeIndex >= 0 && !permanentDismissed) {
             var entry = po.entries && po.entries[po.activeIndex];
             if (entry && entry.text && isInSchedule(entry)) {
                 showBanner(entry, true);
@@ -540,6 +557,9 @@
             // --- Persist dismissed ---
             if (CONFIG.persistDismiss) {
                 getPersistedDismissed().forEach(function (t) { dismissedMessages.add(t); });
+            }
+            if (CONFIG.permanentDismissible && dismissedMessages.has(PERM_DISMISS_KEY)) {
+                permanentDismissed = true;
             }
 
             // Apply control visibility

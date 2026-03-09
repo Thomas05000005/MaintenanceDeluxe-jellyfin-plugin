@@ -77,14 +77,24 @@ The **Annual** panel includes one-click shortcuts for common holidays (Christmas
 
 ### Controls
 
-| Field                       | Default    | Description                                     |
-| --------------------------- | ---------- | ----------------------------------------------- |
-| Show dismiss button (×)     | on         | Whether the per-message close button is visible |
-| Dismiss button size (px)    | 20         | Font size of the × button                       |
-| Show "hide all" button      | on         | Whether the "hide all" button is visible        |
-| "Hide all" button size (px) | 10         | Font size of the "hide all" button              |
-| "Hide all" button label     | `hide all` | Custom label for the "hide all" button          |
-| Persist dismissed messages  | off        | Remember dismissed messages across page reloads (stored in `localStorage`) |
+**Dismiss button size (px)** (default 20) — font size of the × button; applies to both the permanent and rotation dismiss buttons.
+
+**Permanent banner**
+
+| Field               | Default | Description                                                                                    |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| Show dismiss button | off     | Adds a × button to the permanent banner so users can close it for the session                  |
+
+When _Show dismiss button_ is on and _Persist dismissed messages_ (Behaviour) is also on, the dismissal survives page reloads.
+
+**Rotation messages**
+
+| Field                       | Default    | Description                                            |
+| --------------------------- | ---------- | ------------------------------------------------------ |
+| Show dismiss button         | on         | Whether the per-message × button is visible            |
+| Show "hide all" button      | on         | Whether the "hide all" button is visible               |
+| "Hide all" button size (px) | 10         | Font size of the "hide all" button                     |
+| "Hide all" button label     | `hide all` | Custom label for the "hide all" button                 |
 
 Each subsection heading has a small restore icon that resets only that subsection to defaults.
 

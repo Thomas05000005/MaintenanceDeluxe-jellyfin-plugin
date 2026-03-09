@@ -149,6 +149,15 @@
         .jf-icon-btn:hover {
           opacity: 1;
         }
+        /* ── Controls sub-group label ───────────────────────────── */
+        .jf-controls-group {
+          margin: 1em 0 0.4em;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          opacity: 0.55;
+        }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -435,18 +444,7 @@
                 </button>
               </h3>
 
-              <div class="checkboxContainer checkboxContainer-withDescription">
-                <label class="emby-checkbox-label">
-                  <input
-                    id="showDismissButton"
-                    is="emby-checkbox"
-                    type="checkbox"
-                  />
-                  <span>Show dismiss button (X)</span>
-                </label>
-              </div>
-
-              <div class="inputContainer" id="dismissButtonSizeContainer">
+              <div class="inputContainer">
                 <label
                   class="inputLabel inputLabelUnfocused"
                   for="dismissButtonSize"
@@ -460,6 +458,36 @@
                   min="8"
                   max="128"
                 />
+                <div class="fieldDescription">Applies to all dismiss (×) buttons.</div>
+              </div>
+
+              <p class="jf-controls-group">Permanent banner</p>
+
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="permanentDismissible"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show dismiss button</span>
+                </label>
+                <div class="fieldDescription">
+                  If "Remember dismissed" is also on, the dismissal persists across reloads.
+                </div>
+              </div>
+
+              <p class="jf-controls-group">Rotation messages</p>
+
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="showDismissButton"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show dismiss button</span>
+                </label>
               </div>
 
               <div class="checkboxContainer checkboxContainer-withDescription">
@@ -1743,18 +1771,16 @@
               config.rotationShuffle !== false;
             document.getElementById('persistDismiss').checked =
               !!config.persistDismiss;
+            document.getElementById('permanentDismissible').checked =
+              !!config.permanentDismissible;
 
             document.getElementById('displayDuration').value =
               config.displayDuration != null ? config.displayDuration : 30;
             document.getElementById('pauseDuration').value =
               config.pauseDuration != null ? config.pauseDuration : 60;
 
-            var showDismissButton = config.showDismissButton !== false;
             document.getElementById('showDismissButton').checked =
-              showDismissButton;
-            document.getElementById(
-              'dismissButtonSizeContainer'
-            ).style.display = showDismissButton ? '' : 'none';
+              config.showDismissButton !== false;
             document.getElementById('dismissButtonSize').value =
               config.dismissButtonSize != null ? config.dismissButtonSize : 20;
             var showDismissAll = config.showDismissAll !== false;
@@ -1869,9 +1895,6 @@
               .addEventListener('click', function () {
                 if (!window.confirm('Reset Controls to defaults?')) return;
                 document.getElementById('showDismissButton').checked = true;
-                document.getElementById(
-                  'dismissButtonSizeContainer'
-                ).style.display = '';
                 document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
@@ -1882,6 +1905,7 @@
                 ).style.display = '';
                 document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
+                document.getElementById('permanentDismissible').checked = false;
               });
 
             document
@@ -1928,9 +1952,6 @@
                 document.getElementById('displayDuration').value = 30;
                 document.getElementById('pauseDuration').value = 60;
                 document.getElementById('showDismissButton').checked = true;
-                document.getElementById(
-                  'dismissButtonSizeContainer'
-                ).style.display = '';
                 document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
@@ -1941,6 +1962,7 @@
                 ).style.display = '';
                 document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
+                document.getElementById('permanentDismissible').checked = false;
                 document.getElementById('rotationShuffle').checked = true;
                 document.getElementById('persistDismiss').checked = false;
                 var list = document.getElementById('presetList');
@@ -1977,9 +1999,6 @@
                 document.getElementById('displayDuration').value = 30;
                 document.getElementById('pauseDuration').value = 60;
                 document.getElementById('showDismissButton').checked = true;
-                document.getElementById(
-                  'dismissButtonSizeContainer'
-                ).style.display = '';
                 document.getElementById('dismissButtonSize').value = 20;
                 document.getElementById('showDismissAll').checked = true;
                 document.getElementById(
@@ -1990,6 +2009,7 @@
                 ).style.display = '';
                 document.getElementById('dismissAllSize').value = 10;
                 document.getElementById('dismissAllText').value = 'hide all';
+                document.getElementById('permanentDismissible').checked = false;
                 document.getElementById('rotationShuffle').checked = true;
                 document.getElementById('persistDismiss').checked = false;
                 var list = document.getElementById('presetList');
@@ -2000,13 +2020,6 @@
                 onPresetsChanged();
               });
 
-            document
-              .getElementById('showDismissButton')
-              .addEventListener('change', function () {
-                document.getElementById(
-                  'dismissButtonSizeContainer'
-                ).style.display = this.checked ? '' : 'none';
-              });
 
             document
               .getElementById('showDismissAll')
@@ -2101,6 +2114,8 @@
                     document.getElementById('rotationShuffle').checked,
                   persistDismiss:
                     document.getElementById('persistDismiss').checked,
+                  permanentDismissible:
+                    document.getElementById('permanentDismissible').checked,
                   rotationEnabled:
                     document.getElementById('rotationEnabled').checked,
                   colorPresets: collectPresets(),
