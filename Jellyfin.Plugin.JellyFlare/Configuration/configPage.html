@@ -246,7 +246,9 @@
                   id="resetVisibility"
                   title="Reset to defaults"
                 >
-                  <span class="material-icons" style="font-size: 16px">restore</span>
+                  <span class="material-icons" style="font-size: 16px"
+                    >restore</span
+                  >
                 </button>
               </h3>
 
@@ -259,8 +261,13 @@
                   />
                   <span>Show banner in admin dashboard</span>
                 </label>
-                <div class="fieldDescription" style="margin-top:4px; color: var(--warning-color, #e6a817);">
-                  Warning: the banner may overlap content on admin pages (dashboard, settings, plugins…). Leave unchecked to hide it there.
+                <div
+                  class="fieldDescription"
+                  style="margin-top: 4px; color: var(--warning-color, #e6a817)"
+                >
+                  Warning: the banner may overlap content on admin pages
+                  (dashboard, settings, plugins…). Leave unchecked to hide it
+                  there.
                 </div>
               </div>
 
@@ -702,13 +709,13 @@
 
           var DEFAULT_ROTATION_MESSAGES = [
             {
-              text: '🎬 New content is added regularly — check out the Latest section!',
+              text: '🎬 New content is added regularly, check out the Latest section!',
               bg: '#1976d2',
               color: '#ffffff',
               enabled: true
             },
             {
-              text: '🍿 Enjoying the server? Requests are welcome — just ask the admin.',
+              text: '🍿 Enjoying the server? Requests are welcome, just ask the admin.',
               bg: '#7b1fa2',
               color: '#ffffff',
               enabled: true
@@ -717,6 +724,13 @@
               text: 'ℹ️ Having trouble? Reach out to your server administrator.',
               bg: '#455a64',
               color: '#ffffff',
+              enabled: true
+            },
+            {
+              text: 'Made with ❤️ by MorganKryze',
+              bg: '#212121',
+              color: '#ffffff',
+              url: 'https://ko-fi.com/morgankryze',
               enabled: true
             }
           ];
