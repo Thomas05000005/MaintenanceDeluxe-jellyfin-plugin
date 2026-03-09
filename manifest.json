@@ -5,7 +5,7 @@
     "owner": "MorganKryze",
     "category": "General",
     "overview": "Customisable announcement banners for Jellyfin.",
-    "description": "Display announcement banners at the top of the Jellyfin web UI. Set up rotating messages or a permanent notice with per-entry colours, flexible scheduling, dismiss controls and link support — configured from the Jellyfin admin dashboard.",
+    "description": "Display announcement banners at the top of the Jellyfin web UI. Set up rotating messages or a permanent notice with per-entry colours, flexible scheduling, dismiss controls and link support. All configured from the Jellyfin admin dashboard.",
     "imageUrl": "https://raw.githubusercontent.com/MorganKryze/jellyflare/main/assets/icon.png",
     "versions": [
       {
