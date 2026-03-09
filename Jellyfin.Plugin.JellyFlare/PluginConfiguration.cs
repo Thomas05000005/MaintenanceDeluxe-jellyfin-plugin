@@ -167,7 +167,7 @@ public class PluginConfiguration : BasePluginConfiguration
         ShowDismissAll = true;
         DismissAllSize = 10;
         DismissAllText = "hide all";
-        ShowInDashboard = true;
+        ShowInDashboard = false;
         PermanentOverride = new PermanentOverride();
         RotationEnabled = true;
         RotationMessages = new List<BannerMessage>();
