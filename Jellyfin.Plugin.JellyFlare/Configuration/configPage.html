@@ -653,6 +653,39 @@
                 </div>
               </div>
 
+              <div class="checkboxContainer" style="margin-top: 0.8em">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="showRefreshPrompt"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show "Refresh page" prompt after saving</span>
+                </label>
+              </div>
+
+              <div
+                class="checkboxContainer checkboxContainer-withDescription"
+                style="margin-top: 0.8em"
+              >
+                <label class="emby-checkbox-label">
+                  <input
+                    id="showInDashboard"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show banner in admin dashboard</span>
+                </label>
+                <div
+                  class="fieldDescription"
+                  style="margin-top: 4px; color: var(--warning-color, #e6a817)"
+                >
+                  Warning: the banner may overlap content on admin pages
+                  (dashboard, settings, plugins…). Leave unchecked to hide it
+                  there.
+                </div>
+              </div>
+
               <h3 class="sectionTitle" style="margin-top: 1.5em">
                 Presets
                 <button
@@ -683,39 +716,6 @@
               >
                 <span>+ Add Preset</span>
               </button>
-
-              <div
-                class="checkboxContainer checkboxContainer-withDescription"
-                style="margin-top: 2em"
-              >
-                <label class="emby-checkbox-label">
-                  <input
-                    id="showInDashboard"
-                    is="emby-checkbox"
-                    type="checkbox"
-                  />
-                  <span>Show banner in admin dashboard</span>
-                </label>
-                <div
-                  class="fieldDescription"
-                  style="margin-top: 4px; color: var(--warning-color, #e6a817)"
-                >
-                  Warning: the banner may overlap content on admin pages
-                  (dashboard, settings, plugins…). Leave unchecked to hide it
-                  there.
-                </div>
-              </div>
-
-              <div class="checkboxContainer" style="margin-top: 0.8em">
-                <label class="emby-checkbox-label">
-                  <input
-                    id="showRefreshPrompt"
-                    is="emby-checkbox"
-                    type="checkbox"
-                  />
-                  <span>Show "Refresh page" prompt after saving</span>
-                </label>
-              </div>
 
               <div
                 style="
@@ -1946,6 +1946,10 @@
               CONFIG_DEFAULTS.rotationShuffle;
             document.getElementById('persistDismiss').checked =
               CONFIG_DEFAULTS.persistDismiss;
+            document.getElementById('showInDashboard').checked =
+              CONFIG_DEFAULTS.showInDashboard;
+            document.getElementById('showRefreshPrompt').checked =
+              CONFIG_DEFAULTS.showRefreshPrompt;
           }
 
           function resetSectionPresets() {
@@ -2037,10 +2041,6 @@
                   )
                 )
                   return;
-                document.getElementById('showInDashboard').checked =
-                  CONFIG_DEFAULTS.showInDashboard;
-                document.getElementById('showRefreshPrompt').checked =
-                  CONFIG_DEFAULTS.showRefreshPrompt;
                 resetSectionAppearance();
                 resetSectionTiming();
                 resetSectionControls();
@@ -2099,10 +2099,6 @@
                 });
                 refreshAllPresetButtons();
                 // Settings tab
-                document.getElementById('showInDashboard').checked =
-                  CONFIG_DEFAULTS.showInDashboard;
-                document.getElementById('showRefreshPrompt').checked =
-                  CONFIG_DEFAULTS.showRefreshPrompt;
                 resetSectionAppearance();
                 resetSectionTiming();
                 resetSectionControls();
@@ -2133,19 +2129,38 @@
             function isUrlSafe(url) {
               if (!url) return true;
               var l = url.toLowerCase();
-              return l.startsWith('http://') || l.startsWith('https://') || url.startsWith('/');
+              return (
+                l.startsWith('http://') ||
+                l.startsWith('https://') ||
+                url.startsWith('/')
+              );
             }
 
             function validateUrls(config) {
-              var entries = (config.permanentOverride && config.permanentOverride.entries) || [];
+              var entries =
+                (config.permanentOverride &&
+                  config.permanentOverride.entries) ||
+                [];
               for (var i = 0; i < entries.length; i++) {
                 if (!isUrlSafe(entries[i].url))
-                  return 'Invalid URL in permanent entry #' + (i + 1) + ': only http://, https://, and relative URLs are allowed. Got: "' + entries[i].url + '"';
+                  return (
+                    'Invalid URL in permanent entry #' +
+                    (i + 1) +
+                    ': only http://, https://, and relative URLs are allowed. Got: "' +
+                    entries[i].url +
+                    '"'
+                  );
               }
               var msgs = config.rotationMessages || [];
               for (var j = 0; j < msgs.length; j++) {
                 if (!isUrlSafe(msgs[j].url))
-                  return 'Invalid URL in rotation message #' + (j + 1) + ': only http://, https://, and relative URLs are allowed. Got: "' + msgs[j].url + '"';
+                  return (
+                    'Invalid URL in rotation message #' +
+                    (j + 1) +
+                    ': only http://, https://, and relative URLs are allowed. Got: "' +
+                    msgs[j].url +
+                    '"'
+                  );
               }
               return null;
             }
@@ -2307,19 +2322,35 @@
                     }
                   })
                   .catch(function (err) {
-                    if (saveSpan) { saveSpan.textContent = 'Save'; }
-                    if (saveBtn) { saveBtn.disabled = false; }
+                    if (saveSpan) {
+                      saveSpan.textContent = 'Save';
+                    }
+                    if (saveBtn) {
+                      saveBtn.disabled = false;
+                    }
                     function showSaveError(status, body) {
                       var detail = body || '';
-                      try { detail = JSON.parse(detail); } catch (e) {}
+                      try {
+                        detail = JSON.parse(detail);
+                      } catch (e) {}
                       var msg = 'Save failed';
-                      if (status) { msg += ' (HTTP ' + status + ')'; }
-                      if (detail) { msg += ': ' + detail; }
+                      if (status) {
+                        msg += ' (HTTP ' + status + ')';
+                      }
+                      if (detail) {
+                        msg += ': ' + detail;
+                      }
                       Dashboard.alert(msg);
                     }
-                    var status = err && (err.status || (err.response && err.response.status)) || 0;
+                    var status =
+                      (err &&
+                        (err.status ||
+                          (err.response && err.response.status))) ||
+                      0;
                     if (err && typeof err.text === 'function') {
-                      err.text().then(function (body) { showSaveError(status, body); });
+                      err.text().then(function (body) {
+                        showSaveError(status, body);
+                      });
                     } else {
                       showSaveError(status, (err && err.responseText) || '');
                     }
