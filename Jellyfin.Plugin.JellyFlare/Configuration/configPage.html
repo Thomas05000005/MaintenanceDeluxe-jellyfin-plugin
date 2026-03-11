@@ -1961,6 +1961,10 @@
             onPresetsChanged();
           }
 
+          function notifyResetDone() {
+            Dashboard.alert('Reset applied. Save to take effect.');
+          }
+
           // ── one-time DOM setup ────────────────────────────────────
 
           var _initialized = false;
@@ -1995,68 +1999,52 @@
             document
               .getElementById('resetAppearance')
               .addEventListener('click', function () {
-                if (!window.confirm('Reset Appearance to defaults?')) return;
                 resetSectionAppearance();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetTiming')
               .addEventListener('click', function () {
-                if (!window.confirm('Reset Timing to defaults?')) return;
                 resetSectionTiming();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetControls')
               .addEventListener('click', function () {
-                if (!window.confirm('Reset Controls to defaults?')) return;
                 resetSectionControls();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetBehaviour')
               .addEventListener('click', function () {
-                if (!window.confirm('Reset Behaviour to defaults?')) return;
                 resetSectionBehaviour();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetPresets')
               .addEventListener('click', function () {
-                if (
-                  !window.confirm(
-                    'Reset presets to defaults? Your current preset list will be replaced.'
-                  )
-                )
-                  return;
                 resetSectionPresets();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetAll')
               .addEventListener('click', function () {
-                if (
-                  !window.confirm(
-                    'Reset all settings to defaults? Your messages and banners are not affected.'
-                  )
-                )
-                  return;
                 resetSectionAppearance();
                 resetSectionTiming();
                 resetSectionControls();
                 resetSectionBehaviour();
                 resetSectionPresets();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetMessages')
               .addEventListener('click', function () {
-                if (
-                  !window.confirm(
-                    'Reset messages to defaults? Settings are not affected.'
-                  )
-                )
-                  return;
                 document.getElementById('permanentEnabled').checked = false;
                 var permList = document.getElementById('permanentList');
                 permList.innerHTML = '';
@@ -2071,17 +2059,12 @@
                   msgList.appendChild(createMessageRow(msg, false));
                 });
                 refreshAllPresetButtons();
+                notifyResetDone();
               });
 
             document
               .getElementById('resetAllConf')
               .addEventListener('click', function () {
-                if (
-                  !window.confirm(
-                    'Reset ALL configuration? This will clear the permanent banner, all rotation messages, and restore every setting to its default. This cannot be undone.'
-                  )
-                )
-                  return;
                 // Permanent tab
                 document.getElementById('permanentEnabled').checked = false;
                 var permList = document.getElementById('permanentList');
@@ -2104,6 +2087,7 @@
                 resetSectionControls();
                 resetSectionBehaviour();
                 resetSectionPresets();
+                notifyResetDone();
               });
 
             document
