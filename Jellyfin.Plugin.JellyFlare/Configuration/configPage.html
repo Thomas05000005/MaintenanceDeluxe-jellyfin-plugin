@@ -117,10 +117,18 @@
           flex-shrink: 0;
           line-height: 1;
         }
-        .jf-drag-handle:hover { opacity: 0.7; }
-        .jf-msg-row.jf-dragging { opacity: 0.35; }
-        .jf-msg-row.jf-drag-over-top    { border-top:    2px solid #90caf9; }
-        .jf-msg-row.jf-drag-over-bottom { border-bottom: 2px solid #90caf9; }
+        .jf-drag-handle:hover {
+          opacity: 0.7;
+        }
+        .jf-msg-row.jf-dragging {
+          opacity: 0.35;
+        }
+        .jf-msg-row.jf-drag-over-top {
+          border-top: 2px solid #90caf9;
+        }
+        .jf-msg-row.jf-drag-over-bottom {
+          border-bottom: 2px solid #90caf9;
+        }
         .jf-msg-detail {
           padding: 14px;
           border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -174,32 +182,57 @@
 
         /* ── Refresh-prompt modal ───────────────────────────────── */
         #jf-refresh-overlay {
-          position: fixed; inset: 0; z-index: 99999;
-          background: rgba(0,0,0,.55); display: flex;
-          align-items: center; justify-content: center;
+          position: fixed;
+          inset: 0;
+          z-index: 99999;
+          background: rgba(0, 0, 0, 0.55);
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         #jf-refresh-modal {
-          background: #1e1e1e; color: #e0e0e0;
-          border-radius: 8px; padding: 24px 28px;
-          box-shadow: 0 8px 32px rgba(0,0,0,.7);
-          max-width: 380px; width: calc(100% - 32px);
+          background: #1e1e1e;
+          color: #e0e0e0;
+          border-radius: 8px;
+          padding: 24px 28px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+          max-width: 380px;
+          width: calc(100% - 32px);
           font-family: inherit;
         }
         #jf-refresh-modal h3 {
-          margin: 0 0 10px; font-size: 16px; color: #fff;
+          margin: 0 0 10px;
+          font-size: 16px;
+          color: #fff;
         }
         #jf-refresh-modal p {
-          margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: .8;
+          margin: 0 0 20px;
+          font-size: 14px;
+          line-height: 1.5;
+          opacity: 0.8;
         }
         .jf-refresh-btns {
-          display: flex; gap: 10px; justify-content: flex-end;
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
         }
         .jf-refresh-btn {
-          padding: 8px 18px; border: none; border-radius: 4px;
-          cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit;
+          padding: 8px 18px;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: inherit;
         }
-        .jf-refresh-btn-primary { background: #1976d2; color: #fff; }
-        .jf-refresh-btn-later   { background: #333; color: #aaa; }
+        .jf-refresh-btn-primary {
+          background: #1976d2;
+          color: #fff;
+        }
+        .jf-refresh-btn-later {
+          background: #333;
+          color: #aaa;
+        }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -500,7 +533,9 @@
                   min="8"
                   max="128"
                 />
-                <div class="fieldDescription">Applies to all dismiss (×) buttons.</div>
+                <div class="fieldDescription">
+                  Applies to all dismiss (×) buttons.
+                </div>
               </div>
 
               <p class="jf-controls-group">Permanent banner</p>
@@ -515,7 +550,8 @@
                   <span>Show dismiss button</span>
                 </label>
                 <div class="fieldDescription">
-                  If "Remember dismissed" is also on, the dismissal persists across reloads.
+                  If "Remember dismissed" is also on, the dismissal persists
+                  across reloads.
                 </div>
               </div>
 
@@ -648,7 +684,10 @@
                 <span>+ Add Preset</span>
               </button>
 
-              <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top: 2em">
+              <div
+                class="checkboxContainer checkboxContainer-withDescription"
+                style="margin-top: 2em"
+              >
                 <label class="emby-checkbox-label">
                   <input
                     id="showInDashboard"
@@ -716,11 +755,20 @@
                   <button
                     is="emby-button"
                     type="button"
+                    id="resetMessages"
+                    class="raised"
+                    style="background: #c62828; color: #fff"
+                  >
+                    <span>Reset messages only</span>
+                  </button>
+                  <button
+                    is="emby-button"
+                    type="button"
                     id="resetAll"
                     class="raised"
                     style="background: #c62828; color: #fff"
                   >
-                    <span>Reset settings</span>
+                    <span>Reset settings only</span>
                   </button>
                   <button
                     is="emby-button"
@@ -729,7 +777,7 @@
                     class="raised"
                     style="background: #b71c1c; color: #fff"
                   >
-                    <span>Wipe all plugin data</span>
+                    <span>Reset all</span>
                   </button>
                 </div>
               </div>
@@ -804,24 +852,24 @@
           ];
 
           var CONFIG_DEFAULTS = {
-            displayDuration:     30,
-            pauseDuration:       60,
-            dismissButtonSize:   20,
-            dismissAllSize:      10,
-            dismissAllText:      'hide all',
-            fontSize:            14,
-            bannerHeight:        36,
-            transitionSpeed:     'normal',
-            textAlign:           'center',
-            fontBold:            true,
-            showInDashboard:     false,
-            showRefreshPrompt:   true,
-            rotationShuffle:     true,
-            persistDismiss:      false,
+            displayDuration: 30,
+            pauseDuration: 60,
+            dismissButtonSize: 20,
+            dismissAllSize: 10,
+            dismissAllText: 'hide all',
+            fontSize: 14,
+            bannerHeight: 36,
+            transitionSpeed: 'normal',
+            textAlign: 'center',
+            fontBold: true,
+            showInDashboard: false,
+            showRefreshPrompt: true,
+            rotationShuffle: true,
+            persistDismiss: false,
             permanentDismissible: false,
-            showDismissButton:   true,
-            showDismissAll:      true,
-            rotationEnabled:     true
+            showDismissButton: true,
+            showDismissAll: true,
+            rotationEnabled: true
           };
 
           var ANNUAL_PRESETS = [
@@ -1406,7 +1454,8 @@
             var emptyPlaceholder = isPerm ? '(new entry)' : '(new message)';
 
             var row = document.createElement('div');
-            row.className = 'jf-msg-row' +
+            row.className =
+              'jf-msg-row' +
               (isPerm ? ' jf-perm-row' : '') +
               (isActive ? ' expanded' : '');
 
@@ -1426,14 +1475,19 @@
             // Toggle control: radio for permanent, checkbox for rotation
             var toggleEl = document.createElement('input');
             toggleEl.style.cssText = 'flex-shrink:0;cursor:pointer;margin:0';
-            toggleEl.addEventListener('click', function (e) { e.stopPropagation(); });
+            toggleEl.addEventListener('click', function (e) {
+              e.stopPropagation();
+            });
             if (isPerm) {
               toggleEl.type = 'radio';
               toggleEl.name = 'permanentActive';
               toggleEl.className = 'perm-active-radio';
               toggleEl.checked = isActive;
               toggleEl.title = 'Use this entry as the active permanent banner';
-              toggleEl.setAttribute('aria-label', 'Use this entry as the active permanent banner');
+              toggleEl.setAttribute(
+                'aria-label',
+                'Use this entry as the active permanent banner'
+              );
             } else {
               var enabled = data.enabled !== false;
               toggleEl.type = 'checkbox';
@@ -1487,8 +1541,9 @@
               '  <label class="inputLabel inputLabelUnfocused">Text</label>' +
               '  <input is="emby-input" type="text" class="msg-text"' +
               '         placeholder="' +
-                (isPerm ? 'e.g. \uD83D\uDD34 Server in maintenance until 23:00'
-                        : 'e.g. \u2139\uFE0F New content added every Sunday') +
+              (isPerm
+                ? 'e.g. \uD83D\uDD34 Server in maintenance until 23:00'
+                : 'e.g. \u2139\uFE0F New content added every Sunday') +
               '">' +
               '</div>' +
               '<div class="inputContainer">' +
@@ -1504,7 +1559,9 @@
               '      <input type="color" class="msg-bg-picker"' +
               '             style="height:34px;width:46px;border:none;padding:2px;cursor:pointer;border-radius:4px">' +
               '      <input is="emby-input" type="text" class="msg-bg"' +
-              '             maxlength="7" style="width:84px" placeholder="' + bgPlaceholder + '">' +
+              '             maxlength="7" style="width:84px" placeholder="' +
+              bgPlaceholder +
+              '">' +
               '    </div>' +
               '  </div>' +
               '  <div>' +
@@ -1588,8 +1645,12 @@
               swatch.style.background = this.value;
               clearPreset();
             });
-            colorText.addEventListener('input', function () { clearPreset(); });
-            colorPicker.addEventListener('input', function () { clearPreset(); });
+            colorText.addEventListener('input', function () {
+              clearPreset();
+            });
+            colorPicker.addEventListener('input', function () {
+              clearPreset();
+            });
 
             // Toggle expand / collapse (ignore remove btn; also ignore radio for permanent)
             summary.addEventListener('click', function (e) {
@@ -1610,9 +1671,13 @@
             row.addEventListener('dragend', function () {
               row.draggable = false;
               row.classList.remove('jf-dragging');
-              document.querySelectorAll('.jf-drag-over-top, .jf-drag-over-bottom')
+              document
+                .querySelectorAll('.jf-drag-over-top, .jf-drag-over-bottom')
                 .forEach(function (el) {
-                  el.classList.remove('jf-drag-over-top', 'jf-drag-over-bottom');
+                  el.classList.remove(
+                    'jf-drag-over-top',
+                    'jf-drag-over-bottom'
+                  );
                 });
               draggedRow = null;
             });
@@ -1622,7 +1687,9 @@
               e.dataTransfer.dropEffect = 'move';
               row.classList.remove('jf-drag-over-top', 'jf-drag-over-bottom');
               var mid = row.getBoundingClientRect().top + row.offsetHeight / 2;
-              row.classList.add(e.clientY < mid ? 'jf-drag-over-top' : 'jf-drag-over-bottom');
+              row.classList.add(
+                e.clientY < mid ? 'jf-drag-over-top' : 'jf-drag-over-bottom'
+              );
             });
             row.addEventListener('dragleave', function (e) {
               if (!row.contains(e.relatedTarget)) {
@@ -1650,11 +1717,17 @@
 
           // Convenience wrappers kept for clarity at call sites
           function createMessageRow(msg, startExpanded) {
-            return createEntryRow(msg, { type: 'message', isActive: startExpanded });
+            return createEntryRow(msg, {
+              type: 'message',
+              isActive: startExpanded
+            });
           }
 
           function createPermanentRow(entry, isActive) {
-            return createEntryRow(entry, { type: 'permanent', isActive: isActive });
+            return createEntryRow(entry, {
+              type: 'permanent',
+              isActive: isActive
+            });
           }
 
           // ── shared row data collector ─────────────────────────────
@@ -1665,7 +1738,8 @@
             var urlVal = (detail.querySelector('.msg-url').value || '').trim();
             return {
               text: detail.querySelector('.msg-text').value,
-              bg: detail.querySelector('.msg-bg').value ||
+              bg:
+                detail.querySelector('.msg-bg').value ||
                 (isPermanent ? '#2e7d32' : '#1976d2'),
               color: detail.querySelector('.msg-color').value || '#ffffff',
               url: urlVal || null,
@@ -1673,7 +1747,9 @@
               // Null out orphaned labels: if the preset no longer exists, drop it.
               presetLabel:
                 label &&
-                currentPresets.some(function (p) { return p.label === label; })
+                currentPresets.some(function (p) {
+                  return p.label === label;
+                })
                   ? label
                   : null
             };
@@ -1725,14 +1801,19 @@
               config.showRefreshPrompt !== false;
 
             // ── Appearance ────────────────────────────────────────────
-            var align = config.textAlign === 'left' ? 'left' : CONFIG_DEFAULTS.textAlign;
+            var align =
+              config.textAlign === 'left' ? 'left' : CONFIG_DEFAULTS.textAlign;
             document.getElementById('textAlignCenter').checked =
               align === 'center';
             document.getElementById('textAlignLeft').checked = align === 'left';
             document.getElementById('fontSize').value =
-              config.fontSize != null ? config.fontSize : CONFIG_DEFAULTS.fontSize;
+              config.fontSize != null
+                ? config.fontSize
+                : CONFIG_DEFAULTS.fontSize;
             document.getElementById('bannerHeight').value =
-              config.bannerHeight != null ? config.bannerHeight : CONFIG_DEFAULTS.bannerHeight;
+              config.bannerHeight != null
+                ? config.bannerHeight
+                : CONFIG_DEFAULTS.bannerHeight;
             document.getElementById('fontBold').checked =
               config.fontBold !== false;
             document.getElementById('transitionSpeed').value =
@@ -1747,20 +1828,28 @@
               !!config.permanentDismissible;
 
             document.getElementById('displayDuration').value =
-              config.displayDuration != null ? config.displayDuration : CONFIG_DEFAULTS.displayDuration;
+              config.displayDuration != null
+                ? config.displayDuration
+                : CONFIG_DEFAULTS.displayDuration;
             document.getElementById('pauseDuration').value =
-              config.pauseDuration != null ? config.pauseDuration : CONFIG_DEFAULTS.pauseDuration;
+              config.pauseDuration != null
+                ? config.pauseDuration
+                : CONFIG_DEFAULTS.pauseDuration;
 
             document.getElementById('showDismissButton').checked =
               config.showDismissButton !== false;
             document.getElementById('dismissButtonSize').value =
-              config.dismissButtonSize != null ? config.dismissButtonSize : CONFIG_DEFAULTS.dismissButtonSize;
+              config.dismissButtonSize != null
+                ? config.dismissButtonSize
+                : CONFIG_DEFAULTS.dismissButtonSize;
             var showDismissAll = config.showDismissAll !== false;
             document.getElementById('showDismissAll').checked = showDismissAll;
             document.getElementById('dismissAllText').value =
               config.dismissAllText || CONFIG_DEFAULTS.dismissAllText;
             document.getElementById('dismissAllSize').value =
-              config.dismissAllSize != null ? config.dismissAllSize : CONFIG_DEFAULTS.dismissAllSize;
+              config.dismissAllSize != null
+                ? config.dismissAllSize
+                : CONFIG_DEFAULTS.dismissAllSize;
             document.getElementById('dismissAllTextContainer').style.display =
               showDismissAll ? '' : 'none';
             document.getElementById('dismissAllSizeContainer').style.display =
@@ -1816,31 +1905,47 @@
           function resetSectionAppearance() {
             document.getElementById('textAlignCenter').checked = true;
             document.getElementById('textAlignLeft').checked = false;
-            document.getElementById('fontSize').value = CONFIG_DEFAULTS.fontSize;
-            document.getElementById('bannerHeight').value = CONFIG_DEFAULTS.bannerHeight;
-            document.getElementById('fontBold').checked = CONFIG_DEFAULTS.fontBold;
-            document.getElementById('transitionSpeed').value = CONFIG_DEFAULTS.transitionSpeed;
+            document.getElementById('fontSize').value =
+              CONFIG_DEFAULTS.fontSize;
+            document.getElementById('bannerHeight').value =
+              CONFIG_DEFAULTS.bannerHeight;
+            document.getElementById('fontBold').checked =
+              CONFIG_DEFAULTS.fontBold;
+            document.getElementById('transitionSpeed').value =
+              CONFIG_DEFAULTS.transitionSpeed;
           }
 
           function resetSectionTiming() {
-            document.getElementById('displayDuration').value = CONFIG_DEFAULTS.displayDuration;
-            document.getElementById('pauseDuration').value = CONFIG_DEFAULTS.pauseDuration;
+            document.getElementById('displayDuration').value =
+              CONFIG_DEFAULTS.displayDuration;
+            document.getElementById('pauseDuration').value =
+              CONFIG_DEFAULTS.pauseDuration;
           }
 
           function resetSectionControls() {
-            document.getElementById('showDismissButton').checked = CONFIG_DEFAULTS.showDismissButton;
-            document.getElementById('dismissButtonSize').value = CONFIG_DEFAULTS.dismissButtonSize;
-            document.getElementById('showDismissAll').checked = CONFIG_DEFAULTS.showDismissAll;
-            document.getElementById('dismissAllTextContainer').style.display = '';
-            document.getElementById('dismissAllSizeContainer').style.display = '';
-            document.getElementById('dismissAllSize').value = CONFIG_DEFAULTS.dismissAllSize;
-            document.getElementById('dismissAllText').value = CONFIG_DEFAULTS.dismissAllText;
-            document.getElementById('permanentDismissible').checked = CONFIG_DEFAULTS.permanentDismissible;
+            document.getElementById('showDismissButton').checked =
+              CONFIG_DEFAULTS.showDismissButton;
+            document.getElementById('dismissButtonSize').value =
+              CONFIG_DEFAULTS.dismissButtonSize;
+            document.getElementById('showDismissAll').checked =
+              CONFIG_DEFAULTS.showDismissAll;
+            document.getElementById('dismissAllTextContainer').style.display =
+              '';
+            document.getElementById('dismissAllSizeContainer').style.display =
+              '';
+            document.getElementById('dismissAllSize').value =
+              CONFIG_DEFAULTS.dismissAllSize;
+            document.getElementById('dismissAllText').value =
+              CONFIG_DEFAULTS.dismissAllText;
+            document.getElementById('permanentDismissible').checked =
+              CONFIG_DEFAULTS.permanentDismissible;
           }
 
           function resetSectionBehaviour() {
-            document.getElementById('rotationShuffle').checked = CONFIG_DEFAULTS.rotationShuffle;
-            document.getElementById('persistDismiss').checked = CONFIG_DEFAULTS.persistDismiss;
+            document.getElementById('rotationShuffle').checked =
+              CONFIG_DEFAULTS.rotationShuffle;
+            document.getElementById('persistDismiss').checked =
+              CONFIG_DEFAULTS.persistDismiss;
           }
 
           function resetSectionPresets() {
@@ -1944,6 +2049,22 @@
               });
 
             document
+              .getElementById('resetMessages')
+              .addEventListener('click', function () {
+                if (
+                  !window.confirm(
+                    'Clear the permanent banner and all rotation messages? Settings are not affected.'
+                  )
+                )
+                  return;
+                document.getElementById('permanentEnabled').checked = false;
+                document.getElementById('permanentList').innerHTML = '';
+                document.getElementById('rotationEnabled').checked =
+                  CONFIG_DEFAULTS.rotationEnabled;
+                document.getElementById('messageList').innerHTML = '';
+              });
+
+            document
               .getElementById('resetAllConf')
               .addEventListener('click', function () {
                 if (
@@ -1970,7 +2091,6 @@
                 resetSectionBehaviour();
                 resetSectionPresets();
               });
-
 
             document
               .getElementById('showDismissAll')
@@ -2005,12 +2125,25 @@
                 '</div></div>';
               document.body.appendChild(overlay);
 
-              function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
-              function onKey(e) { if (e.key === 'Escape') close(); }
+              function close() {
+                overlay.remove();
+                document.removeEventListener('keydown', onKey);
+              }
+              function onKey(e) {
+                if (e.key === 'Escape') close();
+              }
 
-              document.getElementById('jf-refresh-now').addEventListener('click', function () { window.location.reload(); });
-              document.getElementById('jf-refresh-later').addEventListener('click', close);
-              overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+              document
+                .getElementById('jf-refresh-now')
+                .addEventListener('click', function () {
+                  window.location.reload();
+                });
+              document
+                .getElementById('jf-refresh-later')
+                .addEventListener('click', close);
+              overlay.addEventListener('click', function (e) {
+                if (e.target === overlay) close();
+              });
               document.addEventListener('keydown', onKey);
             }
 
@@ -2089,8 +2222,9 @@
                     document.getElementById('rotationShuffle').checked,
                   persistDismiss:
                     document.getElementById('persistDismiss').checked,
-                  permanentDismissible:
-                    document.getElementById('permanentDismissible').checked,
+                  permanentDismissible: document.getElementById(
+                    'permanentDismissible'
+                  ).checked,
                   rotationEnabled:
                     document.getElementById('rotationEnabled').checked,
                   colorPresets: collectPresets(),
@@ -2104,8 +2238,12 @@
                 };
                 var saveBtn = document.getElementById('saveConfigBtn');
                 var saveSpan = saveBtn ? saveBtn.querySelector('span') : null;
-                if (saveBtn) { saveBtn.disabled = true; }
-                if (saveSpan) { saveSpan.textContent = 'Saving…'; }
+                if (saveBtn) {
+                  saveBtn.disabled = true;
+                }
+                if (saveSpan) {
+                  saveSpan.textContent = 'Saving…';
+                }
                 ApiClient.ajax({
                   type: 'POST',
                   url: ApiClient.getUrl('JellyFlare/config'),
@@ -2113,8 +2251,12 @@
                   contentType: 'application/json'
                 })
                   .then(function () {
-                    if (saveSpan) { saveSpan.textContent = 'Save'; }
-                    if (saveBtn) { saveBtn.disabled = false; }
+                    if (saveSpan) {
+                      saveSpan.textContent = 'Save';
+                    }
+                    if (saveBtn) {
+                      saveBtn.disabled = false;
+                    }
                     if (document.getElementById('showRefreshPrompt').checked) {
                       showRefreshPrompt();
                     } else {
@@ -2122,12 +2264,21 @@
                     }
                   })
                   .catch(function (err) {
-                    if (saveSpan) { saveSpan.textContent = 'Save'; }
-                    if (saveBtn) { saveBtn.disabled = false; }
-                    var detail = (err && err.responseText) ? err.responseText : '';
+                    if (saveSpan) {
+                      saveSpan.textContent = 'Save';
+                    }
+                    if (saveBtn) {
+                      saveBtn.disabled = false;
+                    }
+                    var detail =
+                      err && err.responseText ? err.responseText : '';
                     var msg = 'Save failed';
-                    if (err && err.status) { msg += ' (HTTP ' + err.status + ')'; }
-                    if (detail) { msg += ': ' + detail; }
+                    if (err && err.status) {
+                      msg += ' (HTTP ' + err.status + ')';
+                    }
+                    if (detail) {
+                      msg += ': ' + detail;
+                    }
                     Dashboard.alert(msg);
                   });
               });
