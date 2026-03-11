@@ -182,6 +182,7 @@ public class PluginConfiguration : BasePluginConfiguration
         FontSize = 14;
         BannerHeight = 36;
         FontBold = true;
+        ShowRefreshPrompt = true;
     }
 
     /// <summary>Gets or sets how long (seconds) each message is displayed before cycling.</summary>
@@ -263,6 +264,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets whether the banner text is rendered bold (default true).</summary>
     [JsonPropertyName("fontBold")]
     public bool FontBold { get; set; }
+
+    /// <summary>Gets or sets whether a "refresh page" prompt is shown after saving config. Default true.</summary>
+    [JsonPropertyName("showRefreshPrompt")]
+    public bool ShowRefreshPrompt { get; set; }
 
     /// <summary>Gets or sets the Unix timestamp (seconds) of the last config save. Used by clients to detect config changes.</summary>
     [JsonPropertyName("lastModified")]

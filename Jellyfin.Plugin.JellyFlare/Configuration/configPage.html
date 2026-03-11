@@ -171,6 +171,35 @@
           letter-spacing: 0.05em;
           opacity: 0.55;
         }
+
+        /* ── Refresh-prompt modal ───────────────────────────────── */
+        #jf-refresh-overlay {
+          position: fixed; inset: 0; z-index: 99999;
+          background: rgba(0,0,0,.55); display: flex;
+          align-items: center; justify-content: center;
+        }
+        #jf-refresh-modal {
+          background: #1e1e1e; color: #e0e0e0;
+          border-radius: 8px; padding: 24px 28px;
+          box-shadow: 0 8px 32px rgba(0,0,0,.7);
+          max-width: 380px; width: calc(100% - 32px);
+          font-family: inherit;
+        }
+        #jf-refresh-modal h3 {
+          margin: 0 0 10px; font-size: 16px; color: #fff;
+        }
+        #jf-refresh-modal p {
+          margin: 0 0 20px; font-size: 14px; line-height: 1.5; opacity: .8;
+        }
+        .jf-refresh-btns {
+          display: flex; gap: 10px; justify-content: flex-end;
+        }
+        .jf-refresh-btn {
+          padding: 8px 18px; border: none; border-radius: 4px;
+          cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit;
+        }
+        .jf-refresh-btn-primary { background: #1976d2; color: #fff; }
+        .jf-refresh-btn-later   { background: #333; color: #aaa; }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -638,6 +667,17 @@
                 </div>
               </div>
 
+              <div class="checkboxContainer" style="margin-top: 0.8em">
+                <label class="emby-checkbox-label">
+                  <input
+                    id="showRefreshPrompt"
+                    is="emby-checkbox"
+                    type="checkbox"
+                  />
+                  <span>Show "Refresh page" prompt after saving</span>
+                </label>
+              </div>
+
               <div
                 style="
                   margin-top: 2em;
@@ -775,6 +815,7 @@
             textAlign:           'center',
             fontBold:            true,
             showInDashboard:     false,
+            showRefreshPrompt:   true,
             rotationShuffle:     true,
             persistDismiss:      false,
             permanentDismissible: false,
@@ -1680,6 +1721,8 @@
           function populatePage(config) {
             document.getElementById('showInDashboard').checked =
               config.showInDashboard !== false;
+            document.getElementById('showRefreshPrompt').checked =
+              config.showRefreshPrompt !== false;
 
             // ── Appearance ────────────────────────────────────────────
             var align = config.textAlign === 'left' ? 'left' : CONFIG_DEFAULTS.textAlign;
@@ -1891,6 +1934,8 @@
                   return;
                 document.getElementById('showInDashboard').checked =
                   CONFIG_DEFAULTS.showInDashboard;
+                document.getElementById('showRefreshPrompt').checked =
+                  CONFIG_DEFAULTS.showRefreshPrompt;
                 resetSectionAppearance();
                 resetSectionTiming();
                 resetSectionControls();
@@ -1917,6 +1962,8 @@
                 // Settings tab
                 document.getElementById('showInDashboard').checked =
                   CONFIG_DEFAULTS.showInDashboard;
+                document.getElementById('showRefreshPrompt').checked =
+                  CONFIG_DEFAULTS.showRefreshPrompt;
                 resetSectionAppearance();
                 resetSectionTiming();
                 resetSectionControls();
@@ -1945,6 +1992,28 @@
                   .appendChild(createMessageRow(null, true));
               });
 
+            function showRefreshPrompt() {
+              var overlay = document.createElement('div');
+              overlay.id = 'jf-refresh-overlay';
+              overlay.innerHTML =
+                '<div id="jf-refresh-modal">' +
+                '<h3>Configuration saved</h3>' +
+                '<p>Refresh the page for changes to take effect in the banner.</p>' +
+                '<div class="jf-refresh-btns">' +
+                '<button class="jf-refresh-btn jf-refresh-btn-later" id="jf-refresh-later">Later</button>' +
+                '<button class="jf-refresh-btn jf-refresh-btn-primary" id="jf-refresh-now">Refresh now</button>' +
+                '</div></div>';
+              document.body.appendChild(overlay);
+
+              function close() { overlay.remove(); document.removeEventListener('keydown', onKey); }
+              function onKey(e) { if (e.key === 'Escape') close(); }
+
+              document.getElementById('jf-refresh-now').addEventListener('click', function () { window.location.reload(); });
+              document.getElementById('jf-refresh-later').addEventListener('click', close);
+              overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+              document.addEventListener('keydown', onKey);
+            }
+
             document
               .getElementById('JellyFlareConfigForm')
               .addEventListener('submit', function (e) {
@@ -1959,6 +2028,8 @@
                 var config = {
                   showInDashboard:
                     document.getElementById('showInDashboard').checked,
+                  showRefreshPrompt:
+                    document.getElementById('showRefreshPrompt').checked,
                   textAlign: document.querySelector(
                     'input[name="textAlign"]:checked'
                   )
@@ -2044,7 +2115,11 @@
                   .then(function () {
                     if (saveSpan) { saveSpan.textContent = 'Save'; }
                     if (saveBtn) { saveBtn.disabled = false; }
-                    Dashboard.alert('Configuration saved.');
+                    if (document.getElementById('showRefreshPrompt').checked) {
+                      showRefreshPrompt();
+                    } else {
+                      Dashboard.alert('Configuration saved.');
+                    }
                   })
                   .catch(function (err) {
                     if (saveSpan) { saveSpan.textContent = 'Save'; }
