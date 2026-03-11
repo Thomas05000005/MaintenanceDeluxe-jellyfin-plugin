@@ -2130,6 +2130,26 @@
                   .appendChild(createMessageRow(null, true));
               });
 
+            function isUrlSafe(url) {
+              if (!url) return true;
+              var l = url.toLowerCase();
+              return l.startsWith('http://') || l.startsWith('https://') || url.startsWith('/');
+            }
+
+            function validateUrls(config) {
+              var entries = (config.permanentOverride && config.permanentOverride.entries) || [];
+              for (var i = 0; i < entries.length; i++) {
+                if (!isUrlSafe(entries[i].url))
+                  return 'Invalid URL in permanent entry #' + (i + 1) + ': only http://, https://, and relative URLs are allowed. Got: "' + entries[i].url + '"';
+              }
+              var msgs = config.rotationMessages || [];
+              for (var j = 0; j < msgs.length; j++) {
+                if (!isUrlSafe(msgs[j].url))
+                  return 'Invalid URL in rotation message #' + (j + 1) + ': only http://, https://, and relative URLs are allowed. Got: "' + msgs[j].url + '"';
+              }
+              return null;
+            }
+
             function showRefreshPrompt() {
               var overlay = document.createElement('div');
               overlay.id = 'jf-refresh-overlay';
@@ -2254,6 +2274,11 @@
                   },
                   rotationMessages: collectMessages()
                 };
+                var urlError = validateUrls(config);
+                if (urlError) {
+                  Dashboard.alert(urlError);
+                  return;
+                }
                 var saveBtn = document.getElementById('saveConfigBtn');
                 var saveSpan = saveBtn ? saveBtn.querySelector('span') : null;
                 if (saveBtn) {
@@ -2282,22 +2307,22 @@
                     }
                   })
                   .catch(function (err) {
-                    if (saveSpan) {
-                      saveSpan.textContent = 'Save';
+                    if (saveSpan) { saveSpan.textContent = 'Save'; }
+                    if (saveBtn) { saveBtn.disabled = false; }
+                    function showSaveError(status, body) {
+                      var detail = body || '';
+                      try { detail = JSON.parse(detail); } catch (e) {}
+                      var msg = 'Save failed';
+                      if (status) { msg += ' (HTTP ' + status + ')'; }
+                      if (detail) { msg += ': ' + detail; }
+                      Dashboard.alert(msg);
                     }
-                    if (saveBtn) {
-                      saveBtn.disabled = false;
+                    var status = err && (err.status || (err.response && err.response.status)) || 0;
+                    if (err && typeof err.text === 'function') {
+                      err.text().then(function (body) { showSaveError(status, body); });
+                    } else {
+                      showSaveError(status, (err && err.responseText) || '');
                     }
-                    var detail =
-                      err && err.responseText ? err.responseText : '';
-                    var msg = 'Save failed';
-                    if (err && err.status) {
-                      msg += ' (HTTP ' + err.status + ')';
-                    }
-                    if (detail) {
-                      msg += ': ' + detail;
-                    }
-                    Dashboard.alert(msg);
                   });
               });
           }
