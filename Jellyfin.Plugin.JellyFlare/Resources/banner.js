@@ -397,6 +397,7 @@
         dismissAllBtn.style.display =
             (permanent && CONFIG.permanentDismissible) || CONFIG.showDismissAll === false
                 ? 'none' : '';
+        closeBtn.style.display = CONFIG.showDismissButton === false ? 'none' : '';
         document.body.classList.add("jf-banner-active");
 
         // Set up observers to recompute margin when layout changes.
