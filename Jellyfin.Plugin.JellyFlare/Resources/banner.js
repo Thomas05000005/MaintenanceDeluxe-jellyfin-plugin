@@ -394,7 +394,9 @@
         if (permanent && !CONFIG.permanentDismissible) banner.classList.add("permanent");
         else banner.classList.remove("permanent");
         // Hide "dismiss all" for permanent banners; show it for rotation
-        dismissAllBtn.style.display = (permanent && CONFIG.permanentDismissible) ? 'none' : '';
+        dismissAllBtn.style.display =
+            (permanent && CONFIG.permanentDismissible) || CONFIG.showDismissAll === false
+                ? 'none' : '';
         document.body.classList.add("jf-banner-active");
 
         // Set up observers to recompute margin when layout changes.
