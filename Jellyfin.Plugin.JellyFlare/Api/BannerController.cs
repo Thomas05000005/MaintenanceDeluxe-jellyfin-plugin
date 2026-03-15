@@ -115,6 +115,42 @@ public class BannerController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Returns the current maintenance mode configuration.</summary>
+    [HttpGet("maintenance")]
+    // No [Authorize] — intentionally public so the login-page overlay works for unauthenticated users.
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<MaintenanceSetting> GetMaintenance()
+    {
+        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        return Ok(config.MaintenanceMode ?? new MaintenanceSetting());
+    }
+
+    /// <summary>Saves the maintenance mode configuration.</summary>
+    [HttpPost("maintenance")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult SaveMaintenance([FromBody] MaintenanceSetting maintenance)
+    {
+        ArgumentNullException.ThrowIfNull(maintenance);
+
+        if (Plugin.Instance is null)
+            return NotFound();
+
+        if (!IsUrlSafe(maintenance.StatusUrl))
+            return BadRequest("Invalid statusUrl: only http://, https://, and relative URLs are permitted.");
+
+        maintenance.PreDisabledUserIds ??= new System.Collections.Generic.List<string>();
+
+        var config = Plugin.Instance.Configuration;
+        config.MaintenanceMode = maintenance;
+        Plugin.Instance.UpdateConfiguration(config);
+        Plugin.Instance.SaveConfiguration();
+        return NoContent();
+    }
+
     private static readonly System.Collections.Generic.HashSet<string> _validScheduleTypes =
         new(System.StringComparer.Ordinal) { "always", "fixed", "annual", "weekly", "daily" };
 

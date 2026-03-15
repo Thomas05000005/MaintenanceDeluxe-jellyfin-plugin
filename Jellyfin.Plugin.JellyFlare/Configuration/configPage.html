@@ -233,6 +233,26 @@
           background: #333;
           color: #aaa;
         }
+
+        /* ── Maintenance badge ──────────────────────────────────── */
+        .jf-maintenance-badge {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 12px;
+          font-size: 0.8em;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+        .jf-maintenance-badge.active {
+          background: rgba(198, 40, 40, 0.2);
+          color: #ef9a9a;
+          border: 1px solid rgba(198, 40, 40, 0.5);
+        }
+        .jf-maintenance-badge.inactive {
+          background: rgba(46, 125, 50, 0.2);
+          color: #a5d6a7;
+          border: 1px solid rgba(46, 125, 50, 0.5);
+        }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -255,6 +275,9 @@
               </button>
               <button type="button" class="jf-tab" data-tab="settings">
                 Settings
+              </button>
+              <button type="button" class="jf-tab" data-tab="maintenance">
+                Maintenance
               </button>
             </div>
 
@@ -783,6 +806,36 @@
               </div>
             </div>
             <!-- /panel: settings -->
+
+            <!-- ══ Tab: Maintenance ════════════════════════════════════ -->
+            <div class="jf-panel" data-panel="maintenance">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:1em">
+                <h3 class="sectionTitle" style="margin:0">Status</h3>
+                <span id="maintenanceStatusBadge" class="jf-maintenance-badge inactive">Inactive</span>
+              </div>
+              <div class="fieldDescription" style="margin-bottom:1.2em">
+                Activating maintenance mode disables all non-admin users at the API level until deactivated.
+                Users already disabled before activation are not re-enabled on deactivation.
+              </div>
+              <div class="inputContainer" style="margin-bottom:1.2em">
+                <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Message shown to users</label>
+                <input id="maintenanceMessage" is="emby-input" type="text"
+                  placeholder="Server under maintenance. Please check back later." />
+              </div>
+              <div class="inputContainer" style="margin-bottom:1.2em">
+                <label class="inputLabel inputLabelUnfocused" for="maintenanceStatusUrl">Status page URL (optional)</label>
+                <input id="maintenanceStatusUrl" is="emby-input" type="url"
+                  placeholder="https://status.example.com" />
+                <div class="fieldDescription">Shown as a link in the maintenance overlay so users can check server status.</div>
+              </div>
+              <div class="checkboxContainer">
+                <label>
+                  <input type="checkbox" is="emby-checkbox" id="maintenanceIsActive" />
+                  <span>Maintenance mode active</span>
+                </label>
+              </div>
+            </div>
+            <!-- /panel: maintenance -->
 
             <br />
 
@@ -2110,6 +2163,7 @@
                   .appendChild(createMessageRow(null, true));
               });
 
+
             function isUrlSafe(url) {
               if (!url) return true;
               var l = url.toLowerCase();
@@ -2286,19 +2340,27 @@
                 if (saveSpan) {
                   saveSpan.textContent = 'Saving…';
                 }
+                function restoreBtn() {
+                  if (saveSpan) saveSpan.textContent = 'Save';
+                  if (saveBtn) saveBtn.disabled = false;
+                }
+                function showSaveError(status, body) {
+                  var detail = body || '';
+                  try { detail = JSON.parse(detail); } catch (e) {}
+                  var msg = 'Save failed';
+                  if (status) msg += ' (HTTP ' + status + ')';
+                  if (detail) msg += ': ' + detail;
+                  Dashboard.alert(msg);
+                }
                 ApiClient.ajax({
                   type: 'POST',
                   url: ApiClient.getUrl('JellyFlare/config'),
                   data: JSON.stringify(config),
                   contentType: 'application/json'
                 })
+                  .then(function () { return saveMaintenanceSettings(); })
                   .then(function () {
-                    if (saveSpan) {
-                      saveSpan.textContent = 'Save';
-                    }
-                    if (saveBtn) {
-                      saveBtn.disabled = false;
-                    }
+                    restoreBtn();
                     if (document.getElementById('showRefreshPrompt').checked) {
                       showRefreshPrompt();
                     } else {
@@ -2306,39 +2368,115 @@
                     }
                   })
                   .catch(function (err) {
-                    if (saveSpan) {
-                      saveSpan.textContent = 'Save';
-                    }
-                    if (saveBtn) {
-                      saveBtn.disabled = false;
-                    }
-                    function showSaveError(status, body) {
-                      var detail = body || '';
-                      try {
-                        detail = JSON.parse(detail);
-                      } catch (e) {}
-                      var msg = 'Save failed';
-                      if (status) {
-                        msg += ' (HTTP ' + status + ')';
-                      }
-                      if (detail) {
-                        msg += ': ' + detail;
-                      }
-                      Dashboard.alert(msg);
-                    }
+                    restoreBtn();
                     var status =
                       (err &&
                         (err.status ||
                           (err.response && err.response.status))) ||
                       0;
                     if (err && typeof err.text === 'function') {
-                      err.text().then(function (body) {
-                        showSaveError(status, body);
-                      });
+                      err.text().then(function (body) { showSaveError(status, body); });
                     } else {
                       showSaveError(status, (err && err.responseText) || '');
                     }
                   });
+              });
+          }
+
+          // ── maintenance mode ───────────────────────────────────────
+
+          function applyMaintenanceUi(m) {
+            var badge = document.getElementById('maintenanceStatusBadge');
+            var msgInput = document.getElementById('maintenanceMessage');
+            var statusUrlInput = document.getElementById('maintenanceStatusUrl');
+            var isActiveCheckbox = document.getElementById('maintenanceIsActive');
+            if (!badge) return;
+            var active = !!(m && m.isActive);
+            badge.textContent = active ? 'Active' : 'Inactive';
+            badge.className = 'jf-maintenance-badge ' + (active ? 'active' : 'inactive');
+            if (m) {
+              if (msgInput) msgInput.value = m.message || '';
+              if (statusUrlInput) statusUrlInput.value = m.statusUrl || '';
+              if (isActiveCheckbox) isActiveCheckbox.checked = active;
+            }
+          }
+
+          // Returns a Promise — caller handles button state and success/error alerts.
+          function saveMaintenanceSettings() {
+            var msgInput = document.getElementById('maintenanceMessage');
+            var statusUrlInput = document.getElementById('maintenanceStatusUrl');
+            var isActiveCheckbox = document.getElementById('maintenanceIsActive');
+            var message = (msgInput && msgInput.value.trim()) || 'Server under maintenance. Please check back later.';
+            var statusUrl = (statusUrlInput && statusUrlInput.value.trim()) || '';
+            var isActive = !!(isActiveCheckbox && isActiveCheckbox.checked);
+
+            // Fetch current server state to detect activation/deactivation transitions.
+            return ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
+              .then(function (current) {
+                var wasActive = !!(current && current.isActive);
+                var preDisabledUserIds = (current && current.preDisabledUserIds) || [];
+
+                if (!wasActive && isActive) {
+                  // Activating: record already-disabled users, then disable all non-admins.
+                  return ApiClient.getJSON(ApiClient.getUrl('Users'))
+                    .then(function (users) {
+                      var nonAdmins = (users || []).filter(function (u) {
+                        return !(u.Policy && u.Policy.IsAdministrator);
+                      });
+                      nonAdmins.forEach(function (u) {
+                        if (u.Policy && u.Policy.IsDisabled) preDisabledUserIds.push(u.Id);
+                      });
+                      var disablePromises = nonAdmins
+                        .filter(function (u) { return !(u.Policy && u.Policy.IsDisabled); })
+                        .map(function (u) {
+                          return ApiClient.ajax({
+                            type: 'POST',
+                            url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
+                            data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: true })),
+                            contentType: 'application/json'
+                          });
+                        });
+                      return Promise.all(disablePromises).then(function () { return preDisabledUserIds; });
+                    });
+                } else if (wasActive && !isActive) {
+                  // Deactivating: re-enable users not pre-disabled before maintenance.
+                  return ApiClient.getJSON(ApiClient.getUrl('Users'))
+                    .then(function (users) {
+                      var nonAdmins = (users || []).filter(function (u) {
+                        return !(u.Policy && u.Policy.IsAdministrator);
+                      });
+                      var enablePromises = nonAdmins
+                        .filter(function (u) { return preDisabledUserIds.indexOf(u.Id) === -1; })
+                        .map(function (u) {
+                          return ApiClient.ajax({
+                            type: 'POST',
+                            url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
+                            data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: false })),
+                            contentType: 'application/json'
+                          });
+                        });
+                      return Promise.all(enablePromises).then(function () { return []; });
+                    });
+                } else {
+                  // No state change: preserve existing preDisabledUserIds.
+                  return Promise.resolve(isActive ? preDisabledUserIds : []);
+                }
+              })
+              .then(function (finalPreDisabledUserIds) {
+                return ApiClient.ajax({
+                  type: 'POST',
+                  url: ApiClient.getUrl('JellyFlare/maintenance'),
+                  data: JSON.stringify({
+                    isActive: isActive,
+                    message: message,
+                    statusUrl: statusUrl,
+                    preDisabledUserIds: finalPreDisabledUserIds
+                  }),
+                  contentType: 'application/json'
+                });
+              })
+              .then(function () {
+                applyMaintenanceUi({ isActive: isActive, message: message, statusUrl: statusUrl });
               });
           }
 
@@ -2353,6 +2491,9 @@
                   populatePage(config);
                 }
               );
+              ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
+                .then(function (m) { applyMaintenanceUi(m); })
+                .catch(function () {});
             });
         })();
       </script>

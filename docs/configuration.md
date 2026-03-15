@@ -1,6 +1,6 @@
 # Configuration
 
-Navigate to **Dashboard → Plugins → JellyFlare**. The page has three tabs.
+Navigate to **Dashboard → Plugins → JellyFlare**. The page has four tabs.
 
 ## Permanent tab
 
@@ -24,15 +24,15 @@ Entries can be reordered by dragging the ⠿ grip on the left of each row — us
 
 ## Rotation tab
 
-| Field             | Description                                                        |
-| ----------------- | ------------------------------------------------------------------ |
-| Enable            | Toggle all rotation banners on/off                                 |
+| Field             | Description                                                           |
+| ----------------- | --------------------------------------------------------------------- |
+| Enable            | Toggle all rotation banners on/off                                    |
 | Shuffle           | Show messages in random order (on by default); uncheck for sequential |
-| Text              | Message to display                                                 |
-| URL               | Optional link — clicking the banner opens this URL in a new tab    |
-| Background colour | CSS colour value, e.g. `#1976d2`                                   |
-| Text colour       | CSS colour value, e.g. `#fff`                                      |
-| Schedule          | When to show this message — see [schedule types](#schedules) below |
+| Text              | Message to display                                                    |
+| URL               | Optional link — clicking the banner opens this URL in a new tab       |
+| Background colour | CSS colour value, e.g. `#1976d2`                                      |
+| Text colour       | CSS colour value, e.g. `#fff`                                         |
+| Schedule          | When to show this message — see [schedule types](#schedules) below    |
 
 Each message row has its own enable checkbox — uncheck to pause a single message without removing it.
 Messages that are disabled or outside their schedule are silently skipped.
@@ -58,19 +58,19 @@ The **Annual** panel includes one-click shortcuts for common holidays (Christmas
 
 ### Visibility
 
-| Field                          | Default | Description                                                              |
-| ------------------------------ | ------- | ------------------------------------------------------------------------ |
+| Field                          | Default | Description                                                                                                                                     |
+| ------------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Show banner in admin dashboard | off     | When enabled, the banner also appears on admin pages (dashboard, plugins, settings…). Disabled by default as the banner overlaps admin content. |
 
 ### Appearance
 
-| Field             | Default  | Description                                           |
-| ----------------- | -------- | ----------------------------------------------------- |
-| Text alignment    | Center   | Align banner text left or center                      |
-| Font size (px)    | 14       | Base font size; mobile uses 1px smaller automatically |
-| Banner height (px)| 36       | Height of the banner bar (24–80 px)                   |
-| Bold text         | on       | Whether banner text is rendered bold                  |
-| Transition speed  | Normal   | Fade speed: None, Fast, Normal, Slow                  |
+| Field              | Default | Description                                           |
+| ------------------ | ------- | ----------------------------------------------------- |
+| Text alignment     | Center  | Align banner text left or center                      |
+| Font size (px)     | 14      | Base font size; mobile uses 1px smaller automatically |
+| Banner height (px) | 36      | Height of the banner bar (24–80 px)                   |
+| Bold text          | on      | Whether banner text is rendered bold                  |
+| Transition speed   | Normal  | Fade speed: None, Fast, Normal, Slow                  |
 
 ### Timing
 
@@ -85,20 +85,20 @@ The **Annual** panel includes one-click shortcuts for common holidays (Christmas
 
 **Permanent banner**
 
-| Field               | Default | Description                                                                                    |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| Show dismiss button | off     | Adds a × button to the permanent banner so users can close it for the session                  |
+| Field               | Default | Description                                                                   |
+| ------------------- | ------- | ----------------------------------------------------------------------------- |
+| Show dismiss button | off     | Adds a × button to the permanent banner so users can close it for the session |
 
 When _Show dismiss button_ is on and _Persist dismissed messages_ (Behaviour) is also on, the dismissal survives page reloads.
 
 **Rotation messages**
 
-| Field                       | Default    | Description                                            |
-| --------------------------- | ---------- | ------------------------------------------------------ |
-| Show dismiss button         | on         | Whether the per-message × button is visible            |
-| Show "hide all" button      | on         | Whether the "hide all" button is visible               |
-| "Hide all" button size (px) | 10         | Font size of the "hide all" button                     |
-| "Hide all" button label     | `hide all` | Custom label for the "hide all" button                 |
+| Field                       | Default    | Description                                 |
+| --------------------------- | ---------- | ------------------------------------------- |
+| Show dismiss button         | on         | Whether the per-message × button is visible |
+| Show "hide all" button      | on         | Whether the "hide all" button is visible    |
+| "Hide all" button size (px) | 10         | Font size of the "hide all" button          |
+| "Hide all" button label     | `hide all` | Custom label for the "hide all" button      |
 
 Each subsection heading has a small restore icon that resets only that subsection to defaults.
 
@@ -116,3 +116,24 @@ The restore icon next to **Presets** resets the list to the 8 built-in defaults.
 | Wipe all plugin data | Clears the permanent banner, all rotation messages, and resets all settings |
 
 Both buttons require confirmation before applying. Changes only take effect after clicking **Save**.
+
+## Maintenance tab _(new)_
+
+Put the server into maintenance mode — all non-admin users are disabled at the Jellyfin API
+level and see a full-screen overlay on every page (including the login screen).
+
+| Field                   | Description                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| Message shown to users  | Text displayed in the maintenance overlay (default: "Server under maintenance. Please check back later.") |
+| Status page URL         | Optional URL shown as a link in the overlay so users can check server status (http/https only)            |
+| Maintenance mode active | Check to activate; uncheck to deactivate. Applied when you click **Save**.                                |
+
+**Activating** disables all non-admin, non-pre-disabled users at the API level.
+**Deactivating** re-enables only the users that were enabled before maintenance was activated —
+users that were already disabled before activation are left unchanged.
+
+Admins see a "Dismiss (admin)" button in the overlay so they can continue working without
+deactivating maintenance. Non-admin users and unauthenticated visitors (login page) see the
+overlay without a dismiss option.
+
+> Changes take effect as soon as you click **Save** — no page reload required for connected clients.

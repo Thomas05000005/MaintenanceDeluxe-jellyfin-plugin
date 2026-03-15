@@ -152,6 +152,29 @@ public class PermanentOverride
 }
 
 /// <summary>
+/// Maintenance mode configuration.
+/// </summary>
+public class MaintenanceSetting
+{
+    /// <summary>Gets or sets a value indicating whether maintenance mode is active.</summary>
+    [JsonPropertyName("isActive")]
+    public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets the message displayed to users during maintenance.</summary>
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = "Server under maintenance. Please check back later.";
+
+    /// <summary>Gets or sets an optional URL to a status page shown as a link in the maintenance overlay.</summary>
+    [JsonPropertyName("statusUrl")]
+    public string? StatusUrl { get; set; }
+
+    /// <summary>Gets or sets the IDs of users who were already disabled before maintenance was activated.
+    /// These users are NOT re-enabled when maintenance is deactivated.</summary>
+    [JsonPropertyName("preDisabledUserIds")]
+    public List<string> PreDisabledUserIds { get; set; } = new();
+}
+
+/// <summary>
 /// Plugin configuration for JellyFlare.
 /// Serialized to XML by Jellyfin and exposed as JSON via <c>/JellyFlare/config</c>.
 /// </summary>
@@ -183,6 +206,7 @@ public class PluginConfiguration : BasePluginConfiguration
         BannerHeight = 36;
         FontBold = true;
         ShowRefreshPrompt = true;
+        MaintenanceMode = new MaintenanceSetting();
     }
 
     /// <summary>Gets or sets how long (seconds) each message is displayed before cycling.</summary>
@@ -272,4 +296,8 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the Unix timestamp (seconds) of the last config save. Used by clients to detect config changes.</summary>
     [JsonPropertyName("lastModified")]
     public long LastModified { get; set; }
+
+    /// <summary>Gets or sets the maintenance mode configuration.</summary>
+    [JsonPropertyName("maintenanceMode")]
+    public MaintenanceSetting MaintenanceMode { get; set; }
 }

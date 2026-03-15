@@ -39,6 +39,11 @@
     var STORAGE_KEY = "jf-dismissed-v1";
     var CONFIG_LAST_MODIFIED = 0; // tracks the lastModified stamp of the loaded config
 
+    var MAINTENANCE = null;
+    var IS_ADMIN = false;
+    var maintenanceOverlay = null;
+    var OVERLAY_Z_INDEX = 1000000; // above BANNER_Z_INDEX (999999)
+
     // Cross-tab dismiss sync via BroadcastChannel (graceful degradation if unavailable).
     var bc = null;
     try { bc = new BroadcastChannel("jf-banner-v1"); } catch (e) {}
@@ -483,6 +488,75 @@
         }
     }
 
+    // --- Maintenance overlay ---
+    function showMaintenanceOverlay(message, isAdmin) {
+        if (maintenanceOverlay) return;
+        var overlay = document.createElement("div");
+        overlay.id = "jf-maintenance-overlay";
+        overlay.style.cssText = [
+            "position:fixed;inset:0;z-index:" + OVERLAY_Z_INDEX + ";",
+            "background:rgba(10,10,10,0.92);",
+            "display:flex;flex-direction:column;align-items:center;justify-content:center;",
+            "color:#e0e0e0;font-family:inherit;text-align:center;padding:24px;"
+        ].join("");
+
+        var icon = document.createElement("div");
+        icon.style.cssText = "font-size:48px;margin-bottom:16px";
+        icon.textContent = "\u26a0\ufe0f";
+
+        var msg = document.createElement("div");
+        msg.style.cssText = "font-size:20px;font-weight:600;max-width:480px;line-height:1.5";
+        msg.textContent = message || "Server under maintenance. Please check back later.";
+
+        overlay.appendChild(icon);
+        overlay.appendChild(msg);
+
+        if (MAINTENANCE && MAINTENANCE.statusUrl) {
+            var link = document.createElement("a");
+            link.href = MAINTENANCE.statusUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "Check server status \u2197";
+            link.style.cssText = "display:block;margin-top:14px;color:#90caf9;font-size:14px";
+            overlay.appendChild(link);
+        }
+
+        if (isAdmin) {
+            var dismissBtn = document.createElement("button");
+            dismissBtn.style.cssText = [
+                "margin-top:24px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);",
+                "background:rgba(255,255,255,0.1);color:#e0e0e0;border-radius:4px;",
+                "cursor:pointer;font-size:13px;font-family:inherit;"
+            ].join("");
+            dismissBtn.textContent = "\u2715 Dismiss (admin)";
+            dismissBtn.addEventListener("click", function () {
+                removeMaintenanceOverlay();
+            });
+            overlay.appendChild(dismissBtn);
+        }
+
+        document.body.appendChild(overlay);
+        maintenanceOverlay = overlay;
+    }
+
+    function removeMaintenanceOverlay() {
+        if (maintenanceOverlay && maintenanceOverlay.parentNode) {
+            maintenanceOverlay.parentNode.removeChild(maintenanceOverlay);
+        }
+        maintenanceOverlay = null;
+    }
+
+    function applyMaintenanceState() {
+        if (!MAINTENANCE) return;
+        if (MAINTENANCE.isActive) {
+            if (!maintenanceOverlay) {
+                showMaintenanceOverlay(MAINTENANCE.message, IS_ADMIN);
+            }
+        } else {
+            removeMaintenanceOverlay();
+        }
+    }
+
     // --- Main loop ---
     function tick() {
         if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); return; }
@@ -535,19 +609,36 @@
     }
 
     // --- Go ---
-    // Banner is for registered users only — require a valid Jellyfin auth token.
     function getToken() { return window.ApiClient ? window.ApiClient.accessToken() : null; }
-    var token = getToken();
-    if (!token) return;
 
-    fetch("/JellyFlare/config", {
-        headers: { "Authorization": "MediaBrowser Token=\"" + token + "\"" }
-    })
+    // Fetch maintenance state without auth — works even on the login page.
+    fetch("/JellyFlare/maintenance")
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (config) {
-            if (!config) return;
-            CONFIG = config;
-            CONFIG_LAST_MODIFIED = config.lastModified || 0;
+        .catch(function () { return null; })
+        .then(function (maint) {
+            MAINTENANCE = maint;
+
+            var token = getToken();
+            if (!token) {
+                // Login page / no session — show overlay if active, then stop.
+                applyMaintenanceState();
+                return;
+            }
+
+            var configPromise = fetch("/JellyFlare/config", {
+                headers: { "Authorization": "MediaBrowser Token=\"" + token + "\"" }
+            }).then(function (r) { return r.ok ? r.json() : null; });
+
+            var userPromise = (window.ApiClient && typeof window.ApiClient.getCurrentUser === "function")
+                ? window.ApiClient.getCurrentUser() : Promise.resolve(null);
+
+            Promise.all([configPromise, userPromise])
+                .then(function (results) {
+                    var config = results[0]; var user = results[1];
+                    if (!config) return;
+                    CONFIG = config;
+                    CONFIG_LAST_MODIFIED = config.lastModified || 0;
+                    IS_ADMIN = !!(user && user.Policy && user.Policy.IsAdministrator);
 
             // --- Banner height ---
             var h = Math.max(24, Math.min(80, CONFIG.bannerHeight || BANNER_H));
@@ -612,6 +703,11 @@
                     if (document.body.classList.contains('jf-banner-active')) {
                         requestAnimationFrame(applyBodyMargin);
                     }
+                    // Re-check maintenance state on each navigation (unauthenticated).
+                    fetch("/JellyFlare/maintenance")
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (m) { if (!m) return; MAINTENANCE = m; applyMaintenanceState(); })
+                        .catch(function () {});
                     // Poll config for changes: if lastModified has advanced, reload
                     // the full config so new messages appear within one rotation cycle.
                     var tok = getToken();
@@ -674,9 +770,11 @@
                 };
             }
 
+            applyMaintenanceState();
             tick();
         })
         .catch(function (err) {
-            console.warn("[JellyFlare] Failed to load config:", err);
+            console.warn("[JellyFlare] init failed:", err);
+        });
         });
 })();

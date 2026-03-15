@@ -18,6 +18,9 @@ Put announcements where your users will actually see them — a customisable ban
 - 🔗 Optional click-through URL per message — clicking the banner opens a link in a new tab
 - 🙈 Option to hide the banner while browsing the admin dashboard
 - 🔁 Cross-tab dismiss sync — dismissing a message in one tab instantly hides it in all other open tabs
+- 🛠️ **Maintenance mode** _(new)_ — instantly block non-admin users at the API level with a
+  full-screen overlay; overlay also appears on the login page so kicked-out users see an
+  explanation; optional link to an external status page
 
 ## Prerequisites
 
@@ -80,7 +83,7 @@ If a one-liner banner is all you need, a raw JS Injector script is fine. If you 
 
 ## Configuration
 
-The plugin page has three tabs. See [docs/configuration.md](./docs/configuration.md) for field-level details.
+The plugin page has four tabs. See [docs/configuration.md](./docs/configuration.md) for field-level details.
 
 ### 📌 Permanent tab
 
@@ -112,6 +115,21 @@ Control visibility (optionally show on admin pages — off by default), appearan
 <summary>Screenshot</summary>
 
 ![Settings tab](./assets/screenshots/settings.png)
+
+</details>
+
+### 🛠️ Maintenance tab _(new)_
+
+Put the server into maintenance mode with one click: all non-admin users are disabled at the
+API level and see a full-screen overlay (on every page, including the login screen). Set a
+custom message and an optional link to an external status page. Admins can dismiss the overlay
+to keep working. Deactivating re-enables only the users who were active before maintenance
+started.
+
+<details>
+<summary>Screenshot</summary>
+
+![Maintenance tab](./assets/screenshots/maintenance.png)
 
 </details>
 
