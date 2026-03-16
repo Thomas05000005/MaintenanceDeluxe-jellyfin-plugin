@@ -109,6 +109,9 @@ public class BannerController : ControllerBase
             if (err is not null) return BadRequest(err);
         }
 
+        // Maintenance mode is managed by its own endpoint — preserve the live state unchanged.
+        config.MaintenanceMode = Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting();
+
         config.LastModified = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         Plugin.Instance.UpdateConfiguration(config);
         Plugin.Instance.SaveConfiguration();

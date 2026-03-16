@@ -234,6 +234,32 @@
           color: #aaa;
         }
 
+        /* ── Maintenance affected users ─────────────────────────── */
+        #jf-maintenance-affected {
+          margin-top: 1.4em;
+        }
+        #jf-maintenance-affected details summary {
+          cursor: pointer;
+          opacity: 0.75;
+          user-select: none;
+          list-style: none;
+        }
+        #jf-maintenance-affected details summary::before {
+          content: '\25B6';
+          font-size: 0.75em;
+          margin-right: 6px;
+        }
+        #jf-maintenance-affected details[open] summary::before {
+          content: '\25BC';
+          margin-right: 6px;
+        }
+        #jf-maintenance-affected-list {
+          margin-top: 8px;
+          padding-left: 16px;
+          opacity: 0.7;
+          line-height: 1.8;
+        }
+
         /* ── Maintenance badge ──────────────────────────────────── */
         .jf-maintenance-badge {
           display: inline-block;
@@ -244,14 +270,14 @@
           text-transform: uppercase;
         }
         .jf-maintenance-badge.active {
-          background: rgba(198, 40, 40, 0.2);
-          color: #ef9a9a;
-          border: 1px solid rgba(198, 40, 40, 0.5);
-        }
-        .jf-maintenance-badge.inactive {
           background: rgba(46, 125, 50, 0.2);
           color: #a5d6a7;
           border: 1px solid rgba(46, 125, 50, 0.5);
+        }
+        .jf-maintenance-badge.inactive {
+          background: rgba(198, 40, 40, 0.2);
+          color: #ef9a9a;
+          border: 1px solid rgba(198, 40, 40, 0.5);
         }
       </style>
       <div data-role="content">
@@ -810,12 +836,23 @@
             <!-- ══ Tab: Maintenance ════════════════════════════════════ -->
             <div class="jf-panel" data-panel="maintenance">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:1em">
-                <h3 class="sectionTitle" style="margin:0">Status</h3>
+                <h3 class="sectionTitle" style="margin:0">
+                  Status
+                  <button type="button" class="jf-icon-btn" id="resetMaintenance" title="Reset to defaults">
+                    <span class="material-icons" style="font-size:16px">restore</span>
+                  </button>
+                </h3>
                 <span id="maintenanceStatusBadge" class="jf-maintenance-badge inactive">Inactive</span>
               </div>
               <div class="fieldDescription" style="margin-bottom:1.2em">
                 Activating maintenance mode disables all non-admin users at the API level until deactivated.
                 Users already disabled before activation are not re-enabled on deactivation.
+              </div>
+              <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:1.2em">
+                <label class="emby-checkbox-label">
+                  <input id="maintenanceIsActive" is="emby-checkbox" type="checkbox" />
+                  <span>Enter maintenance mode</span>
+                </label>
               </div>
               <div class="inputContainer" style="margin-bottom:1.2em">
                 <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Message shown to users</label>
@@ -828,11 +865,15 @@
                   placeholder="https://status.example.com" />
                 <div class="fieldDescription">Shown as a link in the maintenance overlay so users can check server status.</div>
               </div>
-              <div class="checkboxContainer">
-                <label>
-                  <input type="checkbox" is="emby-checkbox" id="maintenanceIsActive" />
-                  <span>Maintenance mode active</span>
-                </label>
+              <div id="jf-maintenance-affected" style="margin-top:1.4em">
+                <details>
+                  <summary><span id="jf-maintenance-affected-summary">Users affected</span></summary>
+                  <div id="jf-maintenance-affected-list"></div>
+                </details>
+                <div class="fieldDescription" style="margin-top:0.8em;color:var(--warning-color, #e6a817)">
+                  Warning: all affected users will need to log in again, including those who did not try to
+                  connect during maintenance, as their sessions are invalidated when accounts are disabled.
+                </div>
               </div>
             </div>
             <!-- /panel: maintenance -->
@@ -923,6 +964,12 @@
             showDismissButton: true,
             showDismissAll: true,
             rotationEnabled: true
+          };
+
+          var MAINTENANCE_DEFAULTS = {
+            isActive: false,
+            message: 'Server under maintenance. Please check back later.',
+            statusUrl: ''
           };
 
           var ANNUAL_PRESETS = [
@@ -2005,6 +2052,12 @@
               CONFIG_DEFAULTS.showRefreshPrompt;
           }
 
+          function resetSectionMaintenance() {
+            document.getElementById('maintenanceIsActive').checked = MAINTENANCE_DEFAULTS.isActive;
+            document.getElementById('maintenanceMessage').value = MAINTENANCE_DEFAULTS.message;
+            document.getElementById('maintenanceStatusUrl').value = MAINTENANCE_DEFAULTS.statusUrl;
+          }
+
           function resetSectionPresets() {
             var list = document.getElementById('presetList');
             list.innerHTML = '';
@@ -2081,6 +2134,13 @@
               .getElementById('resetPresets')
               .addEventListener('click', function () {
                 resetSectionPresets();
+                notifyResetDone();
+              });
+
+            document
+              .getElementById('resetMaintenance')
+              .addEventListener('click', function () {
+                resetSectionMaintenance();
                 notifyResetDone();
               });
 
@@ -2385,6 +2445,12 @@
 
           // ── maintenance mode ───────────────────────────────────────
 
+          function escHtml(s) {
+            return String(s).replace(/[<>&"]/g, function (c) {
+              return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c];
+            });
+          }
+
           function applyMaintenanceUi(m) {
             var badge = document.getElementById('maintenanceStatusBadge');
             var msgInput = document.getElementById('maintenanceMessage');
@@ -2398,6 +2464,66 @@
               if (msgInput) msgInput.value = m.message || '';
               if (statusUrlInput) statusUrlInput.value = m.statusUrl || '';
               if (isActiveCheckbox) isActiveCheckbox.checked = active;
+            }
+
+            var affectedSummary = document.getElementById('jf-maintenance-affected-summary');
+            var affectedList = document.getElementById('jf-maintenance-affected-list');
+            if (!affectedSummary || !affectedList) return;
+
+            function renderNames(names, label) {
+              affectedSummary.textContent = label + ' (' + names.length + ')';
+              affectedList.innerHTML = names.length
+                ? names.map(function (n) { return '<div>' + escHtml(n) + '</div>'; }).join('')
+                : '<div style="opacity:.6;font-style:italic">None found.</div>';
+            }
+
+            function renderError(label) {
+              affectedSummary.textContent = label;
+              affectedList.innerHTML = '<div style="opacity:.6;font-style:italic">Failed to load users.</div>';
+            }
+
+            affectedSummary.textContent = 'Loading\u2026';
+            affectedList.innerHTML = '';
+
+            if (active) {
+              var ids = (m && m.maintenanceDisabledUserIds) || [];
+              if (ids.length > 0) {
+                // Tracked: fetch names for the stored IDs.
+                Promise.all(ids.map(function (id) {
+                  return ApiClient.getJSON(ApiClient.getUrl('Users/' + id))
+                    .then(function (u) { return u ? (u.Name || id) : id; })
+                    .catch(function () { return id; });
+                })).then(function (names) {
+                  renderNames(names, 'Users to re-enable on deactivation');
+                });
+              } else {
+                // Legacy activation (no tracking): fetch currently disabled non-admins.
+                var preDisabled = (m && m.preDisabledUserIds) || [];
+                ApiClient.getJSON(ApiClient.getUrl('Users?isDisabled=true'))
+                  .then(function (users) {
+                    var names = (users || [])
+                      .filter(function (u) {
+                        return !(u.Policy && u.Policy.IsAdministrator)
+                          && preDisabled.indexOf(u.Id) === -1;
+                      })
+                      .map(function (u) { return u.Name || u.Id; });
+                    renderNames(names, 'Disabled users — no tracking data, re-enable manually');
+                  })
+                  .catch(function () { renderError('Disabled users (failed to load)'); });
+              }
+            } else {
+              // Inactive: show who would be disabled on activation.
+              ApiClient.getJSON(ApiClient.getUrl('Users'))
+                .then(function (users) {
+                  var names = (users || [])
+                    .filter(function (u) {
+                      return !(u.Policy && u.Policy.IsAdministrator)
+                        && !(u.Policy && u.Policy.IsDisabled);
+                    })
+                    .map(function (u) { return u.Name || u.Id; });
+                  renderNames(names, 'Users that will be disabled');
+                })
+                .catch(function () { renderError('Users that will be disabled (failed to load)'); });
             }
           }
 
@@ -2415,6 +2541,8 @@
               .then(function (current) {
                 var wasActive = !!(current && current.isActive);
                 var preDisabledUserIds = (current && current.preDisabledUserIds) || [];
+                // IDs of users JellyFlare actually disabled — used to re-enable on deactivation.
+                var maintenanceDisabledUserIds = (current && current.maintenanceDisabledUserIds) || [];
 
                 if (!wasActive && isActive) {
                   // Activating: record already-disabled users, then disable all non-admins.
@@ -2426,43 +2554,53 @@
                       nonAdmins.forEach(function (u) {
                         if (u.Policy && u.Policy.IsDisabled) preDisabledUserIds.push(u.Id);
                       });
-                      var disablePromises = nonAdmins
-                        .filter(function (u) { return !(u.Policy && u.Policy.IsDisabled); })
-                        .map(function (u) {
-                          return ApiClient.ajax({
-                            type: 'POST',
-                            url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
-                            data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: true })),
-                            contentType: 'application/json'
-                          });
+                      var toDisable = nonAdmins.filter(function (u) {
+                        return !(u.Policy && u.Policy.IsDisabled);
+                      });
+                      var newMaintenanceDisabledIds = toDisable.map(function (u) { return u.Id; });
+                      var disablePromises = toDisable.map(function (u) {
+                        return ApiClient.ajax({
+                          type: 'POST',
+                          url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
+                          data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: true })),
+                          contentType: 'application/json'
                         });
-                      return Promise.all(disablePromises).then(function () { return preDisabledUserIds; });
+                      });
+                      return Promise.all(disablePromises).then(function () {
+                        return { preDisabledUserIds: preDisabledUserIds, maintenanceDisabledUserIds: newMaintenanceDisabledIds };
+                      });
                     });
                 } else if (wasActive && !isActive) {
-                  // Deactivating: re-enable users not pre-disabled before maintenance.
-                  return ApiClient.getJSON(ApiClient.getUrl('Users'))
-                    .then(function (users) {
-                      var nonAdmins = (users || []).filter(function (u) {
-                        return !(u.Policy && u.Policy.IsAdministrator);
-                      });
-                      var enablePromises = nonAdmins
-                        .filter(function (u) { return preDisabledUserIds.indexOf(u.Id) === -1; })
-                        .map(function (u) {
-                          return ApiClient.ajax({
-                            type: 'POST',
-                            url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
-                            data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: false })),
-                            contentType: 'application/json'
-                          });
+                  // Deactivating: re-enable users that JellyFlare disabled.
+                  // Prefer the stored list of IDs (fetching each user individually) so deactivation
+                  // works even if GET /Users omits disabled accounts. Fall back to the Users list
+                  // for deployments that pre-date maintenanceDisabledUserIds tracking.
+                  var reEnableById = function (userId) {
+                    return ApiClient.getJSON(ApiClient.getUrl('Users/' + userId))
+                      .then(function (user) {
+                        if (!user) return;
+                        return ApiClient.ajax({
+                          type: 'POST',
+                          url: ApiClient.getUrl('Users/' + userId + '/Policy'),
+                          data: JSON.stringify(Object.assign({}, user.Policy || {}, { IsDisabled: false })),
+                          contentType: 'application/json'
                         });
-                      return Promise.all(enablePromises).then(function () { return []; });
-                    });
+                      })
+                      .catch(function () {});
+                  };
+                  var enablePromises = maintenanceDisabledUserIds.map(reEnableById);
+                  return Promise.allSettled(enablePromises).then(function () {
+                    return { preDisabledUserIds: [], maintenanceDisabledUserIds: [] };
+                  });
                 } else {
-                  // No state change: preserve existing preDisabledUserIds.
-                  return Promise.resolve(isActive ? preDisabledUserIds : []);
+                  // No state change: preserve existing state.
+                  return Promise.resolve({
+                    preDisabledUserIds: preDisabledUserIds,
+                    maintenanceDisabledUserIds: maintenanceDisabledUserIds
+                  });
                 }
               })
-              .then(function (finalPreDisabledUserIds) {
+              .then(function (finalState) {
                 return ApiClient.ajax({
                   type: 'POST',
                   url: ApiClient.getUrl('JellyFlare/maintenance'),
@@ -2470,7 +2608,8 @@
                     isActive: isActive,
                     message: message,
                     statusUrl: statusUrl,
-                    preDisabledUserIds: finalPreDisabledUserIds
+                    preDisabledUserIds: finalState.preDisabledUserIds || [],
+                    maintenanceDisabledUserIds: finalState.maintenanceDisabledUserIds || []
                   }),
                   contentType: 'application/json'
                 });

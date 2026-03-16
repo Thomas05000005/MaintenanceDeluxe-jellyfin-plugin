@@ -172,6 +172,11 @@ public class MaintenanceSetting
     /// These users are NOT re-enabled when maintenance is deactivated.</summary>
     [JsonPropertyName("preDisabledUserIds")]
     public List<string> PreDisabledUserIds { get; set; } = new();
+
+    /// <summary>Gets or sets the IDs of users that JellyFlare disabled when maintenance was activated.
+    /// These are the users that will be re-enabled when maintenance is deactivated.</summary>
+    [JsonPropertyName("maintenanceDisabledUserIds")]
+    public List<string> MaintenanceDisabledUserIds { get; set; } = new();
 }
 
 /// <summary>

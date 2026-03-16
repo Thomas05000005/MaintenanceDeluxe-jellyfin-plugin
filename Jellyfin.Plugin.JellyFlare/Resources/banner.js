@@ -42,6 +42,7 @@
     var MAINTENANCE = null;
     var IS_ADMIN = false;
     var maintenanceOverlay = null;
+    var adminDismissed = false;
     var OVERLAY_Z_INDEX = 1000000; // above BANNER_Z_INDEX (999999)
 
     // Cross-tab dismiss sync via BroadcastChannel (graceful degradation if unavailable).
@@ -530,6 +531,7 @@
             ].join("");
             dismissBtn.textContent = "\u2715 Dismiss (admin)";
             dismissBtn.addEventListener("click", function () {
+                adminDismissed = true;
                 removeMaintenanceOverlay();
             });
             overlay.appendChild(dismissBtn);
@@ -549,10 +551,11 @@
     function applyMaintenanceState() {
         if (!MAINTENANCE) return;
         if (MAINTENANCE.isActive) {
-            if (!maintenanceOverlay) {
+            if (!maintenanceOverlay && !(IS_ADMIN && adminDismissed)) {
                 showMaintenanceOverlay(MAINTENANCE.message, IS_ADMIN);
             }
         } else {
+            adminDismissed = false;
             removeMaintenanceOverlay();
         }
     }
