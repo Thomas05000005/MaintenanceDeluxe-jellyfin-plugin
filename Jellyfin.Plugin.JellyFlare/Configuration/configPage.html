@@ -293,6 +293,11 @@
               After saving, refresh your browser page for the changes to take
               effect.
             </div>
+            <div id="jf-dep-warning" style="display:none; background:#7b2b2b; color:#fff; border-radius:4px; padding:0.6em 1em; margin-bottom:1em; font-size:0.9em">
+              <strong>Missing dependencies:</strong> <span id="jf-dep-list"></span>.
+              The banner will not appear until these are installed and active.
+              See the <a href="https://github.com/MorganKryze/JellyFlare/blob/main/README.md#prerequisites" target="_blank" rel="noopener" style="color:#ffd;text-decoration:underline">prerequisites</a>.
+            </div>
 
             <!-- ── Tab strip ───────────────────────────────────────── -->
             <div class="jf-tab-strip">
@@ -2631,10 +2636,35 @@
 
           // ── pageshow: load fresh config each visit ────────────────
 
+          function checkDependencies() {
+            var REQUIRED = [
+              { name: 'JavaScript Injector', match: 'javascript injector' },
+              { name: 'File Transformation', match: 'file transformation' },
+            ];
+            ApiClient.getJSON(ApiClient.getUrl('Plugins'))
+              .then(function (plugins) {
+                var activeNames = plugins
+                  .filter(function (p) { return p.Status === 'Active'; })
+                  .map(function (p) { return p.Name.toLowerCase(); });
+                var missing = REQUIRED.filter(function (r) {
+                  return !activeNames.some(function (n) { return n.includes(r.match); });
+                }).map(function (r) { return r.name; });
+                var warn = document.getElementById('jf-dep-warning');
+                if (missing.length) {
+                  document.getElementById('jf-dep-list').textContent = missing.join(', ');
+                  warn.style.display = '';
+                } else {
+                  warn.style.display = 'none';
+                }
+              })
+              .catch(function () {});
+          }
+
           document
             .getElementById('JellyFlareConfigPage')
             .addEventListener('pageshow', function () {
               initDom();
+              checkDependencies();
               ApiClient.getJSON(ApiClient.getUrl('JellyFlare/config')).then(
                 function (config) {
                   populatePage(config);
