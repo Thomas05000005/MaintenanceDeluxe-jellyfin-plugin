@@ -1,10 +1,10 @@
-# JellyFlare — A Jellyfin Plugin
+# JellyFlare - A Jellyfin Plugin
 
-![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11.6%2B-00a4dc?logo=jellyfin&logoColor=white) ![Client](https://img.shields.io/badge/compatibility-web%20clients%20only-4A90D9?logo=javascript&logoColor=white) ![Issues](https://img.shields.io/github/issues/MorganKryze/JellyFlare?logo=github&logoColor=white) ![Version](https://img.shields.io/github/v/release/MorganKryze/JellyFlare?logo=semantic-release&logoColor=white&label=version&color=AA5CC3) ![Last Commit](https://img.shields.io/github/last-commit/MorganKryze/JellyFlare/main?logo=github&logoColor=white&label=Last%20Updated&color=AA5CC3&cacheSeconds=3600) ![Commit Activity](https://img.shields.io/github/commit-activity/m/MorganKryze/JellyFlare?logo=github&logoColor=white&label=Commit%20Activity&color=AA5CC3&cacheSeconds=3600) ![License](https://img.shields.io/github/license/MorganKryze/JellyFlare?logoColor=white)
+![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11.6%2B-00a4dc?logo=jellyfin&logoColor=white) ![Client](https://img.shields.io/badge/compatibility-web%20clients%20only-4A90D9?logo=javascript&logoColor=white) ![Issues](https://img.shields.io/github/issues/MorganKryze/JellyFlare?logo=github&logoColor=white) ![Version](https://img.shields.io/github/v/release/MorganKryze/JellyFlare?logo=semantic-release&logoColor=white&label=version&color=AA5CC3) ![Last Commit](https://img.shields.io/github/last-commit/MorganKryze/JellyFlare/main?logo=github&logoColor=white&label=Last%20Updated&color=AA5CC3&cacheSeconds=3600) ![License](https://img.shields.io/github/license/MorganKryze/JellyFlare?logoColor=white)
 
 ![Banner](./assets/banner-readme.png)
 
-Put announcements where your users will actually see them — a customisable banner at the top of Jellyfin, with rotating messages, scheduling, and link support.
+Put announcements where your users will actually see them: a customisable banner at the top of Jellyfin, with rotating messages, scheduling, and link support.
 
 ## Features
 
@@ -13,22 +13,23 @@ Put announcements where your users will actually see them — a customisable ban
 - 🔄 Rotating messages with configurable display and pause durations
 - 🎨 Per-message background and text colour with a named preset palette
 - 📅 Flexible per-message scheduling: always, fixed date range, annual (e.g. Christmas), weekly, or daily time window
-- 📌 Permanent banner library — save multiple entries and pick the active one; supersedes all rotation messages when enabled
+- 📌 Permanent banner library: save multiple entries and pick the active one; supersedes all rotation messages when enabled
 - 🎛️ Configurable dismiss controls: show/hide × and "hide all" buttons, with custom sizes and label
-- 🔗 Optional click-through URL per message — clicking the banner opens a link in a new tab
+- 🔗 Optional click-through URL per message; clicking the banner opens a link in a new tab
 - 🙈 Option to hide the banner while browsing the admin dashboard
-- 🔁 Cross-tab dismiss sync — dismissing a message in one tab instantly hides it in all other open tabs
-- 🛠️ **Maintenance mode** _(new)_ — instantly block non-admin users at the API level with a
+- 🔁 Cross-tab dismiss sync: dismissing a message in one tab instantly hides it in all other open tabs
+- 🛠️ **Maintenance mode** _(new)_: instantly block non-admin users at the API level with a
   full-screen overlay; overlay also appears on the login page so kicked-out users see an
-  explanation; optional link to an external status page
+  explanation; optional link to an external status page; schedule activation, deactivation, and
+  server restarts automatically
 
 ## Prerequisites
 
 Install these three components **in order** before adding JellyFlare:
 
-1. **Jellyfin 10.11.6 or later** — [jellyfin.org](https://jellyfin.org) _(earlier versions are not supported)_
+1. **Jellyfin 10.11.6 or later** ([jellyfin.org](https://jellyfin.org)); earlier versions are not supported.
 
-2. **File Transformation** (by IAmParadox27) — required by JS Injector
+2. **File Transformation** (by IAmParadox27), required by JS Injector.
    Add this repository in **Dashboard → Plugins → Repositories**:
 
    ```plain
@@ -37,7 +38,7 @@ Install these three components **in order** before adding JellyFlare:
 
    Then install **File Transformation** from the Catalog.
 
-3. **JavaScript Injector** (by n00bcodr) — delivers the banner script to the browser
+3. **JavaScript Injector** (by n00bcodr), delivers the banner script to the browser.
    Add this repository in **Dashboard → Plugins → Repositories**:
 
    ```plain
@@ -70,7 +71,7 @@ Install these three components **in order** before adding JellyFlare:
 
 ## Why JellyFlare?
 
-You can already inject arbitrary CSS or JS into Jellyfin using JS Injector alone — so why add another plugin?
+You can already inject arbitrary CSS or JS into Jellyfin using JS Injector alone. So why add another plugin?
 
 Because maintaining a hand-written script gets old fast. JellyFlare gives you:
 
@@ -87,7 +88,7 @@ The plugin page has four tabs. See [docs/configuration.md](./docs/configuration.
 
 ### 📌 Permanent tab
 
-Pin a banner that overrides all rotation messages — useful for outage notices or time-sensitive announcements. Manage a library of entries and switch the active one without losing the others.
+Pin a banner that overrides all rotation messages, useful for outage notices or time-sensitive announcements. Manage a library of entries and switch the active one without losing the others.
 
 <details>
 <summary>Screenshot</summary>
@@ -109,7 +110,7 @@ Manage the pool of rotating messages: add, reorder, enable/disable individual en
 
 ### ⚙️ Settings tab
 
-Control visibility (optionally show on admin pages — off by default), appearance (font size, banner height, alignment, transition speed), timing (display and pause durations), dismiss controls (permanent dismissibility, rotation × and "hide all" buttons, shared button size), and the named colour preset palette.
+Control visibility (optionally show on admin pages, off by default), appearance (font size, banner height, alignment, transition speed), timing (display and pause durations), dismiss controls (permanent dismissibility, rotation × and "hide all" buttons, shared button size), and the named colour preset palette.
 
 <details>
 <summary>Screenshot</summary>
@@ -124,7 +125,8 @@ Put the server into maintenance mode with one click: all non-admin users are dis
 API level and see a full-screen overlay (on every page, including the login screen). Set a
 custom message and an optional link to an external status page. Admins can dismiss the overlay
 to keep working. Deactivating re-enables only the users who were active before maintenance
-started.
+started. Use the Automation section to schedule a maintenance window (activate and optionally
+deactivate at a set time) or trigger a server restart automatically.
 
 <details>
 <summary>Screenshot</summary>
@@ -138,11 +140,11 @@ started.
 **Banner not showing?**
 
 - Confirm all three prerequisites are installed and Jellyfin has been restarted after each one.
-- Check that you used the **10.11 manifest URLs** listed in Prerequisites — the 10.10 builds silently fail.
+- Check that you used the **10.11 manifest URLs** listed in Prerequisites. The 10.10 builds silently fail.
 - In the Jellyfin admin, verify that **JS Injector** and **File Transformation** both show as _Active_ (not just installed).
 - Open your browser's developer console and look for errors from `banner.js`; a 404 means JellyFlare's API is unreachable, likely a missing restart.
 
-If the issue persists, [open a bug report](https://github.com/MorganKryze/JellyFlare/issues/new/choose) — the template will ask for the details needed to diagnose it.
+If the issue persists, [open a bug report](https://github.com/MorganKryze/JellyFlare/issues/new/choose). The template will ask for the details needed to diagnose it.
 
 ## Development
 
@@ -160,4 +162,4 @@ Parts of this project were developed and documented with AI assistance. All code
 
 ## License
 
-GNU General Public License v3 — see [LICENSE](LICENSE). Use, modify, and redistribute freely — but any distributed derivative must also be GPL v3 and open source.
+GNU General Public License v3. See [LICENSE](LICENSE). Use, modify, and redistribute freely, but any distributed derivative must also be GPL v3 and open source.

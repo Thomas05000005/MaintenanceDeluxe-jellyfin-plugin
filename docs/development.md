@@ -46,7 +46,7 @@ make update   # build → copy DLL → restart container → tail logs
 ## Releasing a new version
 
 1. On GitHub: **Releases → Draft a new release** → create tag `v1.2.0` targeting `main`.
-   Write release notes in the body — they become the `changelog` field in `manifest.json`.
+   Write release notes in the body; they become the `changelog` field in `manifest.json`.
    Then publish.
 2. CI automatically:
    - patches `AssemblyVersion` and `FileVersion` in the csproj from the tag
@@ -54,6 +54,6 @@ make update   # build → copy DLL → restart container → tail logs
    - prepends a new entry to `manifest.json` (with MD5 checksum and your release notes)
    - pushes a `chore: update manifest for vX.X.X` commit back to `main`
    - attaches the ZIP to the GitHub release
-3. Run `git pull` before your next local change — the CI pushes a manifest commit back to `main`.
+3. Run `git pull` before your next local change. The CI pushes a manifest commit back to `main`.
 
 > `make bump V=1.2.0` is still available if you need to bump the csproj locally (e.g. to verify a build), but it is no longer required before releasing.
