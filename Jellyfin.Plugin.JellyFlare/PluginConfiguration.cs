@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using MediaBrowser.Model.Plugins;
@@ -177,6 +178,22 @@ public class MaintenanceSetting
     /// These are the users that will be re-enabled when maintenance is deactivated.</summary>
     [JsonPropertyName("maintenanceDisabledUserIds")]
     public List<string> MaintenanceDisabledUserIds { get; set; } = new();
+
+    /// <summary>Gets or sets whether scheduled auto-activate/deactivate is enabled.</summary>
+    [JsonPropertyName("scheduleEnabled")]
+    public bool ScheduleEnabled { get; set; }
+
+    /// <summary>Gets or sets the UTC datetime at which maintenance auto-activates. Null = no auto-activate.</summary>
+    [JsonPropertyName("scheduledStart")]
+    public DateTime? ScheduledStart { get; set; }
+
+    /// <summary>Gets or sets the UTC datetime at which maintenance auto-deactivates. Null = no auto-deactivate.</summary>
+    [JsonPropertyName("scheduledEnd")]
+    public DateTime? ScheduledEnd { get; set; }
+
+    /// <summary>Gets or sets the UTC datetime at which the server will be restarted. Null = no pending restart. Cleared automatically after triggering.</summary>
+    [JsonPropertyName("scheduledRestart")]
+    public DateTime? ScheduledRestart { get; set; }
 }
 
 /// <summary>

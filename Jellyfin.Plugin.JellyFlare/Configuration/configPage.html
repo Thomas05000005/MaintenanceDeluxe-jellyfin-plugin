@@ -837,25 +837,25 @@
             <div class="jf-panel" data-panel="maintenance">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:1em">
                 <h3 class="sectionTitle" style="margin:0">
-                  Status
+                  Maintenance mode
                   <button type="button" class="jf-icon-btn" id="resetMaintenance" title="Reset to defaults">
                     <span class="material-icons" style="font-size:16px">restore</span>
                   </button>
                 </h3>
                 <span id="maintenanceStatusBadge" class="jf-maintenance-badge inactive">Inactive</span>
               </div>
-              <div class="fieldDescription" style="margin-bottom:1.2em">
-                Activating maintenance mode disables all non-admin users at the API level until deactivated.
-                Users already disabled before activation are not re-enabled on deactivation.
-              </div>
-              <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:1.2em">
+              <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0.6em">
                 <label class="emby-checkbox-label">
                   <input id="maintenanceIsActive" is="emby-checkbox" type="checkbox" />
-                  <span>Enter maintenance mode</span>
+                  <span>Active</span>
                 </label>
               </div>
+              <div class="fieldDescription" style="margin-bottom:1.4em">
+                When active, all non-admin users are disabled at the API level. Users already disabled
+                before activation are not re-enabled on deactivation.
+              </div>
               <div class="inputContainer" style="margin-bottom:1.2em">
-                <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Message shown to users</label>
+                <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Overlay message</label>
                 <input id="maintenanceMessage" is="emby-input" type="text"
                   placeholder="Server under maintenance. Please check back later." />
               </div>
@@ -865,16 +865,45 @@
                   placeholder="https://status.example.com" />
                 <div class="fieldDescription">Shown as a link in the maintenance overlay so users can check server status.</div>
               </div>
-              <div id="jf-maintenance-affected" style="margin-top:1.4em">
+              <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <details>
                   <summary><span id="jf-maintenance-affected-summary">Users affected</span></summary>
                   <div id="jf-maintenance-affected-list"></div>
                 </details>
                 <div class="fieldDescription" style="margin-top:0.8em;color:var(--warning-color, #e6a817)">
-                  Warning: all affected users will need to log in again, including those who did not try to
-                  connect during maintenance, as their sessions are invalidated when accounts are disabled.
+                  All affected users will need to log in again. Sessions are invalidated when accounts are disabled.
                 </div>
               </div>
+              <!-- Automation section -->
+              <div style="margin-top:1.6em">
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Automation</h3>
+                <div class="fieldDescription" style="margin-bottom:1.2em">
+                  Schedule maintenance windows and server restarts. All times use your browser's local timezone and take effect within one minute.
+                </div>
+
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Scheduled maintenance</p>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                  Set an activation time to start maintenance automatically. Add a deactivation time to end it then the schedule clears once the window completes.
+                </div>
+                <div class="inputContainer" style="margin-bottom:1.2em">
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledStart">Activate at</label>
+                  <input id="scheduledStart" is="emby-input" type="datetime-local" />
+                </div>
+                <div class="inputContainer" style="margin-bottom:1.6em">
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledEnd">Deactivate at (optional)</label>
+                  <input id="scheduledEnd" is="emby-input" type="datetime-local" />
+                </div>
+
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Scheduled restart</p>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                  The server restarts once at the specified time. The field clears automatically after the restart.
+                </div>
+                <div class="inputContainer" style="margin-bottom:1.2em">
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledRestart">Restart at</label>
+                  <input id="scheduledRestart" is="emby-input" type="datetime-local" />
+                </div>
+              </div>
+
             </div>
             <!-- /panel: maintenance -->
 
@@ -969,7 +998,10 @@
           var MAINTENANCE_DEFAULTS = {
             isActive: false,
             message: 'Server under maintenance. Please check back later.',
-            statusUrl: ''
+            statusUrl: '',
+            scheduledStart: null,
+            scheduledEnd: null,
+            scheduledRestart: null
           };
 
           var ANNUAL_PRESETS = [
@@ -2056,6 +2088,9 @@
             document.getElementById('maintenanceIsActive').checked = MAINTENANCE_DEFAULTS.isActive;
             document.getElementById('maintenanceMessage').value = MAINTENANCE_DEFAULTS.message;
             document.getElementById('maintenanceStatusUrl').value = MAINTENANCE_DEFAULTS.statusUrl;
+            document.getElementById('scheduledStart').value = '';
+            document.getElementById('scheduledEnd').value = '';
+            document.getElementById('scheduledRestart').value = '';
           }
 
           function resetSectionPresets() {
@@ -2143,6 +2178,7 @@
                 resetSectionMaintenance();
                 notifyResetDone();
               });
+
 
             document
               .getElementById('resetAll')
@@ -2310,6 +2346,12 @@
                   );
                   return;
                 }
+                var schedStart = localToUtcIso(document.getElementById('scheduledStart').value);
+                var schedEnd = localToUtcIso(document.getElementById('scheduledEnd').value);
+                if (schedStart && schedEnd && new Date(schedEnd) <= new Date(schedStart)) {
+                  Dashboard.alert('Cannot save: deactivation time must be after activation time.');
+                  return;
+                }
                 var permData = collectPermanentEntries();
                 var config = {
                   showInDashboard:
@@ -2453,6 +2495,23 @@
             });
           }
 
+          // Converts a UTC ISO datetime string to the "YYYY-MM-DDTHH:MM" format used by datetime-local inputs.
+          function utcToDatetimeLocal(isoStr) {
+            if (!isoStr) return '';
+            var d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            var pad = function (n) { return String(n).padStart(2, '0'); };
+            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+              + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+          }
+
+          // Converts a datetime-local input value (local time) to a UTC ISO string, or null if empty.
+          function localToUtcIso(val) {
+            if (!val) return null;
+            var d = new Date(val);
+            return isNaN(d.getTime()) ? null : d.toISOString();
+          }
+
           function applyMaintenanceUi(m) {
             var badge = document.getElementById('maintenanceStatusBadge');
             var msgInput = document.getElementById('maintenanceMessage');
@@ -2466,6 +2525,13 @@
               if (msgInput) msgInput.value = m.message || '';
               if (statusUrlInput) statusUrlInput.value = m.statusUrl || '';
               if (isActiveCheckbox) isActiveCheckbox.checked = active;
+
+              var scheduledStartEl = document.getElementById('scheduledStart');
+              var scheduledEndEl = document.getElementById('scheduledEnd');
+              var scheduledRestartEl = document.getElementById('scheduledRestart');
+              if (scheduledStartEl) scheduledStartEl.value = utcToDatetimeLocal(m.scheduledStart);
+              if (scheduledEndEl) scheduledEndEl.value = utcToDatetimeLocal(m.scheduledEnd);
+              if (scheduledRestartEl) scheduledRestartEl.value = utcToDatetimeLocal(m.scheduledRestart);
             }
 
             var affectedSummary = document.getElementById('jf-maintenance-affected-summary');
@@ -2530,95 +2596,34 @@
           }
 
           // Returns a Promise — caller handles button state and success/error alerts.
+          // User enable/disable is handled server-side; this function just POSTs the desired state.
           function saveMaintenanceSettings() {
-            var msgInput = document.getElementById('maintenanceMessage');
-            var statusUrlInput = document.getElementById('maintenanceStatusUrl');
-            var isActiveCheckbox = document.getElementById('maintenanceIsActive');
-            var message = (msgInput && msgInput.value.trim()) || 'Server under maintenance. Please check back later.';
-            var statusUrl = (statusUrlInput && statusUrlInput.value.trim()) || '';
-            var isActive = !!(isActiveCheckbox && isActiveCheckbox.checked);
+            var message = (document.getElementById('maintenanceMessage').value.trim())
+              || 'Server under maintenance. Please check back later.';
+            var statusUrl = document.getElementById('maintenanceStatusUrl').value.trim();
+            var isActive = !!document.getElementById('maintenanceIsActive').checked;
+            var scheduledStart = localToUtcIso(document.getElementById('scheduledStart').value);
+            var scheduledEnd = localToUtcIso(document.getElementById('scheduledEnd').value);
+            var scheduledRestart = localToUtcIso(document.getElementById('scheduledRestart').value);
+            var scheduleEnabled = !!(scheduledStart || scheduledEnd);
 
-            // Fetch current server state to detect activation/deactivation transitions.
-            return ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
-              .then(function (current) {
-                var wasActive = !!(current && current.isActive);
-                var preDisabledUserIds = (current && current.preDisabledUserIds) || [];
-                // IDs of users JellyFlare actually disabled — used to re-enable on deactivation.
-                var maintenanceDisabledUserIds = (current && current.maintenanceDisabledUserIds) || [];
-
-                if (!wasActive && isActive) {
-                  // Activating: record already-disabled users, then disable all non-admins.
-                  return ApiClient.getJSON(ApiClient.getUrl('Users'))
-                    .then(function (users) {
-                      var nonAdmins = (users || []).filter(function (u) {
-                        return !(u.Policy && u.Policy.IsAdministrator);
-                      });
-                      nonAdmins.forEach(function (u) {
-                        if (u.Policy && u.Policy.IsDisabled) preDisabledUserIds.push(u.Id);
-                      });
-                      var toDisable = nonAdmins.filter(function (u) {
-                        return !(u.Policy && u.Policy.IsDisabled);
-                      });
-                      var newMaintenanceDisabledIds = toDisable.map(function (u) { return u.Id; });
-                      var disablePromises = toDisable.map(function (u) {
-                        return ApiClient.ajax({
-                          type: 'POST',
-                          url: ApiClient.getUrl('Users/' + u.Id + '/Policy'),
-                          data: JSON.stringify(Object.assign({}, u.Policy, { IsDisabled: true })),
-                          contentType: 'application/json'
-                        });
-                      });
-                      return Promise.all(disablePromises).then(function () {
-                        return { preDisabledUserIds: preDisabledUserIds, maintenanceDisabledUserIds: newMaintenanceDisabledIds };
-                      });
-                    });
-                } else if (wasActive && !isActive) {
-                  // Deactivating: re-enable users that JellyFlare disabled.
-                  // Prefer the stored list of IDs (fetching each user individually) so deactivation
-                  // works even if GET /Users omits disabled accounts. Fall back to the Users list
-                  // for deployments that pre-date maintenanceDisabledUserIds tracking.
-                  var reEnableById = function (userId) {
-                    return ApiClient.getJSON(ApiClient.getUrl('Users/' + userId))
-                      .then(function (user) {
-                        if (!user) return;
-                        return ApiClient.ajax({
-                          type: 'POST',
-                          url: ApiClient.getUrl('Users/' + userId + '/Policy'),
-                          data: JSON.stringify(Object.assign({}, user.Policy || {}, { IsDisabled: false })),
-                          contentType: 'application/json'
-                        });
-                      })
-                      .catch(function () {});
-                  };
-                  var enablePromises = maintenanceDisabledUserIds.map(reEnableById);
-                  return Promise.allSettled(enablePromises).then(function () {
-                    return { preDisabledUserIds: [], maintenanceDisabledUserIds: [] };
-                  });
-                } else {
-                  // No state change: preserve existing state.
-                  return Promise.resolve({
-                    preDisabledUserIds: preDisabledUserIds,
-                    maintenanceDisabledUserIds: maintenanceDisabledUserIds
-                  });
-                }
-              })
-              .then(function (finalState) {
-                return ApiClient.ajax({
-                  type: 'POST',
-                  url: ApiClient.getUrl('JellyFlare/maintenance'),
-                  data: JSON.stringify({
-                    isActive: isActive,
-                    message: message,
-                    statusUrl: statusUrl,
-                    preDisabledUserIds: finalState.preDisabledUserIds || [],
-                    maintenanceDisabledUserIds: finalState.maintenanceDisabledUserIds || []
-                  }),
-                  contentType: 'application/json'
-                });
-              })
-              .then(function () {
-                applyMaintenanceUi({ isActive: isActive, message: message, statusUrl: statusUrl });
-              });
+            return ApiClient.ajax({
+              type: 'POST',
+              url: ApiClient.getUrl('JellyFlare/maintenance'),
+              data: JSON.stringify({
+                isActive: isActive,
+                message: message,
+                statusUrl: statusUrl,
+                scheduleEnabled: scheduleEnabled,
+                scheduledStart: scheduledStart,
+                scheduledEnd: scheduledEnd,
+                scheduledRestart: scheduledRestart
+              }),
+              contentType: 'application/json'
+            }).then(function () {
+              return ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
+                .then(function (m) { applyMaintenanceUi(m); });
+            });
           }
 
           // ── pageshow: load fresh config each visit ────────────────

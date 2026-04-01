@@ -11,3 +11,6 @@ obj/
 
 # docker testing
 docker/config/
+
+# Macos
+.DS_Store

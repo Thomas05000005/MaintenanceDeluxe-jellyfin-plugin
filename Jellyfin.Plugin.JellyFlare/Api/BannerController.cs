@@ -1,10 +1,13 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyFlare.Configuration;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyFlare.Api;
 
@@ -16,6 +19,16 @@ namespace Jellyfin.Plugin.JellyFlare.Api;
 [Route("JellyFlare")]
 public class BannerController : ControllerBase
 {
+    private readonly IUserManager _userManager;
+    private readonly ILogger<BannerController> _logger;
+
+    /// <summary>Initializes a new instance of <see cref="BannerController"/>.</summary>
+    public BannerController(IUserManager userManager, ILogger<BannerController> logger)
+    {
+        _userManager = userManager;
+        _logger = logger;
+    }
+
     /// <summary>Returns the current plugin configuration.</summary>
     [HttpGet("config")]
     [Authorize]
@@ -129,13 +142,13 @@ public class BannerController : ControllerBase
         return Ok(config.MaintenanceMode ?? new MaintenanceSetting());
     }
 
-    /// <summary>Saves the maintenance mode configuration.</summary>
+    /// <summary>Saves the maintenance mode configuration. Handles user enable/disable transitions server-side.</summary>
     [HttpPost("maintenance")]
     [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult SaveMaintenance([FromBody] MaintenanceSetting maintenance)
+    public async Task<IActionResult> SaveMaintenance([FromBody] MaintenanceSetting maintenance)
     {
         ArgumentNullException.ThrowIfNull(maintenance);
 
@@ -145,12 +158,41 @@ public class BannerController : ControllerBase
         if (!IsUrlSafe(maintenance.StatusUrl))
             return BadRequest("Invalid statusUrl: only http://, https://, and relative URLs are permitted.");
 
-        maintenance.PreDisabledUserIds ??= new System.Collections.Generic.List<string>();
+        if (maintenance.ScheduledStart.HasValue
+            && maintenance.ScheduledEnd.HasValue
+            && maintenance.ScheduledEnd.Value <= maintenance.ScheduledStart.Value)
+            return BadRequest("scheduledEnd must be after scheduledStart.");
 
         var config = Plugin.Instance.Configuration;
-        config.MaintenanceMode = maintenance;
-        Plugin.Instance.UpdateConfiguration(config);
-        Plugin.Instance.SaveConfiguration();
+        var wasActive = config.MaintenanceMode.IsActive;
+
+        // Update non-user-tracking fields first so the helpers see the latest values when they save.
+        config.MaintenanceMode.Message = maintenance.Message ?? config.MaintenanceMode.Message;
+        config.MaintenanceMode.StatusUrl = maintenance.StatusUrl;
+        config.MaintenanceMode.ScheduleEnabled = maintenance.ScheduleEnabled;
+        config.MaintenanceMode.ScheduledStart = maintenance.ScheduledStart;
+        config.MaintenanceMode.ScheduledEnd = maintenance.ScheduledEnd;
+        config.MaintenanceMode.ScheduledRestart = maintenance.ScheduledRestart;
+
+        if (!wasActive && maintenance.IsActive)
+        {
+            // Persist updated fields before activation so the helper reads the latest message/url.
+            Plugin.Instance.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+            await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
+        }
+        else if (wasActive && !maintenance.IsActive)
+        {
+            Plugin.Instance.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+            await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
+        }
+        else
+        {
+            Plugin.Instance.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+        }
+
         return NoContent();
     }
 
