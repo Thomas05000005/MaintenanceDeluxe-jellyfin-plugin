@@ -224,12 +224,12 @@
         "  border-radius:8px; padding:12px 14px;",
         "  box-shadow:0 6px 24px rgba(0,0,0,.6);",
         "  font-size:13px; font-weight:normal; font-family:inherit;",
-        "  width:max-content; min-width:280px; max-width:calc(100vw - 24px); box-sizing:border-box;",
+        "  width:max-content; min-width:280px; max-width:min(480px, calc(100vw - 24px)); box-sizing:border-box;",
         "  opacity:0; transition:opacity .18s ease,transform .18s ease;",
         "}",
         "#jf-url-popup.jf-popup-in { opacity:1; transform:translateX(-50%) translateY(0); }",
-        "#jf-url-popup-url { word-break:break-all; margin-bottom:10px; opacity:.7; font-size:12px; line-height:1.4; }",
-        "#jf-url-popup-btns { display:flex; gap:8px; justify-content:flex-end; align-items:center; }",
+        "#jf-url-popup-url { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:10px; opacity:.7; font-size:12px; line-height:1.4; }",
+        "#jf-url-popup-btns { display:flex; gap:8px; justify-content:center; align-items:center; }",
         ".jf-url-primary-btns { display:inline-grid; grid-template-columns:1fr 1fr; gap:8px; }",
         ".jf-url-btn { padding:7px 16px; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600; line-height:1.4; white-space:nowrap; font-family:inherit; text-align:center; text-decoration:none; display:inline-block; box-sizing:border-box; }",
         ".jf-url-btn-open { background:#1976d2; color:#fff; }",
@@ -352,6 +352,7 @@
         var urlDiv = document.createElement("div");
         urlDiv.id = "jf-url-popup-url";
         urlDiv.textContent = url;
+        urlDiv.title = url;
 
         var btns = document.createElement("div");
         btns.id = "jf-url-popup-btns";
