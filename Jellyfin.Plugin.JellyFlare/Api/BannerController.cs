@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.JellyFlare.Configuration;
 using MediaBrowser.Controller.Library;
@@ -106,19 +109,30 @@ public class BannerController : ControllerBase
             }
         }
 
-        // Validate schedule types
+        // Sanitize and validate schedule types
         if (config.PermanentOverride?.Entries is not null)
         {
-            var err = ValidateSchedules(
-                System.Linq.Enumerable.Select(config.PermanentOverride.Entries, e => e.Schedule),
-                "permanent entry");
+            var err = ValidateSchedules(config.PermanentOverride.Entries.Select(e => e.Schedule), "permanent entry");
             if (err is not null) return BadRequest(err);
         }
         if (config.RotationMessages is not null)
         {
-            var err = ValidateSchedules(
-                System.Linq.Enumerable.Select(config.RotationMessages, m => m.Schedule),
-                "rotation message");
+            var err = ValidateSchedules(config.RotationMessages.Select(m => m.Schedule), "rotation message");
+            if (err is not null) return BadRequest(err);
+        }
+
+        // Sanitize route patterns (trim, remove empty) then validate
+        config.PermanentOverride?.Entries?.ForEach(e => SanitizeRouteList(e.Routes));
+        config.RotationMessages?.ForEach(m => SanitizeRouteList(m.Routes));
+
+        if (config.PermanentOverride?.Entries is not null)
+        {
+            var err = ValidateRoutes(config.PermanentOverride.Entries.Select(e => (List<string>?)e.Routes), "permanent entry");
+            if (err is not null) return BadRequest(err);
+        }
+        if (config.RotationMessages is not null)
+        {
+            var err = ValidateRoutes(config.RotationMessages.Select(m => (List<string>?)m.Routes), "rotation message");
             if (err is not null) return BadRequest(err);
         }
 
@@ -196,17 +210,44 @@ public class BannerController : ControllerBase
         return NoContent();
     }
 
-    private static readonly System.Collections.Generic.HashSet<string> _validScheduleTypes =
-        new(System.StringComparer.Ordinal) { "always", "fixed", "annual", "weekly", "daily" };
+    private static readonly HashSet<string> _validScheduleTypes =
+        new(StringComparer.Ordinal) { "always", "fixed", "annual", "weekly", "daily" };
 
     /// <summary>Returns an error message if any schedule in the collection has an invalid type, or null if all are valid.</summary>
-    private static string? ValidateSchedules(System.Collections.Generic.IEnumerable<Configuration.BannerSchedule?> schedules, string context)
+    private static string? ValidateSchedules(IEnumerable<BannerSchedule?> schedules, string context)
     {
         foreach (var sch in schedules)
         {
             if (sch is null) continue;
             if (!string.IsNullOrEmpty(sch.Type) && !_validScheduleTypes.Contains(sch.Type))
                 return $"Invalid schedule type \"{sch.Type}\" in {context}: must be one of always, fixed, annual, weekly, daily.";
+        }
+        return null;
+    }
+
+    /// <summary>Trims whitespace from each route pattern and removes empty entries in-place.</summary>
+    private static void SanitizeRouteList(List<string> routes)
+    {
+        if (routes is null) return;
+        routes.RemoveAll(string.IsNullOrWhiteSpace);
+        for (var i = 0; i < routes.Count; i++)
+            routes[i] = routes[i].Trim();
+    }
+
+    /// <summary>Returns an error message if any route pattern in the collection is invalid, or null if all are valid.</summary>
+    private static string? ValidateRoutes(IEnumerable<List<string>?> routeLists, string context)
+    {
+        foreach (var list in routeLists)
+        {
+            if (list is null) continue;
+            foreach (var pattern in list)
+            {
+                if (string.IsNullOrWhiteSpace(pattern)) continue;
+                if (!Regex.IsMatch(pattern, @"^[A-Za-z0-9\-._/*?=&#+%]+$"))
+                    return $"Invalid route pattern \"{pattern}\" in {context}.";
+                if (pattern.Length > 512)
+                    return $"Route pattern in {context} exceeds 512 characters.";
+            }
         }
         return null;
     }

@@ -102,6 +102,13 @@ public class BannerMessage
     /// <summary>Gets or sets the display schedule for this message (null = always show).</summary>
     [JsonPropertyName("schedule")]
     public BannerSchedule? Schedule { get; set; }
+
+    /// <summary>Gets or sets the page-route filter. Empty = show everywhere.
+    /// Non-empty = only show when the current Jellyfin hash matches at least one
+    /// pattern. Supports * wildcard, matched against window.location.hash
+    /// stripped of the #! prefix.</summary>
+    [JsonPropertyName("routes")]
+    public List<string> Routes { get; set; } = new();
 }
 
 /// <summary>
@@ -132,6 +139,13 @@ public class PermanentEntry
     /// <summary>Gets or sets the display schedule for this entry (null = always show).</summary>
     [JsonPropertyName("schedule")]
     public BannerSchedule? Schedule { get; set; }
+
+    /// <summary>Gets or sets the page-route filter. Empty = show everywhere.
+    /// Non-empty = only show when the current Jellyfin hash matches at least one
+    /// pattern. Supports * wildcard, matched against window.location.hash
+    /// stripped of the #! prefix.</summary>
+    [JsonPropertyName("routes")]
+    public List<string> Routes { get; set; } = new();
 }
 
 /// <summary>

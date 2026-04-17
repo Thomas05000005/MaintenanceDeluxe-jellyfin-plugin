@@ -96,10 +96,46 @@
         return true;
     }
 
+    function matchesCurrentRoute(routes) {
+        if (!routes || routes.length === 0) return true;
+        var hash = window.location.hash.replace(/^#!?\/?/, '').split('?')[0];
+        for (var i = 0; i < routes.length; i++) {
+            if (routes[i] && routeGlobMatch(routes[i], hash)) return true;
+        }
+        return false;
+    }
+
+    function anyRoutesConfigured() {
+        if (!CONFIG) return false;
+        if ((CONFIG.rotationMessages || []).some(function (m) { return m.routes && m.routes.length; })) return true;
+        var po = CONFIG.permanentOverride;
+        if (po && (po.entries || []).some(function (e) { return e.routes && e.routes.length; })) return true;
+        return false;
+    }
+
+    function routeGlobMatch(pattern, value) {
+        var lp = pattern.toLowerCase();
+        var lv = value.toLowerCase();
+        var parts = lp.split('*');
+        if (parts.length === 1) return lv === lp;
+        var idx = 0;
+        for (var p = 0; p < parts.length; p++) {
+            var seg = parts[p];
+            if (seg === '') continue;
+            var found = lv.indexOf(seg, idx);
+            if (found === -1) return false;
+            if (p === 0 && found !== 0) return false;
+            idx = found + seg.length;
+        }
+        var last = parts[parts.length - 1];
+        if (last !== '' && !lv.endsWith(last)) return false;
+        return true;
+    }
+
     // --- Queue builder (shuffle or sequential based on config) ---
     function buildQueue() {
         var eligible = CONFIG.rotationMessages.filter(function (m) {
-            return m.text && m.enabled !== false && isInSchedule(m) && !dismissedMessages.has(m.text);
+            return m.text && m.enabled !== false && isInSchedule(m) && matchesCurrentRoute(m.routes) && !dismissedMessages.has(m.text);
         });
         if (CONFIG.rotationShuffle !== false) {
             // Fisher-Yates shuffle
@@ -568,7 +604,7 @@
         var po = CONFIG.permanentOverride;
         if (po && po.enabled !== false && po.activeIndex >= 0 && !permanentDismissed) {
             var entry = po.entries && po.entries[po.activeIndex];
-            if (entry && entry.text && isInSchedule(entry)) {
+            if (entry && entry.text && isInSchedule(entry) && matchesCurrentRoute(entry.routes)) {
                 showBanner(entry, true);
                 rotationTimer = setTimeout(tick, CONFIG.displayDuration * 1000);
                 return;
@@ -600,8 +636,8 @@
 
         var msg = shuffledQueue.shift();
 
-        // Re-check in case schedule/dismiss changed
-        if (!msg || !msg.text || !isInSchedule(msg) || dismissedMessages.has(msg.text)) {
+        // Re-check in case schedule/dismiss/route changed
+        if (!msg || !msg.text || !isInSchedule(msg) || !matchesCurrentRoute(msg.routes) || dismissedMessages.has(msg.text)) {
             // Try next in queue immediately
             rotationTimer = setTimeout(tick, 50);
             return;
@@ -700,7 +736,7 @@
             function onNavigate() {
                 clearTimeout(navTimer);
                 // Prevent a stale tick() from firing during the debounce window.
-                if (CONFIG && CONFIG.showInDashboard === false) clearTimeout(rotationTimer);
+                if (CONFIG && (CONFIG.showInDashboard === false || anyRoutesConfigured())) clearTimeout(rotationTimer);
                 navTimer = setTimeout(function () {
                     // Re-apply padding to the newly mounted .page after SPA navigation.
                     if (document.body.classList.contains('jf-banner-active')) {
@@ -726,21 +762,21 @@
                                     CONFIG_LAST_MODIFIED = fresh.lastModified || 0;
                                     shuffledQueue = []; // invalidate stale queue
                                 }
-                                if (CONFIG.showInDashboard === false) {
+                                if (CONFIG.showInDashboard === false || anyRoutesConfigured()) {
                                     clearTimeout(rotationTimer);
-                                    if (isAdminPage()) { hideBanner(); } else { tick(); }
+                                    if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); } else { tick(); }
                                 }
                             })
                             .catch(function () {
                                 // Network error — fall back to existing config
-                                if (CONFIG.showInDashboard === false) {
+                                if (CONFIG.showInDashboard === false || anyRoutesConfigured()) {
                                     clearTimeout(rotationTimer);
-                                    if (isAdminPage()) { hideBanner(); } else { tick(); }
+                                    if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); } else { tick(); }
                                 }
                             });
-                    } else if (CONFIG.showInDashboard === false) {
+                    } else if (CONFIG.showInDashboard === false || anyRoutesConfigured()) {
                         clearTimeout(rotationTimer);
-                        if (isAdminPage()) { hideBanner(); } else { tick(); }
+                        if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); } else { tick(); }
                     }
                 }, NAV_DEBOUNCE);
             }

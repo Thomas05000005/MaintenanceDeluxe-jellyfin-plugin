@@ -1178,6 +1178,20 @@
             );
           }
 
+          function getRoutesDetailHtml() {
+            return (
+              '<div style="margin-top:10px">' +
+              '  <div style="font-size:0.85em;opacity:0.7;margin-bottom:4px">Page filter</div>' +
+              '  <input is="emby-input" type="text" class="msg-routes"' +
+              '         placeholder="Leave blank to show everywhere, e.g. home.html, list*, *details*">' +
+              '  <div class="fieldDescription" style="margin-top:4px">' +
+              '    Comma-separated patterns matched against the Jellyfin page name (e.g. home.html). ' +
+              '    Empty = show on all pages. Use * as a wildcard.' +
+              '  </div>' +
+              '</div>'
+            );
+          }
+
           function wireScheduleEditor(detail) {
             var typeSelect = detail.querySelector('.msg-sch-type');
             var panels = detail.querySelectorAll('.msg-sch-panel');
@@ -1715,7 +1729,8 @@
               '  </div>' +
               '</div>' +
               '<div class="msg-presets jf-preset-container" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>' +
-              getScheduleDetailHtml();
+              getScheduleDetailHtml() +
+              getRoutesDetailHtml();
 
             row.appendChild(summary);
             row.appendChild(detail);
@@ -1736,6 +1751,8 @@
 
             wireScheduleEditor(detail);
             populateSchedule(detail, data.schedule || null);
+            detail.querySelector('.msg-routes').value =
+              (data.routes && data.routes.length > 0) ? data.routes.join(', ') : '';
 
             syncColorPair(bgPicker, bgText);
             syncColorPair(colorPicker, colorText);
@@ -1884,6 +1901,11 @@
               color: detail.querySelector('.msg-color').value || '#ffffff',
               url: urlVal || null,
               schedule: collectSchedule(detail),
+              routes: (function () {
+                var raw = (detail.querySelector('.msg-routes').value || '').trim();
+                if (!raw) return [];
+                return raw.split(',').map(function (r) { return r.trim(); }).filter(Boolean);
+              }()),
               // Null out orphaned labels: if the preset no longer exists, drop it.
               presetLabel:
                 label &&
