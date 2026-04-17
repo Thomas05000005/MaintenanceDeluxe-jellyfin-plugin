@@ -135,6 +135,12 @@ deactivate at a set time) or trigger a server restart automatically.
 
 </details>
 
+## Project status
+
+JellyFlare has reached a state I consider feature-complete for what I originally set out to build, so I do not plan to drive large new features myself going forward. The plugin is stable, documented, and working well in daily use.
+
+That said, I am still here. Bug reports, feature ideas, and pull requests are always welcome; [open an issue](https://github.com/MorganKryze/JellyFlare/issues/new/choose) and I will read it. Where JellyFlare goes from here will be shaped by the community as much as by me, so if there is something you want to see, please bring it.
+
 ## Troubleshooting
 
 **Banner not showing?**
