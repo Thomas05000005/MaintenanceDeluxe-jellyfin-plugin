@@ -167,6 +167,25 @@ public class PermanentOverride
 }
 
 /// <summary>
+/// A single release note section shown in the maintenance overlay.
+/// Lets admins describe what the maintenance brings to users, in rich, scannable chunks.
+/// </summary>
+public class ReleaseNoteSection
+{
+    /// <summary>Gets or sets the icon — either an emoji ("✨", "🎬", "⚡") or a short identifier.</summary>
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "✨";
+
+    /// <summary>Gets or sets the section title (short, one-line).</summary>
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the section body. Supports a safe subset of Markdown (bold, italic, lists).</summary>
+    [JsonPropertyName("body")]
+    public string Body { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Maintenance mode configuration.
 /// </summary>
 public class MaintenanceSetting
@@ -208,6 +227,26 @@ public class MaintenanceSetting
     /// <summary>Gets or sets the UTC datetime at which the server will be restarted. Null = no pending restart. Cleared automatically after triggering.</summary>
     [JsonPropertyName("scheduledRestart")]
     public DateTime? ScheduledRestart { get; set; }
+
+    /// <summary>Gets or sets the custom overlay title. Null or empty = use localised default.</summary>
+    [JsonPropertyName("customTitle")]
+    public string? CustomTitle { get; set; }
+
+    /// <summary>Gets or sets the custom overlay subtitle. Null or empty = use localised default.</summary>
+    [JsonPropertyName("customSubtitle")]
+    public string? CustomSubtitle { get; set; }
+
+    /// <summary>Gets or sets the rich release notes shown as cards in the overlay. Empty = no notes section displayed.</summary>
+    [JsonPropertyName("releaseNotes")]
+    public List<ReleaseNoteSection> ReleaseNotes { get; set; } = new();
+
+    /// <summary>Gets or sets the visual theme key. Whitelisted in the controller. Defaults to "velours".</summary>
+    [JsonPropertyName("theme")]
+    public string Theme { get; set; } = "velours";
+
+    /// <summary>Gets or sets the custom hex accent colour (e.g. "#C9A96E"). Null = use theme default.</summary>
+    [JsonPropertyName("accentColor")]
+    public string? AccentColor { get; set; }
 }
 
 /// <summary>

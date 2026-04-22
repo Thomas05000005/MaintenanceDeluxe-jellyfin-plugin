@@ -188,6 +188,13 @@ public class BannerController : ControllerBase
         config.MaintenanceMode.ScheduledEnd = maintenance.ScheduledEnd;
         config.MaintenanceMode.ScheduledRestart = maintenance.ScheduledRestart;
 
+        // Rich overlay content — normalised (trim/truncate/whitelist) before persistence.
+        config.MaintenanceMode.CustomTitle = NormaliseOptionalString(maintenance.CustomTitle, MaxTitleLength);
+        config.MaintenanceMode.CustomSubtitle = NormaliseOptionalString(maintenance.CustomSubtitle, MaxSubtitleLength);
+        config.MaintenanceMode.ReleaseNotes = NormaliseReleaseNotes(maintenance.ReleaseNotes);
+        config.MaintenanceMode.Theme = NormaliseTheme(maintenance.Theme);
+        config.MaintenanceMode.AccentColor = NormaliseHexColor(maintenance.AccentColor);
+
         if (!wasActive && maintenance.IsActive)
         {
             // Persist updated fields before activation so the helper reads the latest message/url.
@@ -259,5 +266,73 @@ public class BannerController : ControllerBase
         return url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
             || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
             || url.StartsWith("/", StringComparison.Ordinal);
+    }
+
+    // ── Rich overlay content normalisation ─────────────────────────────────────
+
+    private const int MaxTitleLength = 200;
+    private const int MaxSubtitleLength = 500;
+    private const int MaxReleaseNotes = 20;
+    private const int MaxReleaseNoteTitleLength = 200;
+    private const int MaxReleaseNoteBodyLength = 4000;
+    private const int MaxIconLength = 8;
+
+    private static readonly HashSet<string> _validThemes =
+        new(StringComparer.Ordinal) { "velours" };
+
+    private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
+
+    /// <summary>Trims, truncates, and returns null for empty strings.</summary>
+    private static string? NormaliseOptionalString(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return trimmed.Length > maxLength ? trimmed[..maxLength] : trimmed;
+    }
+
+    /// <summary>Whitelists the theme key, falling back to "velours" for unknown values.</summary>
+    private static string NormaliseTheme(string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && _validThemes.Contains(value)) return value;
+        return "velours";
+    }
+
+    /// <summary>Validates hex colour format (#RRGGBB). Returns null for invalid or empty input.</summary>
+    private static string? NormaliseHexColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return _hexColorRegex.IsMatch(trimmed) ? trimmed : null;
+    }
+
+    /// <summary>Caps the release notes list length and normalises each section's fields.</summary>
+    private static List<ReleaseNoteSection> NormaliseReleaseNotes(List<ReleaseNoteSection>? notes)
+    {
+        if (notes is null || notes.Count == 0) return new List<ReleaseNoteSection>();
+
+        var result = new List<ReleaseNoteSection>();
+        foreach (var note in notes.Take(MaxReleaseNotes))
+        {
+            if (note is null) continue;
+            var title = NormaliseOptionalString(note.Title, MaxReleaseNoteTitleLength);
+            var body = NormaliseOptionalString(note.Body, MaxReleaseNoteBodyLength);
+            // Skip empty sections silently — admin might have added and cleared a row.
+            if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(body)) continue;
+            result.Add(new ReleaseNoteSection
+            {
+                Icon = NormaliseIcon(note.Icon),
+                Title = title ?? string.Empty,
+                Body = body ?? string.Empty
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Keeps short icon strings (emoji / short identifier). Defaults to "✨" when empty.</summary>
+    private static string NormaliseIcon(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "✨";
+        var trimmed = value.Trim();
+        return trimmed.Length > MaxIconLength ? trimmed[..MaxIconLength] : trimmed;
     }
 }
