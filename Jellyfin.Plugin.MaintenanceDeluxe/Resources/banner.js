@@ -791,16 +791,24 @@
         if (tier === "full") {
             var particles = document.createElement("div");
             particles.className = "jf-md-particles";
-            for (var i = 0; i < 10; i++) {
+            for (var i = 0; i < 22; i++) {
                 var p = document.createElement("span");
                 p.className = "jf-md-particle";
+                // Three size classes for a natural "embers" feel.
+                var sizeClass = Math.random();
+                if (sizeClass < 0.6) p.classList.add("jf-md-p-sm");       // majority small
+                else if (sizeClass < 0.9) p.classList.add("jf-md-p-md");  // some medium
+                else p.classList.add("jf-md-p-lg");                       // rare large glowing
                 p.style.left = (Math.random() * 100) + "%";
                 p.style.top = (Math.random() * 100) + "%";
-                p.style.animationDuration = (14 + Math.random() * 10) + "s";
-                p.style.animationDelay = (-Math.random() * 20) + "s";
-                // Vary travel direction per particle for natural "dust" feel.
-                p.style.setProperty("--jf-dx", (Math.random() * 80 - 40) + "px");
-                p.style.setProperty("--jf-dy", (Math.random() > 0.5 ? -1 : 1) * (80 + Math.random() * 40) + "vh");
+                // Wider duration range for more organic motion (8–28s).
+                p.style.animationDuration = (8 + Math.random() * 20) + "s";
+                p.style.animationDelay = (-Math.random() * 24) + "s";
+                // Vary travel direction per particle for natural "dust/ember" feel.
+                p.style.setProperty("--jf-dx", (Math.random() * 160 - 80) + "px");
+                p.style.setProperty("--jf-dy", (Math.random() > 0.5 ? -1 : 1) * (70 + Math.random() * 60) + "vh");
+                // Each particle gets its own flicker phase.
+                p.style.setProperty("--jf-flicker-delay", (-Math.random() * 3) + "s");
                 particles.appendChild(p);
             }
             overlay.appendChild(particles);
@@ -937,67 +945,76 @@
         "animation:jf-md-drift2 100s ease-in-out infinite alternate;}",
         "@keyframes jf-md-drift1{to{transform:translate(12vw,10vh) scale(1.08);}}",
         "@keyframes jf-md-drift2{to{transform:translate(-10vw,-8vh) scale(.95);}}",
-        ".jf-md-grain{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;",
+        ".jf-md-grain{position:absolute;inset:0;pointer-events:none;opacity:.09;mix-blend-mode:overlay;",
         "background-image:url(\"data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\");}",
         ".jf-md-particles{position:absolute;inset:0;pointer-events:none;}",
-        ".jf-md-particle{position:absolute;width:3px;height:3px;background:#C9A96E;border-radius:50%;",
-        "opacity:.4;box-shadow:0 0 6px #C9A96E;will-change:transform;",
-        "animation:jf-md-float 18s linear infinite;}",
+        ".jf-md-particle{position:absolute;border-radius:50%;will-change:transform,opacity;",
+        "animation:jf-md-float 18s linear infinite,jf-md-flicker 2.4s ease-in-out infinite;",
+        "animation-delay:inherit,var(--jf-flicker-delay,0s);}",
+        ".jf-md-p-sm{width:2px;height:2px;background:#C9A96E;box-shadow:0 0 4px #C9A96E;}",
+        ".jf-md-p-md{width:3px;height:3px;background:#E4C88B;box-shadow:0 0 8px #E4C88B;}",
+        ".jf-md-p-lg{width:4px;height:4px;background:#F4D89B;box-shadow:0 0 14px #F4D89B,0 0 24px rgba(244,216,155,.4);}",
         "@keyframes jf-md-float{",
-        "0%{transform:translate(0,0);opacity:0;}",
-        "10%{opacity:.4;}",
-        "90%{opacity:.4;}",
-        "100%{transform:translate(var(--jf-dx,20px),var(--jf-dy,-100vh));opacity:0;}}",
+        "0%{transform:translate(0,0);}",
+        "100%{transform:translate(var(--jf-dx,20px),var(--jf-dy,-100vh));}}",
+        "@keyframes jf-md-flicker{",
+        "0%{opacity:.15;}",
+        "30%{opacity:.8;}",
+        "55%{opacity:.25;}",
+        "80%{opacity:.9;}",
+        "100%{opacity:.15;}}",
         ".jf-md-card{position:relative;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;",
-        "padding:44px 40px;border-radius:16px;background:rgba(36,28,24,.55);",
-        "border:1px solid rgba(201,169,110,.18);text-align:center;",
-        "box-shadow:0 0 0 1px rgba(255,255,255,.02) inset,",
-        "0 20px 60px -20px rgba(201,169,110,.25),",
-        "0 0 40px -10px rgba(201,169,110,.15);",
-        "backdrop-filter:blur(20px) saturate(1.2);",
-        "-webkit-backdrop-filter:blur(20px) saturate(1.2);}",
+        "padding:48px 44px;border-radius:16px;background:rgba(26,20,18,.72);",
+        "border:1px solid rgba(201,169,110,.32);text-align:center;",
+        "box-shadow:0 0 0 1px rgba(201,169,110,.08) inset,",
+        "0 24px 70px -20px rgba(0,0,0,.55),",
+        "0 0 50px -10px rgba(201,169,110,.22);",
+        "backdrop-filter:blur(24px) saturate(1.3);",
+        "-webkit-backdrop-filter:blur(24px) saturate(1.3);}",
         "@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){",
-        ".jf-md-card{background:rgba(36,28,24,.95);}}",
+        ".jf-md-card{background:rgba(26,20,18,.96);}}",
         ".jf-md-logo{width:48px;height:48px;margin:0 auto 20px;display:block;object-fit:contain;",
         "filter:drop-shadow(0 0 12px rgba(201,169,110,.35));",
         "animation:jf-md-breathe 5s ease-in-out infinite;}",
         "@keyframes jf-md-breathe{0%,100%{opacity:.55;}50%{opacity:1;}}",
         ".jf-md-title{font-family:'Instrument Serif','Cormorant Garamond',Georgia,serif;",
-        "font-weight:300;font-size:clamp(28px,5vw,42px);color:#C9A96E;",
-        "margin:0 0 8px 0;letter-spacing:.02em;line-height:1.15;}",
-        ".jf-md-subtitle{font-size:16px;color:#A89584;margin:0 0 16px 0;line-height:1.5;}",
-        ".jf-md-message{font-size:14px;color:#A89584;margin:12px 0 0;line-height:1.5;font-style:italic;opacity:.85;}",
-        ".jf-md-time{margin:28px 0 20px;padding:18px;border-radius:10px;",
-        "background:rgba(0,0,0,.25);border:1px solid rgba(201,169,110,.12);}",
+        "font-weight:400;font-size:clamp(30px,5.2vw,44px);color:#E4C88B;",
+        "margin:0 0 10px 0;letter-spacing:.01em;line-height:1.12;",
+        "text-shadow:0 2px 20px rgba(201,169,110,.2);}",
+        ".jf-md-subtitle{font-size:16.5px;color:#D4C3B2;margin:0 0 16px 0;line-height:1.55;}",
+        ".jf-md-time{margin:32px 0 22px;padding:20px 22px;border-radius:12px;",
+        "background:rgba(0,0,0,.38);border:1px solid rgba(201,169,110,.2);}",
         ".jf-md-time-absolute{font-family:'Geist Mono','JetBrains Mono',Menlo,Consolas,monospace;",
-        "font-variant-numeric:tabular-nums;font-size:clamp(22px,4vw,30px);",
-        "font-weight:400;color:#F4EDE4;line-height:1.2;}",
-        ".jf-md-time-relative{margin-top:4px;font-size:14px;color:#A89584;font-variant-numeric:tabular-nums;}",
-        ".jf-md-progress{margin-top:14px;height:4px;background:rgba(201,169,110,.12);border-radius:2px;overflow:hidden;}",
-        ".jf-md-progress-fill{height:100%;background:linear-gradient(90deg,#C9A96E,#8B4A3A);transition:width 1s linear;width:0;}",
+        "font-variant-numeric:tabular-nums;font-size:clamp(24px,4.2vw,32px);",
+        "font-weight:500;color:#F4EDE4;line-height:1.2;letter-spacing:.01em;}",
+        ".jf-md-time-relative{margin-top:6px;font-size:14.5px;color:#C9A96E;font-variant-numeric:tabular-nums;font-weight:500;}",
+        ".jf-md-progress{margin-top:18px;height:6px;background:rgba(201,169,110,.15);border-radius:3px;overflow:hidden;",
+        "box-shadow:inset 0 1px 2px rgba(0,0,0,.3);}",
+        ".jf-md-progress-fill{height:100%;background:linear-gradient(90deg,#C9A96E,#E4C88B,#8B4A3A);transition:width 1s linear;width:0;",
+        "box-shadow:0 0 12px rgba(201,169,110,.5);}",
         ".jf-md-time.overtime .jf-md-progress-fill{background:#d18033;animation:jf-md-pulse 2s ease-in-out infinite;}",
         "@keyframes jf-md-pulse{50%{opacity:.45;}}",
-        ".jf-md-notes{margin-top:26px;padding-top:22px;border-top:1px solid rgba(201,169,110,.15);}",
-        ".jf-md-notes-title{font-size:11px;text-transform:uppercase;letter-spacing:.18em;",
-        "color:#A89584;font-weight:500;margin:0 0 14px 0;text-align:left;}",
-        ".jf-md-note{display:grid;grid-template-columns:36px 1fr;gap:12px;margin-bottom:14px;text-align:left;}",
-        ".jf-md-note-icon{font-size:22px;line-height:1.2;}",
-        ".jf-md-note-title{font-size:14.5px;color:#C9A96E;margin:0 0 4px 0;font-weight:500;}",
-        ".jf-md-note-body{font-size:13px;color:#A89584;line-height:1.6;}",
-        ".jf-md-note-body p{margin:0 0 4px;}",
+        ".jf-md-notes{margin-top:30px;padding-top:24px;border-top:1px solid rgba(201,169,110,.22);}",
+        ".jf-md-notes-title{font-size:11px;text-transform:uppercase;letter-spacing:.2em;",
+        "color:#C9A96E;font-weight:600;margin:0 0 18px 0;text-align:left;}",
+        ".jf-md-note{display:grid;grid-template-columns:42px 1fr;gap:14px;margin-bottom:18px;text-align:left;}",
+        ".jf-md-note-icon{font-size:26px;line-height:1.2;filter:drop-shadow(0 0 8px rgba(201,169,110,.3));}",
+        ".jf-md-note-title{font-size:15px;color:#E4C88B;margin:0 0 5px 0;font-weight:500;}",
+        ".jf-md-note-body{font-size:13.5px;color:#D4C3B2;line-height:1.65;}",
+        ".jf-md-note-body p{margin:0 0 5px;}",
         ".jf-md-note-body strong{color:#F4EDE4;font-weight:600;}",
-        ".jf-md-note-body em{font-style:italic;}",
-        ".jf-md-note-body ul{padding-left:18px;margin:4px 0;}",
-        ".jf-md-note-body li{margin:2px 0;}",
-        ".jf-md-footer{margin-top:22px;padding-top:18px;border-top:1px solid rgba(201,169,110,.12);",
+        ".jf-md-note-body em{font-style:italic;color:#E4C88B;}",
+        ".jf-md-note-body ul{padding-left:18px;margin:6px 0;}",
+        ".jf-md-note-body li{margin:3px 0;}",
+        ".jf-md-footer{margin-top:26px;padding-top:20px;border-top:1px solid rgba(201,169,110,.18);",
         "display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;}",
-        ".jf-md-status-link{color:#C9A96E;font-size:13px;text-decoration:none;padding:7px 14px;",
-        "border-radius:6px;border:1px solid rgba(201,169,110,.25);transition:background .2s;}",
-        ".jf-md-status-link:hover{background:rgba(201,169,110,.1);}",
-        ".jf-md-dismiss{padding:7px 14px;border-radius:6px;",
-        "border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);",
-        "color:#A89584;cursor:pointer;font-size:12px;font-family:inherit;}",
-        ".jf-md-dismiss:hover{background:rgba(255,255,255,.1);}",
+        ".jf-md-status-link{color:#E4C88B;font-size:13px;text-decoration:none;padding:8px 16px;",
+        "border-radius:8px;border:1px solid rgba(201,169,110,.4);transition:all .2s;}",
+        ".jf-md-status-link:hover{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.7);}",
+        ".jf-md-dismiss{padding:8px 16px;border-radius:8px;",
+        "border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);",
+        "color:#D4C3B2;cursor:pointer;font-size:12px;font-family:inherit;transition:background .2s;}",
+        ".jf-md-dismiss:hover{background:rgba(255,255,255,.12);}",
         "@media (max-width:600px){.jf-md-card{padding:32px 22px;border-radius:12px;}}",
         ".jf-md-tier-reduced .jf-md-blob,",
         ".jf-md-tier-reduced .jf-md-logo,",
