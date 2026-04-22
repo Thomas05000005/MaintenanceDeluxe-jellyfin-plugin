@@ -2640,6 +2640,35 @@
           // ── Release notes : dynamic rows ──────────────────────────
           var MAX_RELEASE_NOTES = 20;
           var DEFAULT_NOTE_ICON = '✨';
+          var MAX_TITLE_LEN = 200;
+          var MAX_BODY_LEN = 4000;
+
+          // Safe-subset markdown renderer (mirror of banner.js mdToHtml).
+          function mdPreviewRender(src) {
+            if (!src) return '';
+            function renderInline(s) {
+              return s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            }
+            var lines = src.split(/\r?\n/);
+            var html = '';
+            var inList = false;
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i];
+              var trimmed = line.replace(/^\s+/, '');
+              var isItem = /^-\s+/.test(trimmed);
+              if (isItem) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + renderInline(escHtml(trimmed.replace(/^-\s+/, ''))) + '</li>';
+              } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (trimmed.length === 0) { if (i > 0) html += '<br>'; }
+                else html += '<p>' + renderInline(escHtml(line)) + '</p>';
+              }
+            }
+            if (inList) html += '</ul>';
+            return html;
+          }
 
           function createReleaseNoteRow(section) {
             var row = document.createElement('div');
@@ -2653,14 +2682,42 @@
             row.innerHTML =
               '<input class="jf-rn-icon" is="emby-input" type="text" maxlength="8" value="' + escHtml(icon) + '" style="text-align:center;font-size:20px" placeholder="✨" />' +
               '<div style="display:flex;flex-direction:column;gap:0.4em">' +
-                '<input class="jf-rn-title" is="emby-input" type="text" maxlength="200" value="' + escHtml(title) + '" placeholder="Section title (e.g. New feature)" />' +
-                '<textarea class="jf-rn-body" maxlength="4000" rows="3" placeholder="Describe what this brings to users. Markdown: **bold**, *italic*, lines starting with - for bullets." style="resize:vertical;padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:inherit;font-family:inherit;font-size:13px;width:100%;box-sizing:border-box">' + escHtml(body) + '</textarea>' +
+                '<div style="display:flex;flex-direction:column;gap:2px">' +
+                  '<input class="jf-rn-title" is="emby-input" type="text" maxlength="' + MAX_TITLE_LEN + '" value="' + escHtml(title) + '" placeholder="Section title (e.g. New feature)" />' +
+                  '<div class="jf-rn-title-count" style="text-align:right;font-size:10px;opacity:.5;font-variant-numeric:tabular-nums"></div>' +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;gap:2px">' +
+                  '<textarea class="jf-rn-body" maxlength="' + MAX_BODY_LEN + '" rows="3" placeholder="Describe what this brings to users. Markdown: **bold**, *italic*, lines starting with - for bullets." style="resize:vertical;padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:inherit;font-family:inherit;font-size:13px;width:100%;box-sizing:border-box">' + escHtml(body) + '</textarea>' +
+                  '<div class="jf-rn-body-count" style="text-align:right;font-size:10px;opacity:.5;font-variant-numeric:tabular-nums"></div>' +
+                '</div>' +
+                '<div class="jf-rn-preview" style="display:none;padding:10px 12px;background:rgba(201,169,110,0.05);border-left:2px solid rgba(201,169,110,0.4);border-radius:2px;font-size:12.5px;line-height:1.55;color:rgba(255,255,255,0.75)"></div>' +
               '</div>' +
               '<div style="display:flex;flex-direction:column;gap:0.3em">' +
                 '<button type="button" class="jf-icon-btn jf-rn-up" title="Move up"><span class="material-icons" style="font-size:16px">arrow_upward</span></button>' +
                 '<button type="button" class="jf-icon-btn jf-rn-down" title="Move down"><span class="material-icons" style="font-size:16px">arrow_downward</span></button>' +
                 '<button type="button" class="jf-icon-btn jf-rn-del" title="Delete"><span class="material-icons" style="font-size:16px">delete</span></button>' +
               '</div>';
+
+            var titleInput = row.querySelector('.jf-rn-title');
+            var titleCount = row.querySelector('.jf-rn-title-count');
+            var bodyInput = row.querySelector('.jf-rn-body');
+            var bodyCount = row.querySelector('.jf-rn-body-count');
+            var preview = row.querySelector('.jf-rn-preview');
+
+            function updateTitleCount() { titleCount.textContent = titleInput.value.length + ' / ' + MAX_TITLE_LEN; }
+            function updateBodyCount() { bodyCount.textContent = bodyInput.value.length + ' / ' + MAX_BODY_LEN; }
+            function updatePreview() {
+              var v = bodyInput.value.trim();
+              if (v.length === 0) { preview.style.display = 'none'; return; }
+              preview.style.display = 'block';
+              preview.innerHTML = mdPreviewRender(bodyInput.value);
+            }
+
+            titleInput.addEventListener('input', updateTitleCount);
+            bodyInput.addEventListener('input', function () { updateBodyCount(); updatePreview(); });
+            updateTitleCount();
+            updateBodyCount();
+            updatePreview();
 
             row.querySelector('.jf-rn-up').addEventListener('click', function () { moveReleaseNote(row, -1); });
             row.querySelector('.jf-rn-down').addEventListener('click', function () { moveReleaseNote(row, 1); });

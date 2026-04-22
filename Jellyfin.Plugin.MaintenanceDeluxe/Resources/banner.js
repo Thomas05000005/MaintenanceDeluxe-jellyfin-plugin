@@ -615,6 +615,20 @@
 
     // --- Maintenance overlay (premium velours + aurora + glass + countdown) ---
 
+    // Localisable strings. English/other locales can override this object later.
+    var MD_I18N = {
+        defaultTitle: "Serveur en maintenance",
+        defaultSubtitle: "On en profite pour améliorer ton expérience",
+        returnSoon: "Retour bientôt",
+        returnAtPrefix: "Retour prévu à ",
+        overtime: "Finalisation en cours",
+        notesTitle: "Au programme",
+        statusLink: "Voir le statut détaillé ↗",
+        adminDismiss: "✕ Accès admin",
+        reconnectTitle: "Le serveur est de retour",
+        reconnectSubtitle: "Redirection en cours…"
+    };
+
     function isLikelyTV() {
         var ua = navigator.userAgent || "";
         return /Tizen|Web0S|webOS|AFT[A-Z]|CrKey/i.test(ua)
@@ -697,22 +711,29 @@
         return isNaN(d.getTime()) ? null : d;
     }
 
+    function cacheTimerRefs(overlay) {
+        overlay._refs = {
+            abs: overlay.querySelector(".jf-md-time-absolute"),
+            rel: overlay.querySelector(".jf-md-time-relative"),
+            box: overlay.querySelector(".jf-md-time"),
+            fill: overlay.querySelector(".jf-md-progress-fill"),
+            progress: overlay.querySelector(".jf-md-progress")
+        };
+    }
+
     function updateMaintenanceTimer() {
         if (!maintenanceOverlay || !MAINTENANCE) return;
-        var absEl = maintenanceOverlay.querySelector(".jf-md-time-absolute");
-        var relEl = maintenanceOverlay.querySelector(".jf-md-time-relative");
-        var timeBox = maintenanceOverlay.querySelector(".jf-md-time");
-        var fill = maintenanceOverlay.querySelector(".jf-md-progress-fill");
-        if (!absEl || !relEl || !timeBox || !fill) return;
+        var r = maintenanceOverlay._refs;
+        if (!r || !r.abs || !r.rel || !r.box || !r.fill) return;
 
         var start = parseDateOrNull(MAINTENANCE.scheduledStart);
         var activatedAt = parseDateOrNull(MAINTENANCE.activatedAt);
         var end = parseDateOrNull(MAINTENANCE.scheduledEnd);
         if (!end) {
-            absEl.textContent = "";
-            relEl.textContent = "Retour bientôt";
-            fill.style.width = "100%";
-            timeBox.querySelector(".jf-md-progress").style.display = "none";
+            r.abs.textContent = "";
+            r.rel.textContent = MD_I18N.returnSoon;
+            r.fill.style.width = "100%";
+            if (r.progress) r.progress.style.display = "none";
             return;
         }
 
@@ -726,17 +747,17 @@
         var elapsed = now - startMs;
         var remaining = endMs - now;
 
-        absEl.textContent = "Retour prévu à " + formatLocalTime(end);
+        r.abs.textContent = MD_I18N.returnAtPrefix + formatLocalTime(end);
 
         if (remaining > 0) {
-            timeBox.classList.remove("overtime");
-            relEl.textContent = formatRelative(remaining);
-            fill.style.width = Math.min(100, Math.max(0, (elapsed / total) * 100)) + "%";
+            r.box.classList.remove("overtime");
+            r.rel.textContent = formatRelative(remaining);
+            r.fill.style.width = Math.min(100, Math.max(0, (elapsed / total) * 100)) + "%";
         } else {
-            timeBox.classList.add("overtime");
+            r.box.classList.add("overtime");
             var overM = Math.floor(-remaining / 60000);
-            relEl.textContent = "Finalisation en cours" + (overM > 0 ? " (+" + overM + " min)" : "");
-            fill.style.width = "100%";
+            r.rel.textContent = MD_I18N.overtime + (overM > 0 ? " (+" + overM + " min)" : "");
+            r.fill.style.width = "100%";
         }
     }
 
@@ -748,9 +769,8 @@
 
     function buildMaintenanceOverlay(m, isAdmin) {
         var tier = getPerfTier();
-        var title = (m && m.customTitle && m.customTitle.trim()) || "Serveur en maintenance";
-        var subtitle = (m && m.customSubtitle && m.customSubtitle.trim()) || "On en profite pour améliorer ton expérience";
-        var message = (m && m.message) || "";
+        var title = (m && m.customTitle && m.customTitle.trim()) || MD_I18N.defaultTitle;
+        var subtitle = (m && m.customSubtitle && m.customSubtitle.trim()) || MD_I18N.defaultSubtitle;
         var statusUrl = (m && m.statusUrl) || "";
         var notes = (m && m.releaseNotes) || [];
 
@@ -778,6 +798,9 @@
                 p.style.top = (Math.random() * 100) + "%";
                 p.style.animationDuration = (14 + Math.random() * 10) + "s";
                 p.style.animationDelay = (-Math.random() * 20) + "s";
+                // Vary travel direction per particle for natural "dust" feel.
+                p.style.setProperty("--jf-dx", (Math.random() * 80 - 40) + "px");
+                p.style.setProperty("--jf-dy", (Math.random() > 0.5 ? -1 : 1) * (80 + Math.random() * 40) + "vh");
                 particles.appendChild(p);
             }
             overlay.appendChild(particles);
@@ -787,13 +810,9 @@
         card.className = "jf-md-card";
 
         var cardHtml =
-            '<div class="jf-md-logo" aria-hidden="true">▶</div>' +
+            '<img class="jf-md-logo" src="/web/favicon.png" alt="" aria-hidden="true" onerror="this.style.display=\'none\'">' +
             '<h1 class="jf-md-title">' + escapeMdHtml(title) + '</h1>' +
             '<p class="jf-md-subtitle">' + escapeMdHtml(subtitle) + '</p>';
-
-        if (message && message.trim() && message.trim() !== subtitle.trim()) {
-            cardHtml += '<p class="jf-md-message">' + escapeMdHtml(message) + '</p>';
-        }
 
         cardHtml +=
             '<div class="jf-md-time" aria-hidden="true">' +
@@ -804,7 +823,7 @@
 
         if (notes.length > 0) {
             cardHtml += '<div class="jf-md-notes">' +
-                '<h2 class="jf-md-notes-title">Au programme</h2>' +
+                '<h2 class="jf-md-notes-title">' + escapeMdHtml(MD_I18N.notesTitle) + '</h2>' +
                 '<div class="jf-md-notes-list">';
             for (var j = 0; j < notes.length; j++) {
                 var n = notes[j];
@@ -821,10 +840,10 @@
 
         cardHtml += '<div class="jf-md-footer">';
         if (statusUrl) {
-            cardHtml += '<a class="jf-md-status-link" href="' + encodeURI(statusUrl) + '" target="_blank" rel="noopener noreferrer">Voir le statut détaillé ↗</a>';
+            cardHtml += '<a class="jf-md-status-link" href="' + encodeURI(statusUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeMdHtml(MD_I18N.statusLink) + '</a>';
         }
         if (isAdmin) {
-            cardHtml += '<button type="button" class="jf-md-dismiss">✕ Accès admin</button>';
+            cardHtml += '<button type="button" class="jf-md-dismiss">' + escapeMdHtml(MD_I18N.adminDismiss) + '</button>';
         }
         cardHtml += '</div>';
 
@@ -850,10 +869,28 @@
         var overlay = buildMaintenanceOverlay(m, isAdmin);
         document.body.appendChild(overlay);
         maintenanceOverlay = overlay;
+        cacheTimerRefs(overlay);
         updateMaintenanceTimer();
         requestAnimationFrame(function () { overlay.classList.add("visible"); });
         if (maintenanceTimerId) clearInterval(maintenanceTimerId);
         maintenanceTimerId = setInterval(updateMaintenanceTimer, 1000);
+    }
+
+    // Smooth reconnect: when maintenance flips off while overlay is showing, replace the card
+    // content with a "back online" message then reload after a short delay.
+    function showReconnectAndReload() {
+        if (!maintenanceOverlay) return;
+        if (maintenanceTimerId) { clearInterval(maintenanceTimerId); maintenanceTimerId = null; }
+        var card = maintenanceOverlay.querySelector(".jf-md-card");
+        if (card) {
+            card.innerHTML =
+                '<div class="jf-md-logo" style="color:#5EB35D;font-size:48px">✓</div>' +
+                '<h1 class="jf-md-title" style="color:#5EB35D">' + escapeMdHtml(MD_I18N.reconnectTitle) + '</h1>' +
+                '<p class="jf-md-subtitle">' + escapeMdHtml(MD_I18N.reconnectSubtitle) + '</p>';
+        }
+        setTimeout(function () {
+            try { window.location.reload(); } catch (e) {}
+        }, 2500);
     }
 
     function removeMaintenanceOverlay() {
@@ -872,7 +909,13 @@
             }
         } else {
             adminDismissed = false;
-            removeMaintenanceOverlay();
+            // If the overlay is showing, the user was blocked — smooth reconnect.
+            // If not (admin had dismissed, or maintenance was never shown this session), just clean up.
+            if (maintenanceOverlay) {
+                showReconnectAndReload();
+            } else {
+                removeMaintenanceOverlay();
+            }
         }
     }
 
@@ -904,7 +947,7 @@
         "0%{transform:translate(0,0);opacity:0;}",
         "10%{opacity:.4;}",
         "90%{opacity:.4;}",
-        "100%{transform:translate(20px,-100vh);opacity:0;}}",
+        "100%{transform:translate(var(--jf-dx,20px),var(--jf-dy,-100vh));opacity:0;}}",
         ".jf-md-card{position:relative;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;",
         "padding:44px 40px;border-radius:16px;background:rgba(36,28,24,.55);",
         "border:1px solid rgba(201,169,110,.18);text-align:center;",
@@ -915,7 +958,8 @@
         "-webkit-backdrop-filter:blur(20px) saturate(1.2);}",
         "@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){",
         ".jf-md-card{background:rgba(36,28,24,.95);}}",
-        ".jf-md-logo{font-size:36px;margin-bottom:20px;color:#C9A96E;",
+        ".jf-md-logo{width:48px;height:48px;margin:0 auto 20px;display:block;object-fit:contain;",
+        "filter:drop-shadow(0 0 12px rgba(201,169,110,.35));",
         "animation:jf-md-breathe 5s ease-in-out infinite;}",
         "@keyframes jf-md-breathe{0%,100%{opacity:.55;}50%{opacity:1;}}",
         ".jf-md-title{font-family:'Instrument Serif','Cormorant Garamond',Georgia,serif;",
