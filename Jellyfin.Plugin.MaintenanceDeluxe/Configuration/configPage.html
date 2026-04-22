@@ -895,6 +895,39 @@
                   placeholder="https://status.example.com" />
                 <div class="fieldDescription">Shown as a link in the maintenance overlay so users can check server status.</div>
               </div>
+
+              <!-- ── Overlay content (title, subtitle, release notes) ─ -->
+              <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Overlay content</h3>
+                <div class="fieldDescription" style="margin-bottom:1.2em">
+                  Customise what users see on the premium maintenance overlay. Leave title and subtitle empty to use defaults.
+                </div>
+
+                <div class="inputContainer" style="margin-bottom:1.2em">
+                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomTitle">Title (optional)</label>
+                  <input id="maintenanceCustomTitle" is="emby-input" type="text" maxlength="200"
+                    placeholder="Server under maintenance" />
+                </div>
+
+                <div class="inputContainer" style="margin-bottom:1.6em">
+                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomSubtitle">Subtitle (optional)</label>
+                  <input id="maintenanceCustomSubtitle" is="emby-input" type="text" maxlength="500"
+                    placeholder="We're improving your experience" />
+                </div>
+
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Release notes</p>
+                <div class="fieldDescription" style="margin-bottom:0.8em">
+                  Rich cards shown in the overlay describing what this maintenance brings. Each section has an icon (emoji), a title, and a body (basic markdown: **bold**, *italic*, lines starting with "-" become bullet lists). Up to 20 sections.
+                </div>
+
+                <div id="releaseNotesList" style="display:flex;flex-direction:column;gap:0.6em;margin-bottom:0.6em"></div>
+
+                <button type="button" id="addReleaseNote" is="emby-button" class="raised" style="margin-top:0.2em">
+                  <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">add</span>
+                  Add a section
+                </button>
+              </div>
+
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <details>
                   <summary><span id="jf-maintenance-affected-summary">Users affected</span></summary>
@@ -1032,7 +1065,10 @@
             statusUrl: '',
             scheduledStart: null,
             scheduledEnd: null,
-            scheduledRestart: null
+            scheduledRestart: null,
+            customTitle: '',
+            customSubtitle: '',
+            releaseNotes: []
           };
 
           var ANNUAL_PRESETS = [
@@ -2148,6 +2184,11 @@
             document.getElementById('scheduledStart').value = '';
             document.getElementById('scheduledEnd').value = '';
             document.getElementById('scheduledRestart').value = '';
+            var customTitleEl = document.getElementById('maintenanceCustomTitle');
+            var customSubtitleEl = document.getElementById('maintenanceCustomSubtitle');
+            if (customTitleEl) customTitleEl.value = MAINTENANCE_DEFAULTS.customTitle;
+            if (customSubtitleEl) customSubtitleEl.value = MAINTENANCE_DEFAULTS.customSubtitle;
+            renderReleaseNotes(MAINTENANCE_DEFAULTS.releaseNotes);
           }
 
           function resetSectionPresets() {
@@ -2183,6 +2224,14 @@
                 document
                   .getElementById('permanentList')
                   .appendChild(createPermanentRow(null, false));
+              });
+
+            document
+              .getElementById('addReleaseNote')
+              .addEventListener('click', function () {
+                var list = document.getElementById('releaseNotesList');
+                if (list.querySelectorAll('.jf-rn-row').length >= MAX_RELEASE_NOTES) return;
+                list.appendChild(createReleaseNoteRow(null));
               });
 
             document
@@ -2573,6 +2622,73 @@
             return isNaN(d.getTime()) ? null : d.toISOString();
           }
 
+          // ── Release notes : dynamic rows ──────────────────────────
+          var MAX_RELEASE_NOTES = 20;
+          var DEFAULT_NOTE_ICON = '✨';
+
+          function createReleaseNoteRow(section) {
+            var row = document.createElement('div');
+            row.className = 'jf-msg-row jf-rn-row';
+            row.style.cssText = 'padding:0.8em;display:grid;gap:0.5em;grid-template-columns:70px 1fr auto;align-items:start';
+
+            var icon = (section && section.icon) || DEFAULT_NOTE_ICON;
+            var title = (section && section.title) || '';
+            var body = (section && section.body) || '';
+
+            row.innerHTML =
+              '<input class="jf-rn-icon" is="emby-input" type="text" maxlength="8" value="' + escHtml(icon) + '" style="text-align:center;font-size:20px" placeholder="✨" />' +
+              '<div style="display:flex;flex-direction:column;gap:0.4em">' +
+                '<input class="jf-rn-title" is="emby-input" type="text" maxlength="200" value="' + escHtml(title) + '" placeholder="Section title (e.g. New feature)" />' +
+                '<textarea class="jf-rn-body" maxlength="4000" rows="3" placeholder="Describe what this brings to users. Markdown: **bold**, *italic*, lines starting with - for bullets." style="resize:vertical;padding:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);border-radius:4px;color:inherit;font-family:inherit;font-size:13px;width:100%;box-sizing:border-box">' + escHtml(body) + '</textarea>' +
+              '</div>' +
+              '<div style="display:flex;flex-direction:column;gap:0.3em">' +
+                '<button type="button" class="jf-icon-btn jf-rn-up" title="Move up"><span class="material-icons" style="font-size:16px">arrow_upward</span></button>' +
+                '<button type="button" class="jf-icon-btn jf-rn-down" title="Move down"><span class="material-icons" style="font-size:16px">arrow_downward</span></button>' +
+                '<button type="button" class="jf-icon-btn jf-rn-del" title="Delete"><span class="material-icons" style="font-size:16px">delete</span></button>' +
+              '</div>';
+
+            row.querySelector('.jf-rn-up').addEventListener('click', function () { moveReleaseNote(row, -1); });
+            row.querySelector('.jf-rn-down').addEventListener('click', function () { moveReleaseNote(row, 1); });
+            row.querySelector('.jf-rn-del').addEventListener('click', function () { row.remove(); });
+            return row;
+          }
+
+          function renderReleaseNotes(notes) {
+            var list = document.getElementById('releaseNotesList');
+            if (!list) return;
+            list.innerHTML = '';
+            (notes || []).slice(0, MAX_RELEASE_NOTES).forEach(function (s) {
+              list.appendChild(createReleaseNoteRow(s));
+            });
+          }
+
+          function collectReleaseNotes() {
+            var list = document.getElementById('releaseNotesList');
+            if (!list) return [];
+            var out = [];
+            list.querySelectorAll('.jf-rn-row').forEach(function (row) {
+              var iconEl = row.querySelector('.jf-rn-icon');
+              var titleEl = row.querySelector('.jf-rn-title');
+              var bodyEl = row.querySelector('.jf-rn-body');
+              var icon = ((iconEl && iconEl.value) || '').trim() || DEFAULT_NOTE_ICON;
+              var title = ((titleEl && titleEl.value) || '').trim();
+              var body = ((bodyEl && bodyEl.value) || '').trim();
+              if (!title && !body) return; // skip empty rows
+              out.push({ icon: icon, title: title, body: body });
+            });
+            return out.slice(0, MAX_RELEASE_NOTES);
+          }
+
+          function moveReleaseNote(row, direction) {
+            var parent = row.parentNode;
+            if (!parent) return;
+            if (direction < 0 && row.previousElementSibling) {
+              parent.insertBefore(row, row.previousElementSibling);
+            } else if (direction > 0 && row.nextElementSibling) {
+              parent.insertBefore(row.nextElementSibling, row);
+            }
+          }
+
           function applyMaintenanceUi(m) {
             var badge = document.getElementById('maintenanceStatusBadge');
             var msgInput = document.getElementById('maintenanceMessage');
@@ -2593,6 +2709,12 @@
               if (scheduledStartEl) scheduledStartEl.value = utcToDatetimeLocal(m.scheduledStart);
               if (scheduledEndEl) scheduledEndEl.value = utcToDatetimeLocal(m.scheduledEnd);
               if (scheduledRestartEl) scheduledRestartEl.value = utcToDatetimeLocal(m.scheduledRestart);
+
+              var customTitleInput = document.getElementById('maintenanceCustomTitle');
+              var customSubtitleInput = document.getElementById('maintenanceCustomSubtitle');
+              if (customTitleInput) customTitleInput.value = m.customTitle || '';
+              if (customSubtitleInput) customSubtitleInput.value = m.customSubtitle || '';
+              renderReleaseNotes(m.releaseNotes || []);
             }
 
             var affectedSummary = document.getElementById('jf-maintenance-affected-summary');
@@ -2668,6 +2790,10 @@
             var scheduledRestart = localToUtcIso(document.getElementById('scheduledRestart').value);
             var scheduleEnabled = !!(scheduledStart || scheduledEnd);
 
+            var customTitle = (document.getElementById('maintenanceCustomTitle').value.trim()) || null;
+            var customSubtitle = (document.getElementById('maintenanceCustomSubtitle').value.trim()) || null;
+            var releaseNotes = collectReleaseNotes();
+
             return ApiClient.ajax({
               type: 'POST',
               url: ApiClient.getUrl('MaintenanceDeluxe/maintenance'),
@@ -2678,7 +2804,10 @@
                 scheduleEnabled: scheduleEnabled,
                 scheduledStart: scheduledStart,
                 scheduledEnd: scheduledEnd,
-                scheduledRestart: scheduledRestart
+                scheduledRestart: scheduledRestart,
+                customTitle: customTitle,
+                customSubtitle: customSubtitle,
+                releaseNotes: releaseNotes
               }),
               contentType: 'application/json'
             }).then(function () {
