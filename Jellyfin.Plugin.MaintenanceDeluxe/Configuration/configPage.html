@@ -898,9 +898,15 @@
 
               <!-- ── Overlay content (title, subtitle, release notes) ─ -->
               <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
-                <h3 class="sectionTitle" style="margin-bottom:0.5em">Overlay content</h3>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:0.5em">
+                  <h3 class="sectionTitle" style="margin:0">Overlay content</h3>
+                  <button type="button" id="previewOverlayBtn" is="emby-button" class="raised" title="Open the overlay with sample data in a new tab — does not activate maintenance">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">visibility</span>
+                    Preview
+                  </button>
+                </div>
                 <div class="fieldDescription" style="margin-bottom:1.2em">
-                  Customise what users see on the premium maintenance overlay. Leave title and subtitle empty to use defaults.
+                  Customise what users see on the premium maintenance overlay. Leave title and subtitle empty to use defaults. Click <b>Preview</b> to see the overlay with sample data without activating maintenance.
                 </div>
 
                 <div class="inputContainer" style="margin-bottom:1.2em">
@@ -2232,6 +2238,15 @@
                 var list = document.getElementById('releaseNotesList');
                 if (list.querySelectorAll('.jf-rn-row').length >= MAX_RELEASE_NOTES) return;
                 list.appendChild(createReleaseNoteRow(null));
+              });
+
+            document
+              .getElementById('previewOverlayBtn')
+              .addEventListener('click', function () {
+                // Opens the Jellyfin root with ?md-preview=1 — banner.js short-circuits
+                // to render the overlay with mock data, without activating maintenance.
+                var url = window.location.origin + '/?md-preview=1';
+                window.open(url, '_blank', 'noopener,noreferrer');
               });
 
             document

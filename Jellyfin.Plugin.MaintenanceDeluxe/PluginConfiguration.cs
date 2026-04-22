@@ -228,6 +228,12 @@ public class MaintenanceSetting
     [JsonPropertyName("scheduledRestart")]
     public DateTime? ScheduledRestart { get; set; }
 
+    /// <summary>Gets or sets the UTC datetime at which maintenance was actually activated (server-managed).
+    /// Used as the starting point for the progress bar when no <see cref="ScheduledStart"/> is set.
+    /// Set in ActivateAsync, cleared in DeactivateAsync.</summary>
+    [JsonPropertyName("activatedAt")]
+    public DateTime? ActivatedAt { get; set; }
+
     /// <summary>Gets or sets the custom overlay title. Null or empty = use localised default.</summary>
     [JsonPropertyName("customTitle")]
     public string? CustomTitle { get; set; }

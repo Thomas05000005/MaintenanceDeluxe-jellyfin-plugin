@@ -71,6 +71,7 @@ internal static class MaintenanceHelper
             }
 
             maint.IsActive = true;
+            maint.ActivatedAt = DateTime.UtcNow;
             maint.PreDisabledUserIds = preDisabled;
             maint.MaintenanceDisabledUserIds = successfullyDisabled;
             plugin.UpdateConfiguration(config);
@@ -133,6 +134,7 @@ internal static class MaintenanceHelper
             }
 
             maint.IsActive = false;
+            maint.ActivatedAt = null;
             maint.PreDisabledUserIds = [];
             maint.MaintenanceDisabledUserIds = [];
             plugin.UpdateConfiguration(config);

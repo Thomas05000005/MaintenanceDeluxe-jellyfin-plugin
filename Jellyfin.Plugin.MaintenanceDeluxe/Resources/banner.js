@@ -706,6 +706,7 @@
         if (!absEl || !relEl || !timeBox || !fill) return;
 
         var start = parseDateOrNull(MAINTENANCE.scheduledStart);
+        var activatedAt = parseDateOrNull(MAINTENANCE.activatedAt);
         var end = parseDateOrNull(MAINTENANCE.scheduledEnd);
         if (!end) {
             absEl.textContent = "";
@@ -717,7 +718,10 @@
 
         var now = Date.now();
         var endMs = end.getTime();
-        var startMs = start ? start.getTime() : (now - 60000);
+        // startMs preference: scheduledStart > activatedAt (set server-side on activation) > now as last resort.
+        var startMs = start ? start.getTime()
+                            : activatedAt ? activatedAt.getTime()
+                            : now;
         var total = Math.max(1, endMs - startMs);
         var elapsed = now - startMs;
         var remaining = endMs - now;
@@ -1015,6 +1019,70 @@
 
     // --- Go ---
     function getToken() { return window.ApiClient ? window.ApiClient.accessToken() : null; }
+
+    // Preview mode short-circuit: ?md-preview=1 renders the overlay with mock data
+    // so admins can iterate the design without activating maintenance for real users.
+    function isPreviewMode() {
+        try { return new URLSearchParams(window.location.search).get("md-preview") === "1"; }
+        catch (e) { return false; }
+    }
+
+    function mockMaintenance() {
+        var now = new Date();
+        var start = new Date(now.getTime() - 20 * 60 * 1000);  // activated 20 min ago
+        var end = new Date(now.getTime() + 35 * 60 * 1000);    // ends in 35 min
+        return {
+            isActive: true,
+            customTitle: "Serveur en maintenance",
+            customSubtitle: "On en profite pour améliorer ton expérience",
+            message: "",
+            statusUrl: "",
+            activatedAt: start.toISOString(),
+            scheduledStart: start.toISOString(),
+            scheduledEnd: end.toISOString(),
+            scheduledRestart: null,
+            scheduleEnabled: true,
+            releaseNotes: [
+                {
+                    icon: "🎬",
+                    title: "12 nouveaux films ajoutés",
+                    body: "Ajout des dernières sorties : **Dune 3**, **Oppenheimer**, et le meilleur de A24.\n\nParfait pour une soirée cinéma."
+                },
+                {
+                    icon: "⚡",
+                    title: "Jellyfin 10.11.6 → 10.12",
+                    body: "- Streaming **30% plus rapide** (nouveau décodeur)\n- Meilleure compression vidéo\n- Correction de 47 bugs"
+                },
+                {
+                    icon: "🧹",
+                    title: "Nettoyage de la bibliothèque",
+                    body: "Suppression des doublons + recompression des 4K trop lourds. *~80 Go récupérés.*"
+                }
+            ]
+        };
+    }
+
+    if (isPreviewMode()) {
+        MAINTENANCE = mockMaintenance();
+        IS_ADMIN = true;
+        applyMaintenanceState();
+        // Visual "PREVIEW" badge so admin can't confuse it with real maintenance.
+        setTimeout(function () {
+            var overlay = document.getElementById("jf-md-overlay");
+            if (!overlay) return;
+            var badge = document.createElement("div");
+            badge.style.cssText = [
+                "position:absolute;top:16px;right:16px;z-index:10;",
+                "padding:6px 14px;border-radius:999px;",
+                "background:rgba(209,128,51,.18);border:1px solid rgba(209,128,51,.55);",
+                "color:#d18033;font-size:10px;font-weight:600;letter-spacing:.18em;",
+                "text-transform:uppercase;font-family:'Geist Mono',monospace;"
+            ].join("");
+            badge.textContent = "Prévisualisation";
+            overlay.appendChild(badge);
+        }, 120);
+        return;
+    }
 
     // Fetch maintenance state without auth — works even on the login page.
     fetch("/MaintenanceDeluxe/maintenance")
