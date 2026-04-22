@@ -8,7 +8,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Users;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.JellyFlare;
+namespace Jellyfin.Plugin.MaintenanceDeluxe;
 
 /// <summary>
 /// Server-side helpers for activating and deactivating maintenance mode.
@@ -66,7 +66,7 @@ internal static class MaintenanceHelper
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "[JellyFlare] Failed to disable user {UserId} during maintenance activation — skipping.", user.Id);
+                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to disable user {UserId} during maintenance activation — skipping.", user.Id);
                 }
             }
 
@@ -76,7 +76,7 @@ internal static class MaintenanceHelper
             plugin.UpdateConfiguration(config);
             plugin.SaveConfiguration();
 
-            logger?.LogInformation("[JellyFlare] Maintenance activated. Disabled {Count} user(s); {Skipped} skipped.",
+            logger?.LogInformation("[MaintenanceDeluxe] Maintenance activated. Disabled {Count} user(s); {Skipped} skipped.",
                 successfullyDisabled.Count, toDisable.Count - successfullyDisabled.Count);
         }
         finally
@@ -86,7 +86,7 @@ internal static class MaintenanceHelper
     }
 
     /// <summary>
-    /// Re-enables the users that JellyFlare disabled on activation and marks maintenance as inactive.
+    /// Re-enables the users that MaintenanceDeluxe disabled on activation and marks maintenance as inactive.
     /// No-op if maintenance is not active.
     /// Per-user failures are logged and skipped so a single bad record does not block the rest.
     /// </summary>
@@ -107,14 +107,14 @@ internal static class MaintenanceHelper
             {
                 if (!Guid.TryParse(idStr, out var guid))
                 {
-                    logger?.LogWarning("[JellyFlare] Skipping malformed user ID '{Id}' during deactivation.", idStr);
+                    logger?.LogWarning("[MaintenanceDeluxe] Skipping malformed user ID '{Id}' during deactivation.", idStr);
                     continue;
                 }
 
                 var user = userManager.GetUserById(guid);
                 if (user is null)
                 {
-                    logger?.LogDebug("[JellyFlare] User {UserId} not found during deactivation (may have been deleted) — skipping.", guid);
+                    logger?.LogDebug("[MaintenanceDeluxe] User {UserId} not found during deactivation (may have been deleted) — skipping.", guid);
                     continue;
                 }
 
@@ -128,7 +128,7 @@ internal static class MaintenanceHelper
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "[JellyFlare] Failed to re-enable user {UserId} during deactivation — skipping.", guid);
+                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-enable user {UserId} during deactivation — skipping.", guid);
                 }
             }
 
@@ -138,7 +138,7 @@ internal static class MaintenanceHelper
             plugin.UpdateConfiguration(config);
             plugin.SaveConfiguration();
 
-            logger?.LogInformation("[JellyFlare] Maintenance deactivated. Re-enabled {Count} user(s).", reenabled);
+            logger?.LogInformation("[MaintenanceDeluxe] Maintenance deactivated. Re-enabled {Count} user(s).", reenabled);
         }
         finally
         {
@@ -182,13 +182,13 @@ internal static class MaintenanceHelper
                     }
                     catch (Exception ex)
                     {
-                        logger?.LogWarning(ex, "[JellyFlare] Failed to re-disable user {UserId} during startup consistency check.", guid);
+                        logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserId} during startup consistency check.", guid);
                     }
                 }
             }
 
             if (restored > 0)
-                logger?.LogInformation("[JellyFlare] Startup consistency check re-disabled {Count} user(s) that were re-enabled during restart.", restored);
+                logger?.LogInformation("[MaintenanceDeluxe] Startup consistency check re-disabled {Count} user(s) that were re-enabled during restart.", restored);
         }
         finally
         {

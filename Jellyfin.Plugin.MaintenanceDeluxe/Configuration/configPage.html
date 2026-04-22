@@ -2,11 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>JellyFlare</title>
+    <title>MaintenanceDeluxe</title>
   </head>
   <body>
     <div
-      id="JellyFlareConfigPage"
+      id="MaintenanceDeluxeConfigPage"
       data-role="page"
       class="page type-interior pluginConfigurationPage"
       data-require="emby-input,emby-button,emby-checkbox"
@@ -282,10 +282,10 @@
       </style>
       <div data-role="content">
         <div class="content-primary">
-          <form id="JellyFlareConfigForm">
+          <form id="MaintenanceDeluxeConfigForm">
             <div class="sectionTitleContainer flex align-items-center">
-              <h2 class="sectionTitle">JellyFlare</h2>
-              <a href="https://github.com/MorganKryze/JellyFlare/blob/main/docs/configuration.md" target="_blank" rel="noopener" class="button-link headerHelpButton emby-button" title="Documentation" style="margin-left: auto">
+              <h2 class="sectionTitle">MaintenanceDeluxe</h2>
+              <a href="https://github.com/MorganKryze/MaintenanceDeluxe/blob/main/docs/configuration.md" target="_blank" rel="noopener" class="button-link headerHelpButton emby-button" title="Documentation" style="margin-left: auto">
                 <span>Docs</span>
               </a>
             </div>
@@ -296,7 +296,7 @@
             <div id="jf-dep-warning" style="display:none; background:#7b2b2b; color:#fff; border-radius:4px; padding:0.6em 1em; margin-bottom:1em; font-size:0.9em">
               <strong>Missing dependencies:</strong> <span id="jf-dep-list"></span>.
               The banner will not appear until these are installed and active.
-              See the <a href="https://github.com/MorganKryze/JellyFlare/blob/main/README.md#prerequisites" target="_blank" rel="noopener" style="color:#ffd;text-decoration:underline">prerequisites</a>.
+              See the <a href="https://github.com/MorganKryze/MaintenanceDeluxe/blob/main/README.md#prerequisites" target="_blank" rel="noopener" style="color:#ffd;text-decoration:underline">prerequisites</a>.
             </div>
 
             <!-- ── Tab strip ───────────────────────────────────────── -->
@@ -2394,7 +2394,7 @@
             }
 
             document
-              .getElementById('JellyFlareConfigForm')
+              .getElementById('MaintenanceDeluxeConfigForm')
               .addEventListener('submit', function (e) {
                 e.preventDefault();
                 if (validatePresets().length > 0) {
@@ -2519,7 +2519,7 @@
                 }
                 ApiClient.ajax({
                   type: 'POST',
-                  url: ApiClient.getUrl('JellyFlare/config'),
+                  url: ApiClient.getUrl('MaintenanceDeluxe/config'),
                   data: JSON.stringify(config),
                   contentType: 'application/json'
                 })
@@ -2670,7 +2670,7 @@
 
             return ApiClient.ajax({
               type: 'POST',
-              url: ApiClient.getUrl('JellyFlare/maintenance'),
+              url: ApiClient.getUrl('MaintenanceDeluxe/maintenance'),
               data: JSON.stringify({
                 isActive: isActive,
                 message: message,
@@ -2682,7 +2682,7 @@
               }),
               contentType: 'application/json'
             }).then(function () {
-              return ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
+              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/maintenance'))
                 .then(function (m) { applyMaintenanceUi(m); });
             });
           }
@@ -2714,16 +2714,16 @@
           }
 
           document
-            .getElementById('JellyFlareConfigPage')
+            .getElementById('MaintenanceDeluxeConfigPage')
             .addEventListener('pageshow', function () {
               initDom();
               checkDependencies();
-              ApiClient.getJSON(ApiClient.getUrl('JellyFlare/config')).then(
+              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config')).then(
                 function (config) {
                   populatePage(config);
                 }
               );
-              ApiClient.getJSON(ApiClient.getUrl('JellyFlare/maintenance'))
+              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/maintenance'))
                 .then(function (m) { applyMaintenanceUi(m); })
                 .catch(function () {});
             });

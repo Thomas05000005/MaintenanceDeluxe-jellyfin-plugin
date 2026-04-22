@@ -2,10 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <AssemblyName>Jellyfin.Plugin.JellyFlare</AssemblyName>
-    <RootNamespace>Jellyfin.Plugin.JellyFlare</RootNamespace>
-    <AssemblyVersion>1.13.0.0</AssemblyVersion>
-    <FileVersion>1.13.0.0</FileVersion>
+    <AssemblyName>Jellyfin.Plugin.MaintenanceDeluxe</AssemblyName>
+    <RootNamespace>Jellyfin.Plugin.MaintenanceDeluxe</RootNamespace>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>

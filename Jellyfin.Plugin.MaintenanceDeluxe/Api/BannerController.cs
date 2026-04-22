@@ -5,21 +5,21 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.JellyFlare.Configuration;
+using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.JellyFlare.Api;
+namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 
 /// <summary>
 /// Exposes the plugin configuration as JSON for the banner script.
 /// All endpoints require authentication — the banner is intended for registered users only.
 /// </summary>
 [ApiController]
-[Route("JellyFlare")]
+[Route("MaintenanceDeluxe")]
 public class BannerController : ControllerBase
 {
     private readonly IUserManager _userManager;
@@ -51,7 +51,7 @@ public class BannerController : ControllerBase
     public IActionResult GetBannerScript()
     {
         var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("Jellyfin.Plugin.JellyFlare.Resources.banner.js");
+            .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Resources.banner.js");
         if (stream is null)
             return NotFound();
         return File(stream, "application/javascript");

@@ -7,7 +7,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.JellyFlare.ScheduledTasks;
+namespace Jellyfin.Plugin.MaintenanceDeluxe.ScheduledTasks;
 
 /// <summary>
 /// Runs every minute to drive maintenance scheduling, persistence hardening, and scheduled server restart.
@@ -38,16 +38,16 @@ public class MaintenanceScheduleTask : IScheduledTask
     }
 
     /// <inheritdoc />
-    public string Name => "JellyFlare Maintenance Schedule";
+    public string Name => "MaintenanceDeluxe Maintenance Schedule";
 
     /// <inheritdoc />
     public string Description => "Activates/deactivates maintenance mode on schedule and triggers scheduled server restarts.";
 
     /// <inheritdoc />
-    public string Category => "JellyFlare";
+    public string Category => "MaintenanceDeluxe";
 
     /// <inheritdoc />
-    public string Key => "JellyFlareMaintenanceSchedule";
+    public string Key => "MaintenanceDeluxeMaintenanceSchedule";
 
     /// <inheritdoc />
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() =>
@@ -69,7 +69,7 @@ public class MaintenanceScheduleTask : IScheduledTask
             var startupPlugin = Plugin.Instance;
             if (startupPlugin?.Configuration.MaintenanceMode.IsActive == true)
             {
-                _logger.LogInformation("[JellyFlare] Server started mid-maintenance — re-verifying user disabled state.");
+                _logger.LogInformation("[MaintenanceDeluxe] Server started mid-maintenance — re-verifying user disabled state.");
                 await MaintenanceHelper.EnsureUsersDisabledAsync(_userManager, _logger).ConfigureAwait(false);
             }
         }
@@ -86,7 +86,7 @@ public class MaintenanceScheduleTask : IScheduledTask
             && now >= maint.ScheduledStart.Value
             && !maint.IsActive)
         {
-            _logger.LogInformation("[JellyFlare] Scheduled maintenance activation triggered at {Time}.", now);
+            _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance activation triggered at {Time}.", now);
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
         }
 
@@ -101,7 +101,7 @@ public class MaintenanceScheduleTask : IScheduledTask
             && now >= maint.ScheduledEnd.Value
             && maint.IsActive)
         {
-            _logger.LogInformation("[JellyFlare] Scheduled maintenance deactivation triggered at {Time}.", now);
+            _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance deactivation triggered at {Time}.", now);
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
 
             // Clear the schedule so the activation check doesn't immediately re-trigger.
@@ -124,7 +124,7 @@ public class MaintenanceScheduleTask : IScheduledTask
 
         if (maint.ScheduledRestart.HasValue && now >= maint.ScheduledRestart.Value)
         {
-            _logger.LogInformation("[JellyFlare] Scheduled server restart triggered at {Time}.", now);
+            _logger.LogInformation("[MaintenanceDeluxe] Scheduled server restart triggered at {Time}.", now);
             var config = plugin.Configuration;
             config.MaintenanceMode.ScheduledRestart = null;
             plugin.UpdateConfiguration(config);

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.JellyFlare.Configuration;
+namespace Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 
 /// <summary>
 /// Schedule definition for a banner message or permanent entry.
@@ -71,7 +71,7 @@ public class ColorPreset
 }
 
 /// <summary>
-/// A single JellyFlare message shown in rotation.
+/// A single MaintenanceDeluxe message shown in rotation.
 /// </summary>
 public class BannerMessage
 {
@@ -188,7 +188,7 @@ public class MaintenanceSetting
     [JsonPropertyName("preDisabledUserIds")]
     public List<string> PreDisabledUserIds { get; set; } = new();
 
-    /// <summary>Gets or sets the IDs of users that JellyFlare disabled when maintenance was activated.
+    /// <summary>Gets or sets the IDs of users that MaintenanceDeluxe disabled when maintenance was activated.
     /// These are the users that will be re-enabled when maintenance is deactivated.</summary>
     [JsonPropertyName("maintenanceDisabledUserIds")]
     public List<string> MaintenanceDisabledUserIds { get; set; } = new();
@@ -211,8 +211,8 @@ public class MaintenanceSetting
 }
 
 /// <summary>
-/// Plugin configuration for JellyFlare.
-/// Serialized to XML by Jellyfin and exposed as JSON via <c>/JellyFlare/config</c>.
+/// Plugin configuration for MaintenanceDeluxe.
+/// Serialized to XML by Jellyfin and exposed as JSON via <c>/MaintenanceDeluxe/config</c>.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {

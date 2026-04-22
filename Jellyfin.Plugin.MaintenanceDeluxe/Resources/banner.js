@@ -2,9 +2,9 @@
     "use strict";
 
     // Prevent double-execution (JS Injector + direct <script> tag).
-    if (document.getElementById("jf-jellyflare")) return;
+    if (document.getElementById("jf-maintenance-deluxe")) return;
 
-    var CONFIG = null; // loaded asynchronously from /JellyFlare/config
+    var CONFIG = null; // loaded asynchronously from /MaintenanceDeluxe/config
 
     // --- Named constants ---
     var BANNER_Z_INDEX = 999999;
@@ -173,7 +173,7 @@
         "  --jf-fs: 14px;",
         "  --jf-fs-m: 13px;",
         "}",
-        "#jf-jellyflare {",
+        "#jf-maintenance-deluxe {",
         "  position:fixed; top:0; left:0; width:100%; z-index:" + BANNER_Z_INDEX + ";",
         "  text-align:center; padding:0 70px; font-weight:bold; font-size:var(--jf-fs);",
         "  box-sizing:border-box; opacity:0; transform:translateY(-100%);",
@@ -181,11 +181,11 @@
         "  display:flex; align-items:center; justify-content:center;",
         "  height:var(--jf-h);",
         "}",
-        "#jf-jellyflare.visible { opacity:1; transform:translateY(0); }",
-        "#jf-jellyflare.off { display:none!important; }",
+        "#jf-maintenance-deluxe.visible { opacity:1; transform:translateY(0); }",
+        "#jf-maintenance-deluxe.off { display:none!important; }",
         "#jf-banner-text { color:inherit; text-decoration:none; }",
         "@media(max-width:" + MOBILE_BREAKPOINT + "px){",
-        "  #jf-jellyflare { font-size:var(--jf-fs-m); padding:0 36px; height:var(--jf-h-m); }",
+        "  #jf-maintenance-deluxe { font-size:var(--jf-fs-m); padding:0 36px; height:var(--jf-h-m); }",
         "  #jf-banner-dismiss-all { display:none!important; }",
         "  #jf-banner-close { font-size:22px; padding:4px 8px; }",
         "  #jf-banner-close-area { right:4px; }",
@@ -205,7 +205,7 @@
         "  text-decoration:underline; white-space:nowrap;",
         "}",
         "#jf-banner-dismiss-all:hover { opacity:1; }",
-        "#jf-jellyflare.permanent #jf-banner-close-area { display:none!important; }",
+        "#jf-maintenance-deluxe.permanent #jf-banner-close-area { display:none!important; }",
         "body.jf-banner-active .skinHeader { top:var(--jf-h)!important; transition:top .3s ease; }",
         "body.jf-banner-active .mainDrawer { top:var(--jf-h)!important; height:calc(100% - var(--jf-h))!important; transition:top .3s ease,height .3s ease; }",
         "@media(max-width:" + MOBILE_BREAKPOINT + "px){",
@@ -213,7 +213,7 @@
         "  body.jf-banner-active .mainDrawer { top:var(--jf-h-m)!important; height:calc(100% - var(--jf-h-m))!important; }",
         "}",
         ".skinHeader,.mainDrawer,.skinBody { transition:top var(--jf-dur) ease,height var(--jf-dur) ease,padding-top var(--jf-dur) ease,margin-top var(--jf-dur) ease; }",
-        "body.hide-scroll #jf-jellyflare { display:none!important; }",
+        "body.hide-scroll #jf-maintenance-deluxe { display:none!important; }",
         "body.hide-scroll .skinHeader { top:0!important; }",
         "body.hide-scroll .mainDrawer { top:0!important; height:100%!important; }",
         "body.hide-scroll .skinBody { padding-top:0!important; }",
@@ -243,7 +243,7 @@
 
     // --- DOM ---
     var banner = document.createElement("div");
-    banner.id = "jf-jellyflare";
+    banner.id = "jf-maintenance-deluxe";
     banner.classList.add("off");
 
     // textSpan is an <a> so it can optionally be a clickable link
@@ -737,7 +737,7 @@
     function getToken() { return window.ApiClient ? window.ApiClient.accessToken() : null; }
 
     // Fetch maintenance state without auth — works even on the login page.
-    fetch("/JellyFlare/maintenance")
+    fetch("/MaintenanceDeluxe/maintenance")
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (maint) {
@@ -750,7 +750,7 @@
                 return;
             }
 
-            var configPromise = fetch("/JellyFlare/config", {
+            var configPromise = fetch("/MaintenanceDeluxe/config", {
                 headers: { "Authorization": "MediaBrowser Token=\"" + token + "\"" }
             }).then(function (r) { return r.ok ? r.json() : null; });
 
@@ -829,7 +829,7 @@
                         requestAnimationFrame(applyBodyMargin);
                     }
                     // Re-check maintenance state on each navigation (unauthenticated).
-                    fetch("/JellyFlare/maintenance")
+                    fetch("/MaintenanceDeluxe/maintenance")
                         .then(function (r) { return r.ok ? r.json() : null; })
                         .then(function (m) { if (!m) return; MAINTENANCE = m; applyMaintenanceState(); })
                         .catch(function () {});
@@ -837,7 +837,7 @@
                     // the full config so new messages appear within one rotation cycle.
                     var tok = getToken();
                     if (tok) {
-                        fetch("/JellyFlare/config", {
+                        fetch("/MaintenanceDeluxe/config", {
                             headers: { "Authorization": "MediaBrowser Token=\"" + tok + "\"" }
                         })
                             .then(function (r) { return r.ok ? r.json() : null; })
@@ -899,7 +899,7 @@
             tick();
         })
         .catch(function (err) {
-            console.warn("[JellyFlare] init failed:", err);
+            console.warn("[MaintenanceDeluxe] init failed:", err);
         });
         });
 })();

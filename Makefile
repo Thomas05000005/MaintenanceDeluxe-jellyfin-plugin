@@ -1,10 +1,10 @@
 .PHONY: build deploy update up down restart logs setup clean bump \
         _jsinjector _filetransform _meta
 
-PLUGIN_DLL := Jellyfin.Plugin.JellyFlare/bin/Release/net9.0/Jellyfin.Plugin.JellyFlare.dll
-PLUGIN_DIR := docker/config/data/plugins/JellyFlare
+PLUGIN_DLL := Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll
+PLUGIN_DIR := docker/config/data/plugins/MaintenanceDeluxe
 COMPOSE    := docker compose -f docker/compose.yml
-CSPROJ     := Jellyfin.Plugin.JellyFlare/JellyFlare.csproj
+CSPROJ     := Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
 
 # ── build ──────────────────────────────────────────────────────────────────────
 
@@ -91,5 +91,5 @@ endif
 # ── clean ──────────────────────────────────────────────────────────────────────
 
 clean:
-	rm -rf Jellyfin.Plugin.JellyFlare/bin Jellyfin.Plugin.JellyFlare/obj
+	rm -rf Jellyfin.Plugin.MaintenanceDeluxe/bin Jellyfin.Plugin.MaintenanceDeluxe/obj
 	rm -rf docker/config
