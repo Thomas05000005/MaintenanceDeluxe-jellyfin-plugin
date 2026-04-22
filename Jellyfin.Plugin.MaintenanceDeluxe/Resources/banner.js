@@ -43,6 +43,8 @@
     var IS_ADMIN = false;
     var maintenanceOverlay = null;
     var adminDismissed = false;
+    var maintenanceTimerId = null;
+    var MD_STYLES_INJECTED = false;
     var OVERLAY_Z_INDEX = 1000000; // above BANNER_Z_INDEX (999999)
 
     // Cross-tab dismiss sync via BroadcastChannel (graceful degradation if unavailable).
@@ -611,59 +613,247 @@
         }
     }
 
-    // --- Maintenance overlay ---
-    function showMaintenanceOverlay(message, isAdmin) {
-        if (maintenanceOverlay) return;
-        var overlay = document.createElement("div");
-        overlay.id = "jf-maintenance-overlay";
-        overlay.style.cssText = [
-            "position:fixed;inset:0;z-index:" + OVERLAY_Z_INDEX + ";",
-            "background:rgba(10,10,10,0.92);",
-            "display:flex;flex-direction:column;align-items:center;justify-content:center;",
-            "color:#e0e0e0;font-family:inherit;text-align:center;padding:24px;"
-        ].join("");
+    // --- Maintenance overlay (premium velours + aurora + glass + countdown) ---
 
-        var icon = document.createElement("div");
-        icon.style.cssText = "font-size:48px;margin-bottom:16px";
-        icon.textContent = "\u26a0\ufe0f";
+    function isLikelyTV() {
+        var ua = navigator.userAgent || "";
+        return /Tizen|Web0S|webOS|AFT[A-Z]|CrKey/i.test(ua)
+            || /Android.*TV|BRAVIA|SHIELD|NVIDIA Shield/i.test(ua);
+    }
+    function prefersReducedMotion() {
+        try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; }
+    }
+    function getPerfTier() {
+        if (prefersReducedMotion()) return "minimal";
+        if (isLikelyTV()) return "reduced";
+        return "full";
+    }
 
-        var msg = document.createElement("div");
-        msg.style.cssText = "font-size:20px;font-weight:600;max-width:480px;line-height:1.5";
-        msg.textContent = message || "Server under maintenance. Please check back later.";
+    function injectMaintenanceStyles() {
+        if (MD_STYLES_INJECTED) return;
+        MD_STYLES_INJECTED = true;
+        var style = document.createElement("style");
+        style.id = "jf-md-styles";
+        style.textContent = MD_CSS;
+        document.head.appendChild(style);
+    }
 
-        overlay.appendChild(icon);
-        overlay.appendChild(msg);
-
-        if (MAINTENANCE && MAINTENANCE.statusUrl) {
-            var link = document.createElement("a");
-            link.href = MAINTENANCE.statusUrl;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.textContent = "Check server status \u2197";
-            link.style.cssText = "display:block;margin-top:14px;color:#90caf9;font-size:14px";
-            overlay.appendChild(link);
+    // Minimal safe-subset markdown -> HTML: **bold**, *italic*, lines starting with "-" become <ul><li>.
+    function mdToHtml(src) {
+        if (!src) return "";
+        var esc = function (s) { return s.replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        }); };
+        function renderInline(s) {
+            return s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+                    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
         }
+        var lines = src.split(/\r?\n/);
+        var html = "";
+        var inList = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var trimmed = line.replace(/^\s+/, "");
+            var isItem = /^-\s+/.test(trimmed);
+            if (isItem) {
+                if (!inList) { html += "<ul>"; inList = true; }
+                html += "<li>" + renderInline(esc(trimmed.replace(/^-\s+/, ""))) + "</li>";
+            } else {
+                if (inList) { html += "</ul>"; inList = false; }
+                if (trimmed.length === 0) { if (i > 0) html += "<br>"; }
+                else html += "<p>" + renderInline(esc(line)) + "</p>";
+            }
+        }
+        if (inList) html += "</ul>";
+        return html;
+    }
+
+    function formatLocalTime(date) {
+        try {
+            return date.toLocaleTimeString(navigator.language || "default", {
+                hour: "2-digit", minute: "2-digit", hour12: false
+            }).replace(":", "h");
+        } catch (e) {
+            return date.getHours() + "h" + String(date.getMinutes()).padStart(2, "0");
+        }
+    }
+
+    function formatRelative(ms) {
+        if (ms <= 0) return "";
+        var totalSec = Math.floor(ms / 1000);
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        if (totalSec < 5 * 60) {
+            return (m > 0 ? m + " min " : "") + String(s).padStart(2, "0") + " s";
+        }
+        if (h >= 1) return "≈ " + h + " h " + (m > 0 ? m + " min" : "");
+        return "≈ " + m + " min";
+    }
+
+    function parseDateOrNull(s) {
+        if (!s) return null;
+        var d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    function updateMaintenanceTimer() {
+        if (!maintenanceOverlay || !MAINTENANCE) return;
+        var absEl = maintenanceOverlay.querySelector(".jf-md-time-absolute");
+        var relEl = maintenanceOverlay.querySelector(".jf-md-time-relative");
+        var timeBox = maintenanceOverlay.querySelector(".jf-md-time");
+        var fill = maintenanceOverlay.querySelector(".jf-md-progress-fill");
+        if (!absEl || !relEl || !timeBox || !fill) return;
+
+        var start = parseDateOrNull(MAINTENANCE.scheduledStart);
+        var end = parseDateOrNull(MAINTENANCE.scheduledEnd);
+        if (!end) {
+            absEl.textContent = "";
+            relEl.textContent = "Retour bientôt";
+            fill.style.width = "100%";
+            timeBox.querySelector(".jf-md-progress").style.display = "none";
+            return;
+        }
+
+        var now = Date.now();
+        var endMs = end.getTime();
+        var startMs = start ? start.getTime() : (now - 60000);
+        var total = Math.max(1, endMs - startMs);
+        var elapsed = now - startMs;
+        var remaining = endMs - now;
+
+        absEl.textContent = "Retour prévu à " + formatLocalTime(end);
+
+        if (remaining > 0) {
+            timeBox.classList.remove("overtime");
+            relEl.textContent = formatRelative(remaining);
+            fill.style.width = Math.min(100, Math.max(0, (elapsed / total) * 100)) + "%";
+        } else {
+            timeBox.classList.add("overtime");
+            var overM = Math.floor(-remaining / 60000);
+            relEl.textContent = "Finalisation en cours" + (overM > 0 ? " (+" + overM + " min)" : "");
+            fill.style.width = "100%";
+        }
+    }
+
+    function escapeMdHtml(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+    }
+
+    function buildMaintenanceOverlay(m, isAdmin) {
+        var tier = getPerfTier();
+        var title = (m && m.customTitle && m.customTitle.trim()) || "Serveur en maintenance";
+        var subtitle = (m && m.customSubtitle && m.customSubtitle.trim()) || "On en profite pour améliorer ton expérience";
+        var message = (m && m.message) || "";
+        var statusUrl = (m && m.statusUrl) || "";
+        var notes = (m && m.releaseNotes) || [];
+
+        var overlay = document.createElement("div");
+        overlay.id = "jf-md-overlay";
+        overlay.className = "jf-md-tier-" + tier;
+        overlay.setAttribute("role", "status");
+        overlay.setAttribute("aria-live", "polite");
+
+        var bg = document.createElement("div");
+        bg.className = "jf-md-bg";
+        bg.innerHTML =
+            '<div class="jf-md-blob jf-md-blob--gold"></div>' +
+            '<div class="jf-md-blob jf-md-blob--midnight"></div>' +
+            '<div class="jf-md-grain"></div>';
+        overlay.appendChild(bg);
+
+        if (tier === "full") {
+            var particles = document.createElement("div");
+            particles.className = "jf-md-particles";
+            for (var i = 0; i < 10; i++) {
+                var p = document.createElement("span");
+                p.className = "jf-md-particle";
+                p.style.left = (Math.random() * 100) + "%";
+                p.style.top = (Math.random() * 100) + "%";
+                p.style.animationDuration = (14 + Math.random() * 10) + "s";
+                p.style.animationDelay = (-Math.random() * 20) + "s";
+                particles.appendChild(p);
+            }
+            overlay.appendChild(particles);
+        }
+
+        var card = document.createElement("div");
+        card.className = "jf-md-card";
+
+        var cardHtml =
+            '<div class="jf-md-logo" aria-hidden="true">▶</div>' +
+            '<h1 class="jf-md-title">' + escapeMdHtml(title) + '</h1>' +
+            '<p class="jf-md-subtitle">' + escapeMdHtml(subtitle) + '</p>';
+
+        if (message && message.trim() && message.trim() !== subtitle.trim()) {
+            cardHtml += '<p class="jf-md-message">' + escapeMdHtml(message) + '</p>';
+        }
+
+        cardHtml +=
+            '<div class="jf-md-time" aria-hidden="true">' +
+                '<div class="jf-md-time-absolute"></div>' +
+                '<div class="jf-md-time-relative"></div>' +
+                '<div class="jf-md-progress"><div class="jf-md-progress-fill"></div></div>' +
+            '</div>';
+
+        if (notes.length > 0) {
+            cardHtml += '<div class="jf-md-notes">' +
+                '<h2 class="jf-md-notes-title">Au programme</h2>' +
+                '<div class="jf-md-notes-list">';
+            for (var j = 0; j < notes.length; j++) {
+                var n = notes[j];
+                cardHtml += '<div class="jf-md-note">' +
+                    '<div class="jf-md-note-icon">' + escapeMdHtml(n.icon || "✨") + '</div>' +
+                    '<div class="jf-md-note-content">' +
+                        (n.title ? '<h3 class="jf-md-note-title">' + escapeMdHtml(n.title) + '</h3>' : '') +
+                        (n.body ? '<div class="jf-md-note-body">' + mdToHtml(n.body) + '</div>' : '') +
+                    '</div>' +
+                '</div>';
+            }
+            cardHtml += '</div></div>';
+        }
+
+        cardHtml += '<div class="jf-md-footer">';
+        if (statusUrl) {
+            cardHtml += '<a class="jf-md-status-link" href="' + encodeURI(statusUrl) + '" target="_blank" rel="noopener noreferrer">Voir le statut détaillé ↗</a>';
+        }
+        if (isAdmin) {
+            cardHtml += '<button type="button" class="jf-md-dismiss">✕ Accès admin</button>';
+        }
+        cardHtml += '</div>';
+
+        card.innerHTML = cardHtml;
+        overlay.appendChild(card);
 
         if (isAdmin) {
-            var dismissBtn = document.createElement("button");
-            dismissBtn.style.cssText = [
-                "margin-top:24px;padding:8px 20px;border:1px solid rgba(255,255,255,0.3);",
-                "background:rgba(255,255,255,0.1);color:#e0e0e0;border-radius:4px;",
-                "cursor:pointer;font-size:13px;font-family:inherit;"
-            ].join("");
-            dismissBtn.textContent = "\u2715 Dismiss (admin)";
-            dismissBtn.addEventListener("click", function () {
-                adminDismissed = true;
-                removeMaintenanceOverlay();
-            });
-            overlay.appendChild(dismissBtn);
+            var dismissBtn = card.querySelector(".jf-md-dismiss");
+            if (dismissBtn) {
+                dismissBtn.addEventListener("click", function () {
+                    adminDismissed = true;
+                    removeMaintenanceOverlay();
+                });
+            }
         }
 
+        return overlay;
+    }
+
+    function showMaintenanceOverlay(m, isAdmin) {
+        if (maintenanceOverlay) return;
+        injectMaintenanceStyles();
+        var overlay = buildMaintenanceOverlay(m, isAdmin);
         document.body.appendChild(overlay);
         maintenanceOverlay = overlay;
+        updateMaintenanceTimer();
+        requestAnimationFrame(function () { overlay.classList.add("visible"); });
+        if (maintenanceTimerId) clearInterval(maintenanceTimerId);
+        maintenanceTimerId = setInterval(updateMaintenanceTimer, 1000);
     }
 
     function removeMaintenanceOverlay() {
+        if (maintenanceTimerId) { clearInterval(maintenanceTimerId); maintenanceTimerId = null; }
         if (maintenanceOverlay && maintenanceOverlay.parentNode) {
             maintenanceOverlay.parentNode.removeChild(maintenanceOverlay);
         }
@@ -674,13 +864,103 @@
         if (!MAINTENANCE) return;
         if (MAINTENANCE.isActive) {
             if (!maintenanceOverlay && !(IS_ADMIN && adminDismissed)) {
-                showMaintenanceOverlay(MAINTENANCE.message, IS_ADMIN);
+                showMaintenanceOverlay(MAINTENANCE, IS_ADMIN);
             }
         } else {
             adminDismissed = false;
             removeMaintenanceOverlay();
         }
     }
+
+    // Premium overlay stylesheet — injected once on first show.
+    var MD_CSS = [
+        "#jf-md-overlay{position:fixed;inset:0;z-index:" + OVERLAY_Z_INDEX + ";",
+        "background:#1A1412;color:#F4EDE4;",
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;",
+        "overflow:hidden;display:flex;align-items:center;justify-content:center;padding:24px;",
+        "opacity:0;transition:opacity .4s ease;}",
+        "#jf-md-overlay.visible{opacity:1;}",
+        ".jf-md-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden;}",
+        ".jf-md-blob{position:absolute;border-radius:50%;filter:blur(120px);opacity:.22;will-change:transform;}",
+        ".jf-md-blob--gold{width:60vw;height:60vw;top:-20%;left:-10%;",
+        "background:radial-gradient(circle,#C9A96E 0%,transparent 70%);",
+        "animation:jf-md-drift1 80s ease-in-out infinite alternate;}",
+        ".jf-md-blob--midnight{width:55vw;height:55vw;bottom:-25%;right:-15%;",
+        "background:radial-gradient(circle,#1e2a42 0%,transparent 70%);",
+        "animation:jf-md-drift2 100s ease-in-out infinite alternate;}",
+        "@keyframes jf-md-drift1{to{transform:translate(12vw,10vh) scale(1.08);}}",
+        "@keyframes jf-md-drift2{to{transform:translate(-10vw,-8vh) scale(.95);}}",
+        ".jf-md-grain{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;",
+        "background-image:url(\"data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\");}",
+        ".jf-md-particles{position:absolute;inset:0;pointer-events:none;}",
+        ".jf-md-particle{position:absolute;width:3px;height:3px;background:#C9A96E;border-radius:50%;",
+        "opacity:.4;box-shadow:0 0 6px #C9A96E;will-change:transform;",
+        "animation:jf-md-float 18s linear infinite;}",
+        "@keyframes jf-md-float{",
+        "0%{transform:translate(0,0);opacity:0;}",
+        "10%{opacity:.4;}",
+        "90%{opacity:.4;}",
+        "100%{transform:translate(20px,-100vh);opacity:0;}}",
+        ".jf-md-card{position:relative;max-width:640px;width:100%;max-height:92vh;overflow-y:auto;",
+        "padding:44px 40px;border-radius:16px;background:rgba(36,28,24,.55);",
+        "border:1px solid rgba(201,169,110,.18);text-align:center;",
+        "box-shadow:0 0 0 1px rgba(255,255,255,.02) inset,",
+        "0 20px 60px -20px rgba(201,169,110,.25),",
+        "0 0 40px -10px rgba(201,169,110,.15);",
+        "backdrop-filter:blur(20px) saturate(1.2);",
+        "-webkit-backdrop-filter:blur(20px) saturate(1.2);}",
+        "@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){",
+        ".jf-md-card{background:rgba(36,28,24,.95);}}",
+        ".jf-md-logo{font-size:36px;margin-bottom:20px;color:#C9A96E;",
+        "animation:jf-md-breathe 5s ease-in-out infinite;}",
+        "@keyframes jf-md-breathe{0%,100%{opacity:.55;}50%{opacity:1;}}",
+        ".jf-md-title{font-family:'Instrument Serif','Cormorant Garamond',Georgia,serif;",
+        "font-weight:300;font-size:clamp(28px,5vw,42px);color:#C9A96E;",
+        "margin:0 0 8px 0;letter-spacing:.02em;line-height:1.15;}",
+        ".jf-md-subtitle{font-size:16px;color:#A89584;margin:0 0 16px 0;line-height:1.5;}",
+        ".jf-md-message{font-size:14px;color:#A89584;margin:12px 0 0;line-height:1.5;font-style:italic;opacity:.85;}",
+        ".jf-md-time{margin:28px 0 20px;padding:18px;border-radius:10px;",
+        "background:rgba(0,0,0,.25);border:1px solid rgba(201,169,110,.12);}",
+        ".jf-md-time-absolute{font-family:'Geist Mono','JetBrains Mono',Menlo,Consolas,monospace;",
+        "font-variant-numeric:tabular-nums;font-size:clamp(22px,4vw,30px);",
+        "font-weight:400;color:#F4EDE4;line-height:1.2;}",
+        ".jf-md-time-relative{margin-top:4px;font-size:14px;color:#A89584;font-variant-numeric:tabular-nums;}",
+        ".jf-md-progress{margin-top:14px;height:4px;background:rgba(201,169,110,.12);border-radius:2px;overflow:hidden;}",
+        ".jf-md-progress-fill{height:100%;background:linear-gradient(90deg,#C9A96E,#8B4A3A);transition:width 1s linear;width:0;}",
+        ".jf-md-time.overtime .jf-md-progress-fill{background:#d18033;animation:jf-md-pulse 2s ease-in-out infinite;}",
+        "@keyframes jf-md-pulse{50%{opacity:.45;}}",
+        ".jf-md-notes{margin-top:26px;padding-top:22px;border-top:1px solid rgba(201,169,110,.15);}",
+        ".jf-md-notes-title{font-size:11px;text-transform:uppercase;letter-spacing:.18em;",
+        "color:#A89584;font-weight:500;margin:0 0 14px 0;text-align:left;}",
+        ".jf-md-note{display:grid;grid-template-columns:36px 1fr;gap:12px;margin-bottom:14px;text-align:left;}",
+        ".jf-md-note-icon{font-size:22px;line-height:1.2;}",
+        ".jf-md-note-title{font-size:14.5px;color:#C9A96E;margin:0 0 4px 0;font-weight:500;}",
+        ".jf-md-note-body{font-size:13px;color:#A89584;line-height:1.6;}",
+        ".jf-md-note-body p{margin:0 0 4px;}",
+        ".jf-md-note-body strong{color:#F4EDE4;font-weight:600;}",
+        ".jf-md-note-body em{font-style:italic;}",
+        ".jf-md-note-body ul{padding-left:18px;margin:4px 0;}",
+        ".jf-md-note-body li{margin:2px 0;}",
+        ".jf-md-footer{margin-top:22px;padding-top:18px;border-top:1px solid rgba(201,169,110,.12);",
+        "display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;}",
+        ".jf-md-status-link{color:#C9A96E;font-size:13px;text-decoration:none;padding:7px 14px;",
+        "border-radius:6px;border:1px solid rgba(201,169,110,.25);transition:background .2s;}",
+        ".jf-md-status-link:hover{background:rgba(201,169,110,.1);}",
+        ".jf-md-dismiss{padding:7px 14px;border-radius:6px;",
+        "border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);",
+        "color:#A89584;cursor:pointer;font-size:12px;font-family:inherit;}",
+        ".jf-md-dismiss:hover{background:rgba(255,255,255,.1);}",
+        "@media (max-width:600px){.jf-md-card{padding:32px 22px;border-radius:12px;}}",
+        ".jf-md-tier-reduced .jf-md-blob,",
+        ".jf-md-tier-reduced .jf-md-logo,",
+        ".jf-md-tier-reduced .jf-md-time.overtime .jf-md-progress-fill{animation:none!important;}",
+        ".jf-md-tier-reduced .jf-md-particles{display:none;}",
+        ".jf-md-tier-reduced .jf-md-progress-fill{transition:none;}",
+        ".jf-md-tier-minimal .jf-md-bg{display:none;}",
+        ".jf-md-tier-minimal .jf-md-particles{display:none;}",
+        ".jf-md-tier-minimal .jf-md-card{backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(36,28,24,.98);}",
+        ".jf-md-tier-minimal *{animation:none!important;transition:none!important;}"
+    ].join("");
 
     // --- Main loop ---
     function tick() {
