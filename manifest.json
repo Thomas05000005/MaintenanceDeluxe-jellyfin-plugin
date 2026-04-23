@@ -5,16 +5,16 @@
     "owner": "Thomas05000005",
     "category": "General",
     "overview": "Premium maintenance overlay with live countdown and rich release notes.",
-    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), emoji palette, markdown live preview, character counters. Preview button renders the overlay with your real saved settings without activating maintenance. Graceful three-tier performance degradation for TV clients.",
+    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), quick-add templates, emoji palette, markdown live preview, character counters. Preview button auto-saves the current form and renders the overlay with your real settings without activating maintenance.",
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.7.0",
-        "checksum": "A5F6261A22D7DAA668BE030474CF6215",
-        "changelog": "v0.1.7 - Preview uses your real saved config (title, subtitle, release notes) — no more mock content. Admin UI release-note rows have fixed columns so they stop shifting when you type. Emoji palette of common icons under the icon input. README and docs rewritten.",
+        "version": "0.1.8.0",
+        "checksum": "AC4100D327CA521605ACCAC5ACA98AD9",
+        "changelog": "v0.1.8 - Save chain made resilient: the maintenance fields now always persist, even if the general banner/preset config save fails (previously a broken banner URL would silently block the maintenance save). Preview button auto-saves before opening, so you always see your latest edits. Release-note templates: 6 quick-add buttons (Movies, Series, Update, Cleanup, Security, Network) to scaffold sections in one click.",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.7/MaintenanceDeluxe-v0.1.7.zip",
-        "timestamp": "2026-04-23T17:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.8/MaintenanceDeluxe-v0.1.8.zip",
+        "timestamp": "2026-04-23T18:00:00"
       }
     ]
   }

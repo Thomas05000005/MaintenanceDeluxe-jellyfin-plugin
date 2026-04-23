@@ -279,6 +279,17 @@
           color: #ef9a9a;
           border: 1px solid rgba(198, 40, 40, 0.5);
         }
+        .jf-rn-template {
+          padding: 4px 10px;
+          font-size: 12px;
+          border: 1px solid rgba(255,255,255,0.15);
+          background: rgba(255,255,255,0.05);
+          color: inherit;
+          border-radius: 4px;
+          cursor: pointer;
+          font-family: inherit;
+        }
+        .jf-rn-template:hover { background: rgba(201,169,110,0.15); border-color: rgba(201,169,110,0.4); }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -928,10 +939,19 @@
 
                 <div id="releaseNotesList" style="display:flex;flex-direction:column;gap:0.6em;margin-bottom:0.6em"></div>
 
-                <button type="button" id="addReleaseNote" is="emby-button" class="raised" style="margin-top:0.2em">
-                  <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">add</span>
-                  Add a section
-                </button>
+                <div style="display:flex;flex-wrap:wrap;gap:0.4em;margin-top:0.2em;align-items:center">
+                  <button type="button" id="addReleaseNote" is="emby-button" class="raised">
+                    <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">add</span>
+                    Add blank section
+                  </button>
+                  <span style="opacity:.5;font-size:12px;margin:0 4px">or quick-add:</span>
+                  <button type="button" class="jf-rn-template" data-tpl="movies" title="Add 'Movies added' template">🎬 Movies</button>
+                  <button type="button" class="jf-rn-template" data-tpl="series" title="Add 'Series added' template">🏞 Series</button>
+                  <button type="button" class="jf-rn-template" data-tpl="update" title="Add 'Jellyfin update' template">⚡ Update</button>
+                  <button type="button" class="jf-rn-template" data-tpl="cleanup" title="Add 'Library cleanup' template">🧹 Cleanup</button>
+                  <button type="button" class="jf-rn-template" data-tpl="security" title="Add 'Security patch' template">🔒 Security</button>
+                  <button type="button" class="jf-rn-template" data-tpl="network" title="Add 'Network improvements' template">🌐 Network</button>
+                </div>
               </div>
 
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
@@ -2240,15 +2260,79 @@
                 list.appendChild(createReleaseNoteRow(null));
               });
 
+            var RN_TEMPLATES = {
+              movies: {
+                icon: '🎬',
+                title: 'Nouveaux films ajoutés',
+                body: "Découvre les dernières sorties fraîchement ajoutées à la bibliothèque.
+
+- **N films** au total
+- Jaquettes et synopsis récupérés automatiquement"
+              },
+              series: {
+                icon: '🏞',
+                title: 'Nouvelles séries / saisons',
+                body: "Ajout de nouvelles saisons pour :
+
+- *Série 1* — saison X complète
+- *Série 2* — saison Y en cours"
+              },
+              update: {
+                icon: '⚡',
+                title: 'Mise à jour Jellyfin',
+                body: "Passage à Jellyfin **10.x.x**.
+
+- Streaming plus rapide
+- Meilleure compression
+- Correctifs de bugs"
+              },
+              cleanup: {
+                icon: '🧹',
+                title: 'Nettoyage de la bibliothèque',
+                body: "Suppression des doublons et recompression des vieux fichiers 4K lourds. *Plusieurs Go récupérés.*"
+              },
+              security: {
+                icon: '🔒',
+                title: 'Mise à jour sécurité',
+                body: "Application des derniers correctifs de sécurité. Rien de grave — on préfère être carré."
+              },
+              network: {
+                icon: '🌐',
+                title: 'Amélioration réseau',
+                body: "Optimisation du reverse proxy pour réduire la latence depuis l'extérieur."
+              }
+            };
+            document.querySelectorAll('.jf-rn-template').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var list = document.getElementById('releaseNotesList');
+                if (list.querySelectorAll('.jf-rn-row').length >= MAX_RELEASE_NOTES) return;
+                var tpl = RN_TEMPLATES[btn.dataset.tpl];
+                if (!tpl) return;
+                list.appendChild(createReleaseNoteRow(tpl));
+              });
+            });
+
             document
               .getElementById('previewOverlayBtn')
               .addEventListener('click', function () {
-                // Opens the Jellyfin root with md-preview=1 — banner.js short-circuits
-                // to render the overlay with mock data, without activating maintenance.
-                // We put the flag BOTH in search AND in hash so it survives Jellyfin's
-                // SPA router (which can rewrite either location).
-                var url = window.location.origin + '/web/?md-preview=1#!/home.html?md-preview=1';
-                window.open(url, '_blank', 'noopener,noreferrer');
+                var btn = document.getElementById('previewOverlayBtn');
+                var prevText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">hourglass_empty</span>Saving…';
+                // Save the current form state to the backend BEFORE opening preview,
+                // so preview (which fetches from backend) reflects the user's latest edits.
+                saveMaintenanceSettings()
+                  .then(function () {
+                    var url = window.location.origin + '/web/?md-preview=1#!/home.html?md-preview=1';
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  })
+                  .catch(function (err) {
+                    Dashboard.alert('Could not save before preview: ' + (err && err.responseText || err || 'unknown error'));
+                  })
+                  .then(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = prevText;
+                  });
               });
 
             document
@@ -2583,19 +2667,32 @@
                   if (detail) msg += ': ' + detail;
                   Dashboard.alert(msg);
                 }
-                ApiClient.ajax({
+                var configSave = ApiClient.ajax({
                   type: 'POST',
                   url: ApiClient.getUrl('MaintenanceDeluxe/config'),
                   data: JSON.stringify(config),
                   contentType: 'application/json'
-                })
-                  .then(function () { return saveMaintenanceSettings(); })
-                  .then(function () {
+                });
+                // Maintenance save runs INDEPENDENTLY — if the general config save
+                // fails (bad URL in a rotation message, etc.) we still want the
+                // maintenance tab fields persisted. Both errors are surfaced.
+                Promise.allSettled([configSave, saveMaintenanceSettings()])
+                  .then(function (results) {
                     restoreBtn();
-                    if (document.getElementById('showRefreshPrompt').checked) {
-                      showRefreshPrompt();
+                    var configErr = results[0].status === 'rejected';
+                    var maintErr = results[1].status === 'rejected';
+                    if (!configErr && !maintErr) {
+                      if (document.getElementById('showRefreshPrompt').checked) {
+                        showRefreshPrompt();
+                      } else {
+                        Dashboard.alert('Configuration saved.');
+                      }
+                    } else if (configErr && !maintErr) {
+                      Dashboard.alert('Maintenance saved. Banner/preset config failed: ' + (results[0].reason && results[0].reason.responseText || results[0].reason || 'unknown error'));
+                    } else if (!configErr && maintErr) {
+                      Dashboard.alert('Banner config saved. Maintenance save failed: ' + (results[1].reason && results[1].reason.responseText || results[1].reason || 'unknown error'));
                     } else {
-                      Dashboard.alert('Configuration saved.');
+                      Dashboard.alert('Both saves failed. Check the console for details.');
                     }
                   })
                   .catch(function (err) {
