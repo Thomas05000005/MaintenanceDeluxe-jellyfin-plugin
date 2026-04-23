@@ -43,9 +43,12 @@ public class BannerController : ControllerBase
         return Ok(config);
     }
 
-    /// <summary>Serves the banner client script.</summary>
+    /// <summary>Serves the banner client script.
+    /// Public (no [Authorize]) so the preview iframe in the admin config page can load it
+    /// (browsers do not send Authorization headers on iframe-initiated script requests).
+    /// This is safe: the same bytes are already served publicly via JavaScriptInjector.
+    /// </summary>
     [HttpGet("banner.js")]
-    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetBannerScript()
@@ -57,9 +60,12 @@ public class BannerController : ControllerBase
         return File(stream, "application/javascript");
     }
 
-    /// <summary>Serves a minimal admin preview shell used by the config page's live-preview iframe.</summary>
+    /// <summary>Serves a minimal admin preview shell used by the config page's live-preview iframe.
+    /// Public (no [Authorize]) because browsers embed iframes with cookies only, whereas Jellyfin API
+    /// auth requires an Authorization header the browser does not send on iframe navigation. The shell
+    /// itself contains no secrets - it just loads banner.js which reads the already-public maintenance
+    /// endpoint.</summary>
     [HttpGet("preview.html")]
-    [Authorize(Policy = "RequiresElevation")]
     [Produces("text/html")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ContentResult GetPreviewShell()

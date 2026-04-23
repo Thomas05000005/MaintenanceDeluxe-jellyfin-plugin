@@ -291,6 +291,44 @@
         }
         .jf-rn-template:hover { background: rgba(201,169,110,0.15); border-color: rgba(201,169,110,0.4); }
 
+        /* Segmented control (radios styled as an inline pill group) */
+        .jf-segmented {
+          display: inline-flex; flex-wrap: wrap;
+          border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; overflow: hidden;
+          background: rgba(255,255,255,0.03);
+        }
+        .jf-segmented label {
+          padding: 7px 14px; cursor: pointer; background: transparent;
+          color: rgba(255,255,255,0.75); font-size: 12.5px; font-weight: 500;
+          border-right: 1px solid rgba(255,255,255,0.08);
+          transition: background 0.15s, color 0.15s; user-select: none;
+          display: inline-block;
+        }
+        .jf-segmented label:last-child { border-right: 0; }
+        .jf-segmented label:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .jf-segmented input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+        .jf-segmented label:has(input[type="radio"]:checked) {
+          background: rgba(201,169,110,0.22); color: #E4C88B;
+        }
+        .jf-segmented label:has(input[type="radio"]:focus-visible) {
+          outline: 2px solid rgba(201,169,110,0.7); outline-offset: -2px;
+        }
+
+        /* Reset defaults button — compatible light & dark mode */
+        .jf-reset-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 7px 14px; border-radius: 6px; cursor: pointer;
+          font-size: 12.5px; font-weight: 500; font-family: inherit;
+          background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8);
+          border: 1px solid rgba(255,255,255,0.15);
+          transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .jf-reset-btn:hover {
+          background: rgba(201,169,110,0.12); color: #E4C88B;
+          border-color: rgba(201,169,110,0.35);
+        }
+        .jf-reset-btn .material-icons { font-size: 16px; }
+
         /* Expand-preview fullscreen mode */
         #jf-appearance-section.jf-app-expanded {
           position: fixed; inset: 0; z-index: 9999;
@@ -997,21 +1035,21 @@
                 </div>
               </div>
 
-              <!-- Appearance section -->
+              <!-- Section Apparence -->
               <div id="jf-appearance-section" style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <div class="jf-app-exit-bar">
-                  <button type="button" id="appTogglePanel" title="Hide/show the settings panel (H)">Hide panel <kbd>H</kbd></button>
-                  <button type="button" id="appExitExpand" title="Exit expand mode (Esc)">Exit <kbd>Esc</kbd></button>
+                  <button type="button" id="appTogglePanel" title="Masquer/afficher le panneau (H)">Masquer le panneau <kbd>H</kbd></button>
+                  <button type="button" id="appExitExpand" title="Quitter le mode plein ecran (Echap)">Quitter <kbd>Esc</kbd></button>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1em;flex-wrap:wrap">
-                  <h3 class="sectionTitle" style="margin:0 0 0.5em 0">Appearance</h3>
+                  <h3 class="sectionTitle" style="margin:0 0 0.5em 0">Apparence</h3>
                   <button type="button" id="appExpandPreview" is="emby-button" class="emby-button" style="font-size:12px">
                     <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">open_in_full</span>
-                    Expand preview
+                    Agrandir l'aperçu
                   </button>
                 </div>
                 <div class="fieldDescription" style="margin-bottom:1.2em">
-                  Customise the overlay look. The live preview on the right reflects your changes instantly without saving. Click <b>Save</b> at the bottom of the page to apply changes to real users.
+                  Personnalise l'apparence de l'overlay. L'aperçu à droite reflète tes changements en direct, sans avoir besoin de sauvegarder. Clique sur <b>Save</b> en bas de la page pour appliquer aux utilisateurs.
                 </div>
 
                 <div id="appearanceLayout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,44%);gap:1.2em;align-items:start;margin-bottom:1em">
@@ -1019,73 +1057,73 @@
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2em 1.6em">
                   <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="appAccentColor">Accent colour</label>
+                    <label class="inputLabel inputLabelUnfocused" for="appAccentColor">Couleur d'accent</label>
                     <div style="display:flex;gap:0.4em;align-items:center">
                       <input id="appAccentColor" type="color" value="#C9A96E" style="width:48px;height:36px;padding:2px;border-radius:4px;background:transparent;border:1px solid rgba(255,255,255,0.15);cursor:pointer" />
                       <input id="appAccentColorHex" is="emby-input" type="text" maxlength="7" placeholder="#C9A96E" style="flex:1;font-family:monospace;text-transform:uppercase" />
                     </div>
-                    <div class="fieldDescription">Drives all gold highlights. Palette variants are derived automatically.</div>
+                    <div class="fieldDescription">Pilote toutes les touches dorées. Les variantes sont dérivées automatiquement.</div>
                   </div>
 
                   <div class="inputContainer">
-                    <label class="inputLabel inputLabelUnfocused" for="appBgTint">Background tint</label>
+                    <label class="inputLabel inputLabelUnfocused" for="appBgTint">Teinte de fond</label>
                     <div style="display:flex;gap:0.4em;align-items:center">
                       <input id="appBgTint" type="color" value="#1A1412" style="width:48px;height:36px;padding:2px;border-radius:4px;background:transparent;border:1px solid rgba(255,255,255,0.15);cursor:pointer" />
                       <input id="appBgTintHex" is="emby-input" type="text" maxlength="7" placeholder="#1A1412" style="flex:1;font-family:monospace;text-transform:uppercase" />
                     </div>
-                    <div class="fieldDescription">Card + overlay background tint.</div>
+                    <div class="fieldDescription">Teinte de fond de la carte et de l'arrière-plan.</div>
                   </div>
                 </div>
 
                 <div class="inputContainer" style="margin-bottom:1em">
-                  <label class="inputLabel inputLabelUnfocused" for="appCardOpacity">Card opacity: <span id="appCardOpacityValue" style="font-family:monospace;opacity:.7">0.72</span></label>
+                  <label class="inputLabel inputLabelUnfocused" for="appCardOpacity">Opacité de la carte : <span id="appCardOpacityValue" style="font-family:monospace;opacity:.7">0.72</span></label>
                   <input id="appCardOpacity" type="range" min="0.40" max="1.00" step="0.02" value="0.72" style="width:100%" />
                 </div>
 
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8em 1.6em;margin-bottom:1em">
+                <div style="display:grid;grid-template-columns:1fr;gap:0.8em;margin-bottom:1em">
                   <div>
-                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Animation speed</div>
-                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
-                      <label><input type="radio" name="appAnimSpeed" value="off" /> Off</label>
-                      <label><input type="radio" name="appAnimSpeed" value="slow" /> Slow</label>
-                      <label><input type="radio" name="appAnimSpeed" value="normal" checked /> Normal</label>
-                      <label><input type="radio" name="appAnimSpeed" value="fast" /> Fast</label>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Vitesse des animations</div>
+                    <div class="jf-segmented">
+                      <label><input type="radio" name="appAnimSpeed" value="off" /> Désactivées</label>
+                      <label><input type="radio" name="appAnimSpeed" value="slow" /> Lentes</label>
+                      <label><input type="radio" name="appAnimSpeed" value="normal" checked /> Normales</label>
+                      <label><input type="radio" name="appAnimSpeed" value="fast" /> Rapides</label>
                     </div>
                   </div>
 
                   <div>
-                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Particle density</div>
-                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
-                      <label><input type="radio" name="appParticles" value="none" /> None</label>
-                      <label><input type="radio" name="appParticles" value="low" /> Low</label>
-                      <label><input type="radio" name="appParticles" value="normal" checked /> Normal</label>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Densité des particules</div>
+                    <div class="jf-segmented">
+                      <label><input type="radio" name="appParticles" value="none" /> Aucune</label>
+                      <label><input type="radio" name="appParticles" value="low" /> Faible</label>
+                      <label><input type="radio" name="appParticles" value="normal" checked /> Normale</label>
                       <label><input type="radio" name="appParticles" value="dense" /> Dense</label>
                     </div>
                   </div>
 
                   <div>
-                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Card border</div>
-                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
-                      <label><input type="radio" name="appBorder" value="full" checked /> Full</label>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Bordure de carte</div>
+                    <div class="jf-segmented">
+                      <label><input type="radio" name="appBorder" value="full" checked /> Dégradé</label>
                       <label><input type="radio" name="appBorder" value="simple" /> Simple</label>
-                      <label><input type="radio" name="appBorder" value="none" /> None</label>
+                      <label><input type="radio" name="appBorder" value="none" /> Aucune</label>
                     </div>
                   </div>
                 </div>
 
                 <div style="margin-top:0.6em">
-                  <button type="button" id="appResetDefaults" is="emby-button" class="emby-button">
-                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">refresh</span>
-                    Reset appearance to defaults
+                  <button type="button" id="appResetDefaults" class="jf-reset-btn">
+                    <span class="material-icons">refresh</span>
+                    Réinitialiser l'apparence
                   </button>
                 </div>
                   </div>
                   <div id="appearancePreview" style="position:relative;min-height:460px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,0.08)">
-                    <iframe id="appPreviewIframe" src="about:blank" title="Live preview" style="width:100%;height:100%;min-height:460px;border:0;display:block"></iframe>
-                    <div id="appPreviewPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:13px;pointer-events:none">Loading live preview...</div>
+                    <iframe id="appPreviewIframe" src="about:blank" title="Aperçu en direct" style="width:100%;height:100%;min-height:460px;border:0;display:block"></iframe>
+                    <div id="appPreviewPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:13px;pointer-events:none">Chargement de l'aperçu…</div>
                   </div>
                 </div>
-                <div class="fieldDescription" style="margin-top:0.6em;opacity:.6">The live preview uses the current admin form values, not saved config. It updates instantly as you type or pick colours.</div>
+                <div class="fieldDescription" style="margin-top:0.6em;opacity:.6">L'aperçu utilise les valeurs du formulaire actuel (pas la config enregistrée). Il se met à jour en direct à chaque modification.</div>
               </div>
 
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
@@ -2369,7 +2407,7 @@
           }
 
           function notifyResetDone() {
-            Dashboard.alert('Reset applied. Save to take effect.');
+            Dashboard.alert('Réinitialisation appliquée. Clique sur Save pour confirmer.');
           }
 
           // ── one-time DOM setup ────────────────────────────────────
@@ -2650,7 +2688,7 @@
               overlay.id = 'jf-refresh-overlay';
               overlay.innerHTML =
                 '<div id="jf-refresh-modal">' +
-                '<h3>Configuration saved</h3>' +
+                '<h3>Configuration enregistrée</h3>' +
                 '<p>Refresh the page for changes to take effect in the banner.</p>' +
                 '<div class="jf-refresh-btns">' +
                 '<button class="jf-refresh-btn jf-refresh-btn-later" id="jf-refresh-later">Later</button>' +
@@ -2822,14 +2860,14 @@
                       if (document.getElementById('showRefreshPrompt').checked) {
                         showRefreshPrompt();
                       } else {
-                        Dashboard.alert('Configuration saved.');
+                        Dashboard.alert('Configuration enregistrée.');
                       }
                     } else if (configErr && !maintErr) {
-                      Dashboard.alert('Maintenance saved. Banner/preset config failed: ' + (results[0].reason && results[0].reason.responseText || results[0].reason || 'unknown error'));
+                      Dashboard.alert('Maintenance enregistrée. Échec de la config bannière/préréglage : ' + (results[0].reason && results[0].reason.responseText || results[0].reason || 'erreur inconnue'));
                     } else if (!configErr && maintErr) {
-                      Dashboard.alert('Banner config saved. Maintenance save failed: ' + (results[1].reason && results[1].reason.responseText || results[1].reason || 'unknown error'));
+                      Dashboard.alert('Config bannière enregistrée. Échec de la sauvegarde maintenance : ' + (results[1].reason && results[1].reason.responseText || results[1].reason || 'erreur inconnue'));
                     } else {
-                      Dashboard.alert('Both saves failed. Check the console for details.');
+                      Dashboard.alert('Les deux sauvegardes ont échoué. Détails dans la console.');
                     }
                   })
                   .catch(function (err) {
@@ -3176,7 +3214,7 @@
             }
             function togglePanel() {
               var hidden = section.classList.toggle('jf-app-panel-hidden');
-              if (toggleBtn) toggleBtn.firstChild.nodeValue = (hidden ? 'Show panel ' : 'Hide panel ');
+              if (toggleBtn) toggleBtn.firstChild.nodeValue = (hidden ? 'Afficher le panneau ' : 'Masquer le panneau ');
             }
 
             if (expandBtn) expandBtn.addEventListener('click', enterExpand);
