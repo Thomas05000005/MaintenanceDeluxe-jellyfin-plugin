@@ -2,11 +2,20 @@
   {
     "guid": "c462a69c-b428-4ecf-b5f2-a28cae71b0fe",
     "name": "MaintenanceDeluxe",
-    "owner": "blanc",
+    "owner": "Thomas05000005",
     "category": "General",
     "overview": "Premium maintenance overlay for Jellyfin with live countdown and rich release notes.",
     "description": "Display a premium, calm, cinema-themed maintenance overlay to your Jellyfin users. Features a live countdown, a time-based progress bar, admin-configurable release notes sections (with icons, titles, and markdown), and a TV-friendly design with graceful degradation on low-end devices. Forked from JellyFlare (GPL-3.0).",
-    "imageUrl": "",
-    "versions": []
+    "imageUrl": "https://raw.githubusercontent.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/main/assets/icon.png",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "checksum": "732326BC37A560F53B61972AFDE28DA4",
+        "changelog": "Initial MVP release. Premium cinema-themed maintenance overlay: velours palette, aurora background, crackling ember particles, projector beam, brushed-metal border (modern browsers), Instrument Serif embedded font. Live countdown with adaptive display. Time-based progress bar with overtime mode. Admin-configurable release notes (markdown). Preview mode via ?md-preview=1. Three performance tiers auto-detected.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.0/MaintenanceDeluxe-v0.1.0.zip",
+        "timestamp": "2026-04-23T11:00:00"
+      }
+    ]
   }
 ]
