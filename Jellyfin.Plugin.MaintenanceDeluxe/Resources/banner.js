@@ -926,9 +926,12 @@
     function applyMaintenanceState() {
         if (!MAINTENANCE) return;
         if (MAINTENANCE.isActive) {
-            // Never block an authenticated admin on admin-facing pages \u2014 they need
-            // the UI to manage the very feature that's blocking everybody else.
-            if (IS_ADMIN && isAdminPage()) {
+            // Never block on admin-facing pages. We drop the IS_ADMIN guard here
+            // because Jellyfin already redirects anonymous users away from admin
+            // routes, so reaching /dashboard/* or /configurationpage implies an
+            // authenticated admin session even if our async user-fetch hasn't
+            // completed yet and IS_ADMIN still reads false.
+            if (isAdminPage()) {
                 if (maintenanceOverlay) removeMaintenanceOverlay();
                 return;
             }

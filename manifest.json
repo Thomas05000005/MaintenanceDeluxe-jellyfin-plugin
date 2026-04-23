@@ -5,16 +5,16 @@
     "owner": "Thomas05000005",
     "category": "General",
     "overview": "Premium maintenance overlay with live countdown and rich release notes.",
-    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), quick-add templates, emoji palette, markdown live preview, character counters. Overlay is suppressed on admin pages so admins can always access their UI. Preview button auto-saves then opens the overlay with your real settings.",
+    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown, time-based progress bar, admin-configurable release notes with quick-add templates and emoji palette. Overlay suppressed on admin pages so admins always have access.",
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.9.0",
-        "checksum": "EB52505C13F9DAC1EC4BE50C4383D40E",
-        "changelog": "v0.1.9 - Overlay no longer appears on admin pages (dashboard, configurationpage, plugins, users, etc.) so you can always access your UI while maintenance is active. Admin dismiss now persists in sessionStorage across reloads and SPA navigation within the same tab.",
+        "version": "0.1.10.0",
+        "checksum": "A980DEE5D4C085F9BAF3B401E8E238E7",
+        "changelog": "v0.1.10 - Admin pages are now always overlay-free. Previously the IS_ADMIN guard was too strict: it is only set after the async user fetch resolves, and during that window the overlay would still appear on admin pages. Now the check uses isAdminPage() alone (Jellyfin redirects anon users away from admin routes anyway).",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.9/MaintenanceDeluxe-v0.1.9.zip",
-        "timestamp": "2026-04-23T19:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.10/MaintenanceDeluxe-v0.1.10.zip",
+        "timestamp": "2026-04-23T20:00:00"
       }
     ]
   }
