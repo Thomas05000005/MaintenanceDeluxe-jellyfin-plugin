@@ -97,7 +97,12 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 { "name",                   "MaintenanceDeluxe Script" },
                 { "script",                 scriptContent },
                 { "enabled",                true },
-                { "requiresAuthentication", true },
+                // false: the maintenance overlay MUST be able to show on the
+                // unauthenticated login page so kicked/disabled users see the
+                // explanation instead of just "account disabled, contact admin".
+                // The /MaintenanceDeluxe/maintenance endpoint is explicitly public
+                // to support this (see BannerController.GetMaintenance).
+                { "requiresAuthentication", false },
                 { "pluginId",               Id.ToString() },
                 { "pluginName",             Name },
                 { "pluginVersion",          Version?.ToString() ?? "1.0.0" }

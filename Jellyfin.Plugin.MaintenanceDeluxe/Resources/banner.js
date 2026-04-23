@@ -1103,9 +1103,13 @@
 
     // Preview mode short-circuit: ?md-preview=1 renders the overlay with mock data
     // so admins can iterate the design without activating maintenance for real users.
+    // We check the FULL URL (search + hash + href) because Jellyfin's SPA router
+    // may move the query into the hash, strip it, or re-insert it later.
     function isPreviewMode() {
-        try { return new URLSearchParams(window.location.search).get("md-preview") === "1"; }
-        catch (e) { return false; }
+        try {
+            var href = window.location.href || "";
+            return /[?&#]md-preview=1(?:[&#]|$)/.test(href);
+        } catch (e) { return false; }
     }
 
     function mockMaintenance() {

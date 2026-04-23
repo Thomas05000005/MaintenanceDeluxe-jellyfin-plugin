@@ -12,5 +12,8 @@ obj/
 # docker testing
 docker/config/
 
+# deployment bundles (built artefacts, don't commit)
+deploy/
+
 # Macos
 .DS_Store

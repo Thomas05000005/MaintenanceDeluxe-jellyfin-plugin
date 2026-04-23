@@ -2243,9 +2243,11 @@
             document
               .getElementById('previewOverlayBtn')
               .addEventListener('click', function () {
-                // Opens the Jellyfin root with ?md-preview=1 — banner.js short-circuits
+                // Opens the Jellyfin root with md-preview=1 — banner.js short-circuits
                 // to render the overlay with mock data, without activating maintenance.
-                var url = window.location.origin + '/?md-preview=1';
+                // We put the flag BOTH in search AND in hash so it survives Jellyfin's
+                // SPA router (which can rewrite either location).
+                var url = window.location.origin + '/web/?md-preview=1#!/home.html?md-preview=1';
                 window.open(url, '_blank', 'noopener,noreferrer');
               });
 
