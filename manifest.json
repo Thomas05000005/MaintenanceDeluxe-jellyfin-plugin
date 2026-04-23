@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.2.3.0",
-        "checksum": "",
+        "checksum": "450C1ED40E12905CFAA4DE05CE477774",
         "changelog": "v0.2.3 - Two polish fixes on the new Appearance panel. First, the 'Agrandir l'apercu' button used Jellyfin's default emby-button which rendered with a white background on the dark admin theme; it now uses the same neutral-translucent style as the Reset button so it fits both light and dark themes. Second, new 'Rotatif' border option: a luminous gold gradient that slowly spins around the card, paired with a soft pulsing glow. Speed follows the animation scale slider (including the 'off' toggle).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.2.3/MaintenanceDeluxe-v0.2.3.zip",
-        "timestamp": ""
+        "timestamp": "2026-04-23T16:58:18"
       },
       {
         "version": "0.2.2.0",
