@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.2.0.0",
-        "checksum": "",
+        "checksum": "6AAFD2B02B4AE9AB18E131BF15027485",
         "changelog": "v0.2.0 - Appearance customization with live preview. New admin section lets you pick accent color, background tint, card opacity, animation speed (off/slow/normal/fast), particle density (none/low/normal/dense), and card border style (full gradient / simple gold / none). A live preview iframe reflects every change instantly without saving. Expand button gives a fullscreen view with toggleable settings panel (H hotkey) and Esc to exit. All colors are now derived from a single accent pick, so the palette stays coherent whatever hue you choose.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.2.0/MaintenanceDeluxe-v0.2.0.zip",
-        "timestamp": ""
+        "timestamp": "2026-04-23T15:15:44"
       },
       {
         "version": "0.1.13.0",
@@ -35,7 +35,7 @@
       {
         "version": "0.1.11.0",
         "checksum": "EFCEC8F2F172CEBDA5BD5B2F915899BA",
-        "changelog": "v0.1.11 - CRITICAL FIX: admin config page was entirely unresponsive since v0.1.8. Root cause: release-note templates had real newlines inside JS string literals, causing the whole inline admin script to fail parsing. Every button, input, and save handler silently died. Now fixed — admin UI fully interactive again, tested with node --check.",
+        "changelog": "v0.1.11 - CRITICAL FIX: admin config page was entirely unresponsive since v0.1.8. Root cause: release-note templates had real newlines inside JS string literals, causing the whole inline admin script to fail parsing. Every button, input, and save handler silently died. Now fixed \u2014 admin UI fully interactive again, tested with node --check.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.11/MaintenanceDeluxe-v0.1.11.zip",
         "timestamp": "2026-04-23T21:00:00"
