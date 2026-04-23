@@ -625,6 +625,7 @@
         notesTitle: "Au programme",
         statusLink: "Voir le statut d\u00e9taill\u00e9 \u2197",
         adminDismiss: "\u2715 Acc\u00e8s admin",
+        loginAccess: "Acc\u00e8s administrateur \u2192",
         reconnectTitle: "Le serveur est de retour",
         reconnectSubtitle: "Redirection en cours\u2026"
     };
@@ -851,22 +852,23 @@
         if (statusUrl) {
             cardHtml += '<a class="jf-md-status-link" href="' + encodeURI(statusUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeMdHtml(MD_I18N.statusLink) + '</a>';
         }
-        if (isAdmin) {
-            cardHtml += '<button type="button" class="jf-md-dismiss">' + escapeMdHtml(MD_I18N.adminDismiss) + '</button>';
-        }
+        // Always expose a dismiss button: admins need it to keep working, and on
+        // the login page anonymous visitors need it to reach the login form.
+        // Non-admin disabled users who dismiss and try to log in are rejected
+        // by the backend (account disabled), so this is safe.
+        var dismissLabel = isAdmin ? MD_I18N.adminDismiss : MD_I18N.loginAccess;
+        cardHtml += '<button type="button" class="jf-md-dismiss">' + escapeMdHtml(dismissLabel) + '</button>';
         cardHtml += '</div>';
 
         card.innerHTML = cardHtml;
         overlay.appendChild(card);
 
-        if (isAdmin) {
-            var dismissBtn = card.querySelector(".jf-md-dismiss");
-            if (dismissBtn) {
-                dismissBtn.addEventListener("click", function () {
-                    adminDismissed = true;
-                    removeMaintenanceOverlay();
-                });
-            }
+        var dismissBtn = card.querySelector(".jf-md-dismiss");
+        if (dismissBtn) {
+            dismissBtn.addEventListener("click", function () {
+                adminDismissed = true;
+                removeMaintenanceOverlay();
+            });
         }
 
         return overlay;

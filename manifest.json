@@ -9,12 +9,12 @@
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.5.0",
-        "checksum": "BD104F9390B37416F64190071CBA49F8",
-        "changelog": "v0.1.5 - Critical syntax fix. v0.1.4 had a JS SyntaxError (duplicated metal-border CSS block leaked into the preview badge array), the whole banner.js failed to parse, so nothing ran. This release removes the duplicated block. ALSO contains all v0.1.4 features: SPA navigation listeners (hashchange/popstate/viewshow) so the overlay re-attaches on login page SPA navigation, MutationObserver that re-attaches the overlay if React removes it, sessionStorage fallback for preview flag.",
+        "version": "0.1.6.0",
+        "checksum": "D4D3851632A11C886F03615CDF286105",
+        "changelog": "v0.1.6 - Admin can now reach the login form when maintenance is active. Previously the overlay had no dismiss button on the login page, trapping the admin out. Now the overlay always shows an access button: 'Acces admin' for authenticated admins, 'Acces administrateur' for anonymous visitors. Non-admin disabled users are still blocked by the backend after submitting the form.",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.5/MaintenanceDeluxe-v0.1.5.zip",
-        "timestamp": "2026-04-23T15:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.6/MaintenanceDeluxe-v0.1.6.zip",
+        "timestamp": "2026-04-23T16:00:00"
       }
     ]
   }
