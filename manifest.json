@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.3.0.0",
+        "checksum": "",
+        "changelog": "v0.3.0 - Quality release: bug fixes + anti-data-loss + French admin UI. (1) Bugs: BannerController endpoints now return 503 if the plugin instance is not yet initialised instead of serving phantom defaults; ScheduledRestart is preserved when set after a maintenance window (only cleared if it was inside the window); MutationObserver and hideScrollObserver are now properly torn down on pagehide (no more memory leak after long sessions); live-preview postMessage receiver enforces same-origin checks (no cross-origin injection of overlay config). (2) Anti-data-loss: orange dot badge next to Save when there are unsaved changes, browser warning if you try to close the tab with unsaved changes, automatic localStorage draft autosaved every 500ms with restore prompt on next load, inline validation that flags scheduledEnd before scheduledStart and scheduledRestart in the past. (3) French admin UI: the Maintenance tab, Save button, save-confirmation modal, alerts and validations are fully translated to French. (4) The live-preview iframe now shows a clear fallback after a 5s timeout if the iframe never reports ready.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.0/MaintenanceDeluxe-v0.3.0.zip",
+        "timestamp": ""
+      },
+      {
         "version": "0.2.3.0",
         "checksum": "450C1ED40E12905CFAA4DE05CE477774",
         "changelog": "v0.2.3 - Two polish fixes on the new Appearance panel. First, the 'Agrandir l'apercu' button used Jellyfin's default emby-button which rendered with a white background on the dark admin theme; it now uses the same neutral-translucent style as the Reset button so it fits both light and dark themes. Second, new 'Rotatif' border option: a luminous gold gradient that slowly spins around the card, paired with a soft pulsing glow. Speed follows the animation scale slider (including the 'off' toggle).",

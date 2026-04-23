@@ -42,6 +42,8 @@
     var MAINTENANCE = null;
     var IS_ADMIN = false;
     var maintenanceOverlay = null;
+    var maintenanceDomObserver = null;
+    var maintenanceNavWatchersInstalled = false;
     // adminDismissed persists in sessionStorage so a full reload or
     // React-driven remount doesn't drop the admin's explicit decision
     // to hide the overlay for this tab session.
@@ -1393,7 +1395,12 @@
             // Listen for live config updates from the parent admin page. Every received
             // message re-renders the overlay with the new fields merged on top of the
             // currently-held state. We never persist anything here.
+            // Origin check: only accept messages from the parent window AND from the same
+            // origin (rejects malicious cross-origin iframes that could try to inject config).
+            var allowedOrigin = window.location.origin;
             window.addEventListener("message", function (ev) {
+                if (ev.source !== window.parent) return;
+                if (ev.origin !== allowedOrigin) return;
                 var data = ev && ev.data;
                 if (!data || data.type !== "md-preview-update" || !data.config) return;
                 var incoming = data.config;
@@ -1405,9 +1412,10 @@
                 applyMaintenanceState();
             });
             // Announce readiness so the parent can send the initial state immediately.
+            // Target the parent's exact origin to avoid leaking the message anywhere else.
             try {
                 if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({ type: "md-preview-ready" }, "*");
+                    window.parent.postMessage({ type: "md-preview-ready" }, allowedOrigin);
                 }
             } catch (e) {}
         }
@@ -1442,9 +1450,10 @@
         // Safety net: if React or any other lib removes our overlay from the
         // body, re-attach it immediately. Covers the case where Jellyfin's React
         // mounts login.html AFTER we have appended our overlay.
-        if (window.MutationObserver) {
+        // Stored module-scope so it can be disconnected at pagehide / teardown.
+        if (window.MutationObserver && !maintenanceDomObserver) {
             try {
-                var mo = new MutationObserver(function () {
+                maintenanceDomObserver = new MutationObserver(function () {
                     if (MAINTENANCE && MAINTENANCE.isActive
                         && maintenanceOverlay
                         && !document.body.contains(maintenanceOverlay)
@@ -1452,8 +1461,28 @@
                         document.body.appendChild(maintenanceOverlay);
                     }
                 });
-                mo.observe(document.body, { childList: true });
+                maintenanceDomObserver.observe(document.body, { childList: true });
+            } catch (e) { maintenanceDomObserver = null; }
+        }
+
+        if (!maintenanceNavWatchersInstalled) {
+            maintenanceNavWatchersInstalled = true;
+            try {
+                window.addEventListener("pagehide", teardownMaintenanceObservers);
             } catch (e) {}
+        }
+    }
+
+    // Disconnects long-lived observers so they don't leak when the user navigates away
+    // or when the script is reloaded (Jellyfin SPA can swap pages without unloading).
+    function teardownMaintenanceObservers() {
+        if (maintenanceDomObserver) {
+            try { maintenanceDomObserver.disconnect(); } catch (e) {}
+            maintenanceDomObserver = null;
+        }
+        if (hideScrollObserver) {
+            try { hideScrollObserver.disconnect(); } catch (e) {}
+            hideScrollObserver = null;
         }
     }
 

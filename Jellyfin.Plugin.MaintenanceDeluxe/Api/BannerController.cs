@@ -15,8 +15,15 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 
 /// <summary>
-/// Exposes the plugin configuration as JSON for the banner script.
-/// All endpoints require authentication — the banner is intended for registered users only.
+/// REST API for the MaintenanceDeluxe plugin.
+/// <list type="bullet">
+///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (read-only state for the login-page overlay)</item>
+///   <item><c>GET /MaintenanceDeluxe/banner.js</c> — public (script injected on every page; same bytes as the JavaScriptInjector copy)</item>
+///   <item><c>GET /MaintenanceDeluxe/preview.html</c> — public (HTML shell consumed by the admin live-preview iframe; iframe navigation does not carry Authorization headers)</item>
+///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (full plugin config, only authenticated clients)</item>
+///   <item><c>POST /MaintenanceDeluxe/config</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only write)</item>
+///   <item><c>POST /MaintenanceDeluxe/maintenance</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only toggle)</item>
+/// </list>
 /// </summary>
 [ApiController]
 [Route("MaintenanceDeluxe")]
@@ -32,15 +39,18 @@ public class BannerController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Returns the current plugin configuration.</summary>
+    /// <summary>Returns the current plugin configuration. Returns 503 if the plugin instance is not yet initialised
+    /// (avoids serving phantom defaults during a partial bootstrap).</summary>
     [HttpGet("config")]
     [Authorize]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<PluginConfiguration> GetConfig()
     {
-        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        return Ok(config);
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+        return Ok(Plugin.Instance.Configuration);
     }
 
     /// <summary>Serves the banner client script.
@@ -178,15 +188,18 @@ public class BannerController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Returns the current maintenance mode configuration.</summary>
+    /// <summary>Returns the current maintenance mode configuration.
+    /// Public (no [Authorize]) so the login-page overlay works for unauthenticated users.
+    /// Returns 503 if the plugin instance is not yet initialised.</summary>
     [HttpGet("maintenance")]
-    // No [Authorize] — intentionally public so the login-page overlay works for unauthenticated users.
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public ActionResult<MaintenanceSetting> GetMaintenance()
     {
-        var config = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        return Ok(config.MaintenanceMode ?? new MaintenanceSetting());
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+        return Ok(Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting());
     }
 
     /// <summary>Saves the maintenance mode configuration. Handles user enable/disable transitions server-side.</summary>

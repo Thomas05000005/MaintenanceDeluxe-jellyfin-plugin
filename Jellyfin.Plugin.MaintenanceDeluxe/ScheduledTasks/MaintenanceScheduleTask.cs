@@ -105,13 +105,22 @@ public class MaintenanceScheduleTask : IScheduledTask
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
 
             // Clear the schedule so the activation check doesn't immediately re-trigger.
+            // Also clear ScheduledRestart if it was inside the window (admin's intent was likely
+            // "restart as part of this maintenance"); preserve it if it was set after ScheduledEnd
+            // (admin's intent was likely "schedule a restart later, independent of this window").
             plugin = Plugin.Instance;
             if (plugin is not null)
             {
                 var config = plugin.Configuration;
+                var endValue = config.MaintenanceMode.ScheduledEnd;
+                var restartValue = config.MaintenanceMode.ScheduledRestart;
                 config.MaintenanceMode.ScheduleEnabled = false;
                 config.MaintenanceMode.ScheduledStart = null;
                 config.MaintenanceMode.ScheduledEnd = null;
+                if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
+                {
+                    config.MaintenanceMode.ScheduledRestart = null;
+                }
                 plugin.UpdateConfiguration(config);
                 plugin.SaveConfiguration();
             }

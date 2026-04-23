@@ -400,7 +400,7 @@
                 Rotation
               </button>
               <button type="button" class="jf-tab" data-tab="settings">
-                Settings
+                Réglages
               </button>
               <button type="button" class="jf-tab" data-tab="maintenance">
                 Maintenance
@@ -959,8 +959,8 @@
             <div class="jf-panel" data-panel="maintenance">
               <div style="display:flex;align-items:center;gap:12px;margin-bottom:1em">
                 <h3 class="sectionTitle" style="margin:0">
-                  Maintenance mode
-                  <button type="button" class="jf-icon-btn" id="resetMaintenance" title="Reset to defaults">
+                  Mode maintenance
+                  <button type="button" class="jf-icon-btn" id="resetMaintenance" title="Réinitialiser aux valeurs par défaut">
                     <span class="material-icons" style="font-size:16px">restore</span>
                   </button>
                 </h3>
@@ -969,53 +969,52 @@
               <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:0.6em">
                 <label class="emby-checkbox-label">
                   <input id="maintenanceIsActive" is="emby-checkbox" type="checkbox" />
-                  <span>Active</span>
+                  <span>Activée</span>
                 </label>
               </div>
               <div class="fieldDescription" style="margin-bottom:1.4em">
-                When active, all non-admin users are disabled at the API level. Users already disabled
-                before activation are not re-enabled on deactivation.
+                Quand cochée, tous les utilisateurs non-admin sont désactivés au niveau de l'API. Les utilisateurs déjà désactivés avant l'activation ne sont pas réactivés à la désactivation.
               </div>
               <div class="inputContainer" style="margin-bottom:1.2em">
-                <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Overlay message</label>
+                <label class="inputLabel inputLabelUnfocused" for="maintenanceMessage">Message de l'overlay</label>
                 <input id="maintenanceMessage" is="emby-input" type="text"
-                  placeholder="Server under maintenance. Please check back later." />
+                  placeholder="Serveur en maintenance. Reviens dans un instant." />
               </div>
               <div class="inputContainer" style="margin-bottom:1.2em">
-                <label class="inputLabel inputLabelUnfocused" for="maintenanceStatusUrl">Status page URL (optional)</label>
+                <label class="inputLabel inputLabelUnfocused" for="maintenanceStatusUrl">URL de la page de statut (optionnel)</label>
                 <input id="maintenanceStatusUrl" is="emby-input" type="url"
                   placeholder="https://status.example.com" />
-                <div class="fieldDescription">Shown as a link in the maintenance overlay so users can check server status.</div>
+                <div class="fieldDescription">Affichée comme un lien dans l'overlay pour permettre aux utilisateurs de consulter le statut du serveur.</div>
               </div>
 
-              <!-- ── Overlay content (title, subtitle, release notes) ─ -->
+              <!-- ── Contenu de l'overlay (titre, sous-titre, notes de version) ─ -->
               <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:0.5em">
-                  <h3 class="sectionTitle" style="margin:0">Overlay content</h3>
-                  <button type="button" id="previewOverlayBtn" is="emby-button" class="raised" title="Open the overlay with sample data in a new tab — does not activate maintenance">
+                  <h3 class="sectionTitle" style="margin:0">Contenu de l'overlay</h3>
+                  <button type="button" id="previewOverlayBtn" is="emby-button" class="raised" title="Ouvrir l'overlay avec des données de démo dans un nouvel onglet — n'active pas la maintenance">
                     <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">visibility</span>
-                    Preview
+                    Aperçu
                   </button>
                 </div>
                 <div class="fieldDescription" style="margin-bottom:1.2em">
-                  Customise what users see on the premium maintenance overlay. Leave title and subtitle empty to use defaults. Click <b>Preview</b> to see the overlay with sample data without activating maintenance.
+                  Personnalise ce que les utilisateurs voient sur l'overlay premium. Laisse titre et sous-titre vides pour utiliser les valeurs par défaut. Clique sur <b>Aperçu</b> pour voir l'overlay avec des données de démo sans activer la maintenance.
                 </div>
 
                 <div class="inputContainer" style="margin-bottom:1.2em">
-                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomTitle">Title (optional)</label>
+                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomTitle">Titre (optionnel)</label>
                   <input id="maintenanceCustomTitle" is="emby-input" type="text" maxlength="200"
-                    placeholder="Server under maintenance" />
+                    placeholder="Serveur en maintenance" />
                 </div>
 
                 <div class="inputContainer" style="margin-bottom:1.6em">
-                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomSubtitle">Subtitle (optional)</label>
+                  <label class="inputLabel inputLabelUnfocused" for="maintenanceCustomSubtitle">Sous-titre (optionnel)</label>
                   <input id="maintenanceCustomSubtitle" is="emby-input" type="text" maxlength="500"
-                    placeholder="We're improving your experience" />
+                    placeholder="On peaufine le serveur. Rendez-vous juste après." />
                 </div>
 
-                <p class="jf-controls-group" style="margin-bottom:0.4em">Release notes</p>
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Notes de version</p>
                 <div class="fieldDescription" style="margin-bottom:0.8em">
-                  Rich cards shown in the overlay describing what this maintenance brings. Each section has an icon (emoji), a title, and a body (basic markdown: **bold**, *italic*, lines starting with "-" become bullet lists). Up to 20 sections.
+                  Cartes affichées dans l'overlay pour décrire ce que la maintenance apporte. Chaque section comporte une icône (emoji), un titre, et un corps (markdown basique : **gras**, *italique*, lignes débutant par "-" deviennent des listes à puces). Jusqu'à 20 sections.
                 </div>
 
                 <div id="releaseNotesList" style="display:flex;flex-direction:column;gap:0.6em;margin-bottom:0.6em"></div>
@@ -1023,15 +1022,15 @@
                 <div style="display:flex;flex-wrap:wrap;gap:0.4em;margin-top:0.2em;align-items:center">
                   <button type="button" id="addReleaseNote" is="emby-button" class="raised">
                     <span class="material-icons" style="font-size:18px;vertical-align:middle;margin-right:4px">add</span>
-                    Add blank section
+                    Ajouter une section vide
                   </button>
-                  <span style="opacity:.5;font-size:12px;margin:0 4px">or quick-add:</span>
-                  <button type="button" class="jf-rn-template" data-tpl="movies" title="Add 'Movies added' template">🎬 Movies</button>
-                  <button type="button" class="jf-rn-template" data-tpl="series" title="Add 'Series added' template">🏞 Series</button>
-                  <button type="button" class="jf-rn-template" data-tpl="update" title="Add 'Jellyfin update' template">⚡ Update</button>
-                  <button type="button" class="jf-rn-template" data-tpl="cleanup" title="Add 'Library cleanup' template">🧹 Cleanup</button>
-                  <button type="button" class="jf-rn-template" data-tpl="security" title="Add 'Security patch' template">🔒 Security</button>
-                  <button type="button" class="jf-rn-template" data-tpl="network" title="Add 'Network improvements' template">🌐 Network</button>
+                  <span style="opacity:.5;font-size:12px;margin:0 4px">ou ajout rapide :</span>
+                  <button type="button" class="jf-rn-template" data-tpl="movies" title="Ajouter le template 'Films ajoutés'">🎬 Films</button>
+                  <button type="button" class="jf-rn-template" data-tpl="series" title="Ajouter le template 'Séries ajoutées'">🏞 Séries</button>
+                  <button type="button" class="jf-rn-template" data-tpl="update" title="Ajouter le template 'Mise à jour Jellyfin'">⚡ MAJ</button>
+                  <button type="button" class="jf-rn-template" data-tpl="cleanup" title="Ajouter le template 'Nettoyage de la bibliothèque'">🧹 Nettoyage</button>
+                  <button type="button" class="jf-rn-template" data-tpl="security" title="Ajouter le template 'Correctif de sécurité'">🔒 Sécurité</button>
+                  <button type="button" class="jf-rn-template" data-tpl="network" title="Ajouter le template 'Améliorations réseau'">🌐 Réseau</button>
                 </div>
               </div>
 
@@ -1147,39 +1146,39 @@
 
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <details>
-                  <summary><span id="jf-maintenance-affected-summary">Users affected</span></summary>
+                  <summary><span id="jf-maintenance-affected-summary">Utilisateurs affectés</span></summary>
                   <div id="jf-maintenance-affected-list"></div>
                 </details>
                 <div class="fieldDescription" style="margin-top:0.8em;color:var(--warning-color, #e6a817)">
-                  All affected users will need to log in again. Sessions are invalidated when accounts are disabled.
+                  Tous les utilisateurs affectés devront se reconnecter. Les sessions sont invalidées à la désactivation des comptes.
                 </div>
               </div>
-              <!-- Automation section -->
+              <!-- Section Automatisation -->
               <div style="margin-top:1.6em">
-                <h3 class="sectionTitle" style="margin-bottom:0.5em">Automation</h3>
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Automatisation</h3>
                 <div class="fieldDescription" style="margin-bottom:1.2em">
-                  Schedule maintenance windows and server restarts. All times use your browser's local timezone and take effect within one minute.
+                  Programme des fenêtres de maintenance et des redémarrages serveur. Tous les horaires utilisent le fuseau de ton navigateur et prennent effet dans la minute.
                 </div>
 
-                <p class="jf-controls-group" style="margin-bottom:0.4em">Scheduled maintenance</p>
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Maintenance programmée</p>
                 <div class="fieldDescription" style="margin-bottom:1em">
-                  Set an activation time to start maintenance automatically. Add a deactivation time to end it then the schedule clears once the window completes.
+                  Définis une heure d'activation pour démarrer la maintenance automatiquement. Ajoute une heure de désactivation pour y mettre fin — le programme se vide une fois la fenêtre terminée.
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.2em">
-                  <label class="inputLabel inputLabelUnfocused" for="scheduledStart">Activate at</label>
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledStart">Activer à</label>
                   <input id="scheduledStart" is="emby-input" type="datetime-local" />
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.6em">
-                  <label class="inputLabel inputLabelUnfocused" for="scheduledEnd">Deactivate at (optional)</label>
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledEnd">Désactiver à (optionnel)</label>
                   <input id="scheduledEnd" is="emby-input" type="datetime-local" />
                 </div>
 
-                <p class="jf-controls-group" style="margin-bottom:0.4em">Scheduled restart</p>
+                <p class="jf-controls-group" style="margin-bottom:0.4em">Redémarrage programmé</p>
                 <div class="fieldDescription" style="margin-bottom:1em">
-                  The server restarts once at the specified time. The field clears automatically after the restart.
+                  Le serveur redémarre une fois à l'heure indiquée. Le champ se vide automatiquement après le redémarrage.
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.2em">
-                  <label class="inputLabel inputLabelUnfocused" for="scheduledRestart">Restart at</label>
+                  <label class="inputLabel inputLabelUnfocused" for="scheduledRestart">Redémarrer à</label>
                   <input id="scheduledRestart" is="emby-input" type="datetime-local" />
                 </div>
               </div>
@@ -1190,14 +1189,15 @@
             <br />
 
             <!-- ── Save (always visible) ──────────────────────────── -->
-            <div>
+            <div style="position:relative">
               <button
                 is="emby-button"
                 type="submit"
                 id="saveConfigBtn"
                 class="raised button-submit block"
               >
-                <span>Save</span>
+                <span>Enregistrer</span>
+                <span id="mdDirtyBadge" title="Modifications non enregistrées" style="display:none;margin-left:8px;color:#e6a817;font-size:18px;line-height:1;vertical-align:middle">●</span>
               </button>
             </div>
           </form>
@@ -2507,6 +2507,9 @@
             initLivePreview();
             wireLivePreviewListeners();
             initExpandMode();
+            initDirtyTracker();
+            initAutosaveDraft();
+            initInlineValidations();
 
             document
               .getElementById('previewOverlayBtn')
@@ -2523,7 +2526,7 @@
                     window.open(url, '_blank', 'noopener,noreferrer');
                   })
                   .catch(function (err) {
-                    Dashboard.alert('Could not save before preview: ' + (err && err.responseText || err || 'unknown error'));
+                    Dashboard.alert("Impossible d'enregistrer avant l'aperçu : " + (err && err.responseText || err || 'erreur inconnue'));
                   })
                   .then(function () {
                     btn.disabled = false;
@@ -2710,10 +2713,10 @@
               overlay.innerHTML =
                 '<div id="jf-refresh-modal">' +
                 '<h3>Configuration enregistrée</h3>' +
-                '<p>Refresh the page for changes to take effect in the banner.</p>' +
+                '<p>Recharge la page pour que les changements prennent effet dans la bannière.</p>' +
                 '<div class="jf-refresh-btns">' +
-                '<button class="jf-refresh-btn jf-refresh-btn-later" id="jf-refresh-later">Later</button>' +
-                '<button class="jf-refresh-btn jf-refresh-btn-primary" id="jf-refresh-now">Refresh now</button>' +
+                '<button class="jf-refresh-btn jf-refresh-btn-later" id="jf-refresh-later">Plus tard</button>' +
+                '<button class="jf-refresh-btn jf-refresh-btn-primary" id="jf-refresh-now">Recharger maintenant</button>' +
                 '</div></div>';
               document.body.appendChild(overlay);
 
@@ -2745,14 +2748,14 @@
                 e.preventDefault();
                 if (validatePresets().length > 0) {
                   Dashboard.alert(
-                    'Cannot save: preset names must be unique and non-empty. Please check the Presets section.'
+                    "Impossible d'enregistrer : les noms de préréglages doivent être uniques et non vides. Vérifie la section Préréglages."
                   );
                   return;
                 }
                 var schedStart = localToUtcIso(document.getElementById('scheduledStart').value);
                 var schedEnd = localToUtcIso(document.getElementById('scheduledEnd').value);
                 if (schedStart && schedEnd && new Date(schedEnd) <= new Date(schedStart)) {
-                  Dashboard.alert('Cannot save: deactivation time must be after activation time.');
+                  Dashboard.alert("Impossible d'enregistrer : l'heure de désactivation doit être postérieure à celle d'activation.");
                   return;
                 }
                 var permData = collectPermanentEntries();
@@ -2849,16 +2852,16 @@
                   saveBtn.disabled = true;
                 }
                 if (saveSpan) {
-                  saveSpan.textContent = 'Saving…';
+                  saveSpan.textContent = 'Enregistrement…';
                 }
                 function restoreBtn() {
-                  if (saveSpan) saveSpan.textContent = 'Save';
+                  if (saveSpan) saveSpan.textContent = 'Enregistrer';
                   if (saveBtn) saveBtn.disabled = false;
                 }
                 function showSaveError(status, body) {
                   var detail = body || '';
                   try { detail = JSON.parse(detail); } catch (e) {}
-                  var msg = 'Save failed';
+                  var msg = "Échec de l'enregistrement";
                   if (status) msg += ' (HTTP ' + status + ')';
                   if (detail) msg += ': ' + detail;
                   Dashboard.alert(msg);
@@ -2878,6 +2881,9 @@
                     var configErr = results[0].status === 'rejected';
                     var maintErr = results[1].status === 'rejected';
                     if (!configErr && !maintErr) {
+                      // Successful save: clear dirty state + drop the autosave draft.
+                      try { setConfigDirty(false); } catch (e) {}
+                      try { localStorage.removeItem('md_draft_v1'); } catch (e) {}
                       if (document.getElementById('showRefreshPrompt').checked) {
                         showRefreshPrompt();
                       } else {
@@ -3243,13 +3249,25 @@
             if (!iframe) return;
             // Listen for ready/handshake messages from the iframe so we can send the
             // initial state without guessing the right moment.
+            // Origin must match (same-origin iframe).
+            var allowedOrigin = window.location.origin;
             window.addEventListener('message', function (ev) {
-              if (!ev || !ev.data || ev.data.type !== 'md-preview-ready') return;
+              if (!ev || ev.origin !== allowedOrigin) return;
               if (iframe.contentWindow !== ev.source) return;
+              if (!ev.data || ev.data.type !== 'md-preview-ready') return;
               _previewReady = true;
               if (placeholder) placeholder.style.display = 'none';
               sendPreviewUpdate();
             });
+            // Safety net: if the iframe never sends md-preview-ready within 5s
+            // (network error, plugin missing, banner.js failed to parse), surface a
+            // human-readable message instead of leaving the spinner-text frozen.
+            setTimeout(function () {
+              if (!_previewReady && placeholder) {
+                placeholder.textContent = "Aperçu indisponible — recharge la page (Ctrl+Shift+R) ou vérifie que le plugin est bien à jour.";
+                placeholder.style.color = 'rgba(230, 168, 23, 0.85)';
+              }
+            }, 5000);
             // Give the iframe an URL resolved against the ApiClient base so it works
             // regardless of whether Jellyfin is at / or a sub-path.
             iframe.src = ApiClient.getUrl(PREVIEW_IFRAME_SRC);
@@ -3297,6 +3315,142 @@
                 togglePanel();
               }
             });
+          }
+
+          // ── Dirty tracker + beforeunload + autosave draft ───────────────────
+          var _configDirty = false;
+          var _draftAutosaveTimer = null;
+          var DRAFT_KEY = 'md_draft_v1';
+          var DRAFT_AUTOSAVE_DELAY = 500;
+
+          function setConfigDirty(dirty) {
+            _configDirty = !!dirty;
+            var badge = document.getElementById('mdDirtyBadge');
+            if (badge) badge.style.display = _configDirty ? 'inline' : 'none';
+          }
+
+          function buildDraftSnapshot() {
+            // Snapshot the maintenance form state and the global config form together
+            // so a restore puts everything back. We reuse the same builders the save
+            // path uses so the schema stays consistent.
+            try {
+              var snap = {
+                savedAt: Date.now(),
+                maintenance: typeof buildPreviewConfig === 'function' ? buildPreviewConfig() : null
+              };
+              return snap;
+            } catch (e) { return null; }
+          }
+
+          function initDirtyTracker() {
+            var form = document.getElementById('MaintenanceDeluxeConfigForm');
+            if (!form) return;
+            // Delegate input/change so dynamically-added rows (release notes, presets)
+            // are covered without rewiring.
+            ['input', 'change'].forEach(function (evt) {
+              form.addEventListener(evt, function (ev) {
+                // Ignore programmatic events from our own restore/UI updates.
+                if (ev.target && ev.target.dataset && ev.target.dataset.mdSilent === '1') return;
+                setConfigDirty(true);
+              });
+            });
+            // Browser-level guard against accidental tab close.
+            window.addEventListener('beforeunload', function (e) {
+              if (!_configDirty) return undefined;
+              e.preventDefault();
+              e.returnValue = 'Modifications non enregistrées. Quitter quand même ?';
+              return e.returnValue;
+            });
+          }
+
+          function initAutosaveDraft() {
+            var form = document.getElementById('MaintenanceDeluxeConfigForm');
+            if (!form) return;
+            ['input', 'change'].forEach(function (evt) {
+              form.addEventListener(evt, function () {
+                if (_draftAutosaveTimer) clearTimeout(_draftAutosaveTimer);
+                _draftAutosaveTimer = setTimeout(function () {
+                  _draftAutosaveTimer = null;
+                  var snap = buildDraftSnapshot();
+                  if (!snap) return;
+                  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); } catch (e) {}
+                }, DRAFT_AUTOSAVE_DELAY);
+              });
+            });
+            // On load, if a draft exists newer than the server snapshot, offer restore.
+            // We delay this by 1s so applyMaintenanceUi has had time to populate the form.
+            setTimeout(function () { offerDraftRestore(); }, 1000);
+          }
+
+          function offerDraftRestore() {
+            var raw;
+            try { raw = localStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+            if (!raw) return;
+            var draft;
+            try { draft = JSON.parse(raw); } catch (e) { localStorage.removeItem(DRAFT_KEY); return; }
+            if (!draft || !draft.savedAt || !draft.maintenance) return;
+            // Heuristic: only prompt if the draft is from the last 7 days (older = stale).
+            if (Date.now() - draft.savedAt > 7 * 24 * 3600 * 1000) {
+              localStorage.removeItem(DRAFT_KEY);
+              return;
+            }
+            var iso = new Date(draft.savedAt).toLocaleString('fr-FR');
+            var keep = window.confirm(
+              "Un brouillon non enregistré a été détecté (sauvegardé le " + iso + ").\n\n" +
+              "Le restaurer ? (OK = restaurer, Annuler = ignorer et supprimer le brouillon)"
+            );
+            if (!keep) {
+              try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+              return;
+            }
+            try { applyMaintenanceUi(draft.maintenance); } catch (e) {}
+            setConfigDirty(true);
+          }
+
+          function initInlineValidations() {
+            var startEl = document.getElementById('scheduledStart');
+            var endEl = document.getElementById('scheduledEnd');
+            var restartEl = document.getElementById('scheduledRestart');
+
+            function ensureMsgEl(input, id) {
+              var el = document.getElementById(id);
+              if (!el && input) {
+                el = document.createElement('div');
+                el.id = id;
+                el.style.cssText = 'color:#e6a817;font-size:12px;margin-top:0.25em;display:none';
+                input.parentNode.appendChild(el);
+              }
+              return el;
+            }
+
+            function checkScheduleWindow() {
+              if (!startEl || !endEl) return;
+              var msg = ensureMsgEl(endEl, 'mdEndError');
+              if (!msg) return;
+              var s = startEl.value, e = endEl.value;
+              if (s && e && new Date(e) <= new Date(s)) {
+                msg.textContent = "L'heure de désactivation doit être après l'activation.";
+                msg.style.display = 'block';
+              } else {
+                msg.style.display = 'none';
+              }
+            }
+
+            function checkRestartTime() {
+              if (!restartEl) return;
+              var msg = ensureMsgEl(restartEl, 'mdRestartWarn');
+              if (!msg) return;
+              if (restartEl.value && new Date(restartEl.value) <= new Date()) {
+                msg.textContent = "L'heure de redémarrage est dans le passé — il sera déclenché à la prochaine minute.";
+                msg.style.display = 'block';
+              } else {
+                msg.style.display = 'none';
+              }
+            }
+
+            if (startEl) startEl.addEventListener('change', checkScheduleWindow);
+            if (endEl) endEl.addEventListener('change', checkScheduleWindow);
+            if (restartEl) restartEl.addEventListener('change', checkRestartTime);
           }
 
           function wireLivePreviewListeners() {
@@ -3442,6 +3596,7 @@
             if (!badge) return;
             var active = !!(m && m.isActive);
             badge.textContent = active ? 'Active' : 'Inactive';
+            badge.title = active ? 'Maintenance active' : 'Maintenance inactive';
             badge.className = 'jf-maintenance-badge ' + (active ? 'active' : 'inactive');
             if (m) {
               if (msgInput) msgInput.value = m.message || '';
@@ -3480,7 +3635,7 @@
               affectedList.innerHTML = '<div style="opacity:.6;font-style:italic">Failed to load users.</div>';
             }
 
-            affectedSummary.textContent = 'Loading\u2026';
+            affectedSummary.textContent = 'Chargement\u2026';
             affectedList.innerHTML = '';
 
             if (active) {
