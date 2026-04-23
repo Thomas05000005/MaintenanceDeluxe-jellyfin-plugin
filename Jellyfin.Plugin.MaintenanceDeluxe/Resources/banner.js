@@ -1201,6 +1201,26 @@
         "#jf-md-overlay[data-border=\"none\"] .jf-md-card{border-color:transparent!important;}",
         "#jf-md-overlay[data-border=\"none\"] .jf-md-card::before,",
         "#jf-md-overlay[data-border=\"simple\"] .jf-md-card::before{display:none!important;}",
+        /* Rotating luminous border: animates a spinning conic gradient and
+           a soft glow around the card. Uses @property for smooth angle animation. */
+        "@property --md-border-angle{syntax:\"<angle>\";initial-value:0deg;inherits:false;}",
+        "@keyframes jf-md-border-spin{to{--md-border-angle:360deg;}}",
+        "@keyframes jf-md-border-pulse{0%,100%{opacity:.55;}50%{opacity:1;}}",
+        "@supports ((mask-composite:exclude) or (-webkit-mask-composite:xor)){",
+        "#jf-md-overlay[data-border=\"rotating\"] .jf-md-card::before{",
+        "background:conic-gradient(from var(--md-border-angle,0deg),",
+        "var(--md-accent-shadow),var(--md-accent),var(--md-accent-bright),",
+        "var(--md-accent-soft),var(--md-accent),var(--md-accent-deep),",
+        "var(--md-accent-shadow));",
+        "animation:jf-md-border-spin calc(6s * var(--md-anim-scale,1)) linear infinite,",
+        "jf-md-border-pulse calc(4s * var(--md-anim-scale,1)) ease-in-out infinite;}",
+        "#jf-md-overlay[data-border=\"rotating\"] .jf-md-card{",
+        "box-shadow:0 0 0 1px rgba(var(--md-accent-rgb),.08) inset,",
+        "0 24px 70px -20px rgba(0,0,0,.55),",
+        "0 0 60px -5px rgba(var(--md-accent-rgb),.35),",
+        "0 0 120px -20px rgba(var(--md-accent-rgb),.25);}",
+        "}",
+        "#jf-md-overlay[data-anim=\"off\"][data-border=\"rotating\"] .jf-md-card::before{animation:none!important;}",
     ].join("");
 
     // --- Main loop ---

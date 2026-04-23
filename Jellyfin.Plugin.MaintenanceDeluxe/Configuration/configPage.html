@@ -1043,8 +1043,8 @@
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1em;flex-wrap:wrap">
                   <h3 class="sectionTitle" style="margin:0 0 0.5em 0">Apparence</h3>
-                  <button type="button" id="appExpandPreview" is="emby-button" class="emby-button" style="font-size:12px">
-                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">open_in_full</span>
+                  <button type="button" id="appExpandPreview" class="jf-reset-btn">
+                    <span class="material-icons">open_in_full</span>
                     Agrandir l'aperçu
                   </button>
                 </div>
@@ -1123,6 +1123,7 @@
                     <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Bordure de carte</div>
                     <div class="jf-segmented">
                       <label><input type="radio" name="appBorder" value="full" checked /> Dégradé</label>
+                      <label><input type="radio" name="appBorder" value="rotating" /> Rotatif</label>
                       <label><input type="radio" name="appBorder" value="simple" /> Simple</label>
                       <label><input type="radio" name="appBorder" value="none" /> Aucune</label>
                     </div>
@@ -3067,7 +3068,7 @@
           var APP_HEX_RE = /^#[0-9a-fA-F]{6}$/;
           var APP_ANIM_OPTIONS = ['off', 'slow', 'normal', 'fast'];
           var APP_PARTICLE_OPTIONS = ['none', 'low', 'normal', 'dense'];
-          var APP_BORDER_OPTIONS = ['full', 'simple', 'none'];
+          var APP_BORDER_OPTIONS = ['full', 'rotating', 'simple', 'none'];
           // Must stay in sync with MD_ANIM_SCALE / MD_PARTICLE_COUNT in banner.js
           var APP_ANIM_SCALE_BY_PRESET = { off: 0, slow: 2, normal: 1, fast: 0.5 };
           var APP_PARTICLES_BY_PRESET = { none: 0, low: 10, normal: 22, dense: 40 };

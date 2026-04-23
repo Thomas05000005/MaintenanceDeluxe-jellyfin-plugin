@@ -401,7 +401,7 @@ public class BannerController : ControllerBase
     }
 
     private static readonly HashSet<string> _validBorderStyles =
-        new(StringComparer.Ordinal) { "full", "simple", "none" };
+        new(StringComparer.Ordinal) { "full", "rotating", "simple", "none" };
 
     /// <summary>Whitelists card border style; fallback "full".</summary>
     private static string NormaliseBorderStyle(string? value)
