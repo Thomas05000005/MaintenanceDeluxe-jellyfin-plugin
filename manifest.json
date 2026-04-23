@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.2.1.0",
-        "checksum": "",
+        "checksum": "B930C5BA656D5180341726C01FFE5D4C",
         "changelog": "v0.2.1 - Polish on the new Appearance section: live preview iframe now loads correctly (the preview shell and banner.js endpoints no longer require Authorization headers that browsers don't send on iframe navigation, fixes 401 errors). The three enum selectors (animation speed, particle density, card border) are now segmented pill controls instead of plain radio buttons - much more readable and consistent with modern UI. Reset appearance button restyled so it is legible on both light and dark themes. Appearance labels, alerts and preview copy translated to French.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.2.1/MaintenanceDeluxe-v0.2.1.zip",
-        "timestamp": ""
+        "timestamp": "2026-04-23T16:16:23"
       },
       {
         "version": "0.2.0.0",
