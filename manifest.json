@@ -9,12 +9,12 @@
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.1.0",
-        "checksum": "CF3C767E3EB8AA09664CB1C1858C2A30",
-        "changelog": "v0.1.1 — Rebuild with all design changes embedded (film reel SVG, projector beam, crackling ember particles, brushed-metal border, Instrument Serif embedded font). Removed inherited JellyFlare icon.",
+        "version": "0.1.2.0",
+        "checksum": "5DF9501F080D84FD5A9750CEB19AA556",
+        "changelog": "v0.1.2 - Fix Preview button URL detection (robust search+hash+href matching). Fix overlay not showing on login page for disabled users (requiresAuthentication: true -> false so banner.js loads for unauthenticated visitors; the maintenance endpoint stays public).",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.1/MaintenanceDeluxe-v0.1.1.zip",
-        "timestamp": "2026-04-23T11:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.2/MaintenanceDeluxe-v0.1.2.zip",
+        "timestamp": "2026-04-23T12:00:00"
       }
     ]
   }
