@@ -1976,6 +1976,7 @@
 
           function collectRowData(row, isPermanent) {
             var detail = row.querySelector('.jf-msg-detail');
+            if (!detail) return null;
             var label = row._presetLabel || null;
             var urlVal = (detail.querySelector('.msg-url').value || '').trim();
             return {
@@ -2015,7 +2016,7 @@
             var activeIndex = -1;
             rawRows.forEach(function (row, i) {
               var data = collectRowData(row, true);
-              if (data.text.trim() === '') return;
+              if (!data || data.text.trim() === '') return;
               if (i === activeRawIdx) activeIndex = entries.length;
               entries.push(data);
             });
@@ -2026,16 +2027,17 @@
 
           function collectMessages() {
             return Array.from(
-              document.querySelectorAll('.jf-msg-row:not(.jf-perm-row)')
+              document.querySelectorAll('.jf-msg-row:not(.jf-perm-row):not(.jf-rn-row)')
             )
               .map(function (row) {
                 var data = collectRowData(row, false);
+                if (!data) return null;
                 var enabledEl = row.querySelector('.msg-enabled');
                 data.enabled = enabledEl ? enabledEl.checked : true;
                 return data;
               })
               .filter(function (m) {
-                return m.text.trim() !== '';
+                return m && m.text.trim() !== '';
               });
           }
 
