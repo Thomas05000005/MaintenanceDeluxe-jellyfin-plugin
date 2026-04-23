@@ -1,59 +1,81 @@
 # Development
 
-## Building from source
+## Building
 
-```bash
-git clone https://github.com/MorganKryze/jellyflare.git
-cd jellyflare
+```
 dotnet build --configuration Release
 ```
 
-Output DLL: `Jellyfin.Plugin.JellyFlare/bin/Release/net9.0/Jellyfin.Plugin.JellyFlare.dll`
+- Requires .NET SDK **9.0** (any 9.x).
+- Output DLL: `Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll`.
+- The `banner.js` and `configPage.html` resources are embedded in the DLL via `<EmbeddedResource>` entries in the csproj — there's no external JS file to ship.
 
-## Local testing with Docker
+## Structure
 
-A Docker Compose file and `Makefile` provide a full dev loop using the LinuxServer.io Jellyfin image.
-
-### Quick start
-
-```bash
-make deploy   # setup → build → start (run once)
+```
+Jellyfin.Plugin.MaintenanceDeluxe/
+├── Api/
+│   └── BannerController.cs       — REST endpoints: GET/POST /MaintenanceDeluxe/{maintenance,config,banner.js}
+├── Configuration/
+│   ├── configPage.html           — admin UI (tabs, form, release-notes builder)
+│   └── (PluginConfiguration.cs resides one level up; see below)
+├── Resources/
+│   └── banner.js                 — client script: injected by JavaScript Injector, renders the overlay
+├── ScheduledTasks/
+│   └── MaintenanceScheduleTask.cs — 1-min tick: scheduled activation/deactivation, scheduled restart, startup consistency
+├── MaintenanceHelper.cs          — activate/deactivate logic shared between controller and scheduler
+├── Plugin.cs                     — entry point: GUID registration, JS Injector wiring
+├── PluginConfiguration.cs        — XML-serialisable config model (MaintenanceSetting, ReleaseNoteSection, BannerMessage, etc.)
+└── MaintenanceDeluxe.csproj
 ```
 
-Open `http://localhost:8096` and complete the setup wizard.
+## Local test loop
 
-### Dev loop
+A `docker/` folder provides a Compose file based on the LinuxServer.io Jellyfin image. The accompanying `Makefile` wires things up:
 
-```bash
-make update   # build → copy DLL → restart container → tail logs
-```
+| Target     | Effect                                                                 |
+|------------|------------------------------------------------------------------------|
+| `deploy`   | First-run: fetch JavaScript Injector + File Transformation, build, up |
+| `build`    | `dotnet build` and copy the DLL to the docker plugin dir               |
+| `update`   | Build → copy DLL → restart container → tail logs                       |
+| `up/down`  | Compose up/down                                                        |
+| `restart`  | Just restart the jellyfin container                                    |
+| `logs`     | Tail jellyfin container logs                                           |
+| `clean`    | Remove `bin/`, `obj/`, and the docker `config/`                        |
 
-### Available targets
+Note that the Makefile uses bash-isms (`sed -i ''`, `jq`, `curl`, `python3`); on Windows run it from Git Bash or WSL.
 
-| Target    | Description                                                   |
-| --------- | ------------------------------------------------------------- |
-| `deploy`  | First-time bootstrap: download deps, build, start container   |
-| `setup`   | Download JS Injector + File Transformation, write `meta.json` |
-| `build`   | Build DLL and copy it to the plugin directory                 |
-| `update`  | Build, copy DLL, restart container, tail logs                 |
-| `up`      | `docker compose up -d` + tail logs                            |
-| `down`    | `docker compose down`                                         |
-| `restart` | Restart the Jellyfin container                                |
-| `logs`    | Tail Jellyfin container logs                                  |
-| `clean`   | Remove `bin/`, `obj/`, and `docker/config/`                   |
-| `bump`    | Bump version locally: `make bump V=1.2.0`                     |
+## Client script — how the overlay gets on screen
 
-## Releasing a new version
+1. `Plugin.cs` constructor locates the JavaScript Injector assembly via reflection, reads `Resources/banner.js` as an embedded resource, and calls `PluginInterface.RegisterScript(...)` with `requiresAuthentication: false`.
+2. JavaScript Injector persists the script in its own config and serves it as part of `/JavaScriptInjector/public.js` (public endpoint, `[AllowAnonymous]`).
+3. File Transformation intercepts every request for `index.html` and injects `<script defer src="../JavaScriptInjector/public.js">` just before `</body>`.
+4. At page load, `banner.js` runs:
+   - Short-circuits into preview mode if `md-preview=1` is in the URL or sessionStorage.
+   - Otherwise fetches `/MaintenanceDeluxe/maintenance` (public endpoint) and calls `applyMaintenanceState()`.
+5. `applyMaintenanceState()` either shows or removes the overlay depending on `isActive`. It also installs navigation watchers (`hashchange`, `popstate`, `viewshow`) and a `MutationObserver` so the overlay survives React-driven SPA transitions.
 
-1. On GitHub: **Releases → Draft a new release** → create tag `v1.2.0` targeting `main`.
-   Write release notes in the body; they become the `changelog` field in `manifest.json`.
-   Then publish.
-2. CI automatically:
-   - patches `AssemblyVersion` and `FileVersion` in the csproj from the tag
-   - builds and zips the DLL + icon
-   - prepends a new entry to `manifest.json` (with MD5 checksum and your release notes)
-   - pushes a `chore: update manifest for vX.X.X` commit back to `main`
-   - attaches the ZIP to the GitHub release
-3. Run `git pull` before your next local change. The CI pushes a manifest commit back to `main`.
+## Why a MutationObserver
 
-> `make bump V=1.2.0` is still available if you need to bump the csproj locally (e.g. to verify a build), but it is no longer required before releasing.
+Jellyfin 10.11 uses React Router and occasionally remounts large chunks of the body during navigation. Without the observer, our overlay would be removed the first time the admin navigated after maintenance was activated, never to come back until the next full reload. With it, if the overlay element disappears while `MAINTENANCE.isActive` is true and the admin hasn't dismissed it, we re-append immediately.
+
+## Why an `@font-face` in base64
+
+Safari in private mode and some Firefox configs refuse to download external fonts for privacy reasons, which would leave the title rendering in the fallback `Georgia`. Embedding Instrument Serif as base64 (~28 KB) keeps the visual identical everywhere.
+
+## Why escape non-ASCII as `\uXXXX`
+
+JavaScript Injector's `CustomJavaScriptController.cs` responds with `Content-Type: application/javascript` without a `charset`. Some browsers default to Latin-1 in that case, which would mangle French accents. Escaping every non-ASCII character in `banner.js` to a JS Unicode escape (`é`, `—`, etc.) sidesteps the issue entirely — the JS parser decodes the escape at parse time, regardless of the byte-level charset.
+
+A helper Python script (`_escape_all.py`, not committed) does the conversion before each build.
+
+## Publishing a new version
+
+1. Bump `<AssemblyVersion>` and `<FileVersion>` in `MaintenanceDeluxe.csproj`.
+2. Run the ASCII-escape helper on `banner.js` if you edited it.
+3. `dotnet build --configuration Release`.
+4. Zip `Jellyfin.Plugin.MaintenanceDeluxe.dll` + a matching `meta.json` into a flat archive.
+5. Compute the MD5 of the zip.
+6. `gh release create vX.Y.Z path/to/zip --title "vX.Y.Z" --notes "..."`.
+7. Update `manifest.json` at the repo root: bump `version`, `sourceUrl`, `checksum`, `timestamp`.
+8. Commit and push — Jellyfin clients that already added the manifest URL will see the update on their next catalog refresh.

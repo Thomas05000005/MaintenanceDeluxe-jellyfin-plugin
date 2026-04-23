@@ -4,17 +4,17 @@
     "name": "MaintenanceDeluxe",
     "owner": "Thomas05000005",
     "category": "General",
-    "overview": "Premium maintenance overlay for Jellyfin with live countdown and rich release notes.",
-    "description": "Display a premium, calm, cinema-themed maintenance overlay to your Jellyfin users. Features a live countdown, a time-based progress bar, admin-configurable release notes sections (with icons, titles, and markdown), and a TV-friendly design with graceful degradation on low-end devices. Forked from JellyFlare (GPL-3.0).",
+    "overview": "Premium maintenance overlay with live countdown and rich release notes.",
+    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), emoji palette, markdown live preview, character counters. Preview button renders the overlay with your real saved settings without activating maintenance. Graceful three-tier performance degradation for TV clients.",
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.6.0",
-        "checksum": "D4D3851632A11C886F03615CDF286105",
-        "changelog": "v0.1.6 - Admin can now reach the login form when maintenance is active. Previously the overlay had no dismiss button on the login page, trapping the admin out. Now the overlay always shows an access button: 'Acces admin' for authenticated admins, 'Acces administrateur' for anonymous visitors. Non-admin disabled users are still blocked by the backend after submitting the form.",
+        "version": "0.1.7.0",
+        "checksum": "A5F6261A22D7DAA668BE030474CF6215",
+        "changelog": "v0.1.7 - Preview uses your real saved config (title, subtitle, release notes) — no more mock content. Admin UI release-note rows have fixed columns so they stop shifting when you type. Emoji palette of common icons under the icon input. README and docs rewritten.",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.6/MaintenanceDeluxe-v0.1.6.zip",
-        "timestamp": "2026-04-23T16:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.7/MaintenanceDeluxe-v0.1.7.zip",
+        "timestamp": "2026-04-23T17:00:00"
       }
     ]
   }

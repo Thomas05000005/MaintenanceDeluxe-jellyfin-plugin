@@ -2642,6 +2642,7 @@
           // ── Release notes : dynamic rows ──────────────────────────
           var MAX_RELEASE_NOTES = 20;
           var DEFAULT_NOTE_ICON = '✨';
+          var EMOJI_PRESETS = ['✨','🎬','⚡','🧹','🏞','🔒','🌐','📊','🎨','⏳','🔧','🎉'];
           var MAX_TITLE_LEN = 200;
           var MAX_BODY_LEN = 4000;
 
@@ -2675,14 +2676,24 @@
           function createReleaseNoteRow(section) {
             var row = document.createElement('div');
             row.className = 'jf-msg-row jf-rn-row';
-            row.style.cssText = 'padding:0.8em;display:grid;gap:0.5em;grid-template-columns:70px 1fr auto;align-items:start';
+            row.style.cssText = 'padding:0.8em;display:grid;gap:0.6em;grid-template-columns:64px minmax(0,1fr) 40px;align-items:start';
 
             var icon = (section && section.icon) || DEFAULT_NOTE_ICON;
             var title = (section && section.title) || '';
             var body = (section && section.body) || '';
 
+            var emojiPaletteHtml =
+              '<div class="jf-rn-emoji-palette" style="display:flex;flex-wrap:wrap;gap:2px;margin-top:4px">' +
+                EMOJI_PRESETS.map(function (e) {
+                  return '<button type="button" class="jf-emoji-pick" data-emoji="' + escHtml(e) + '" title="Use ' + escHtml(e) + '" style="padding:2px 4px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);border-radius:3px;cursor:pointer;font-size:15px;line-height:1;color:inherit">' + escHtml(e) + '</button>';
+                }).join('') +
+              '</div>';
+
             row.innerHTML =
-              '<input class="jf-rn-icon" is="emby-input" type="text" maxlength="8" value="' + escHtml(icon) + '" style="text-align:center;font-size:20px" placeholder="✨" />' +
+              '<div style="display:flex;flex-direction:column;min-width:0">' +
+                '<input class="jf-rn-icon" is="emby-input" type="text" maxlength="8" value="' + escHtml(icon) + '" style="text-align:center;font-size:20px;width:100%;box-sizing:border-box" placeholder="✨" />' +
+                emojiPaletteHtml +
+              '</div>' +
               '<div style="display:flex;flex-direction:column;gap:0.4em">' +
                 '<div style="display:flex;flex-direction:column;gap:2px">' +
                   '<input class="jf-rn-title" is="emby-input" type="text" maxlength="' + MAX_TITLE_LEN + '" value="' + escHtml(title) + '" placeholder="Section title (e.g. New feature)" />' +
@@ -2720,6 +2731,13 @@
             updateTitleCount();
             updateBodyCount();
             updatePreview();
+
+            row.querySelectorAll('.jf-emoji-pick').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var iconInput = row.querySelector('.jf-rn-icon');
+                if (iconInput) { iconInput.value = btn.dataset.emoji; iconInput.focus(); }
+              });
+            });
 
             row.querySelector('.jf-rn-up').addEventListener('click', function () { moveReleaseNote(row, -1); });
             row.querySelector('.jf-rn-down').addEventListener('click', function () { moveReleaseNote(row, 1); });

@@ -1,171 +1,94 @@
-# JellyFlare - A Jellyfin Plugin
+# MaintenanceDeluxe
 
-![Jellyfin](https://img.shields.io/badge/Jellyfin-10.11.6%2B-00a4dc?logo=jellyfin&logoColor=white) ![Client](https://img.shields.io/badge/compatibility-web%20clients%20only-4A90D9?logo=javascript&logoColor=white) ![Issues](https://img.shields.io/github/issues/MorganKryze/JellyFlare?logo=github&logoColor=white) ![Version](https://img.shields.io/github/v/release/MorganKryze/JellyFlare?logo=semantic-release&logoColor=white&label=version&color=AA5CC3) ![Last Commit](https://img.shields.io/github/last-commit/MorganKryze/JellyFlare/main?logo=github&logoColor=white&label=Last%20Updated&color=AA5CC3&cacheSeconds=3600) ![License](https://img.shields.io/github/license/MorganKryze/JellyFlare?logoColor=white)
+A premium cinema-themed maintenance overlay for [Jellyfin](https://jellyfin.org).
 
-![Banner](./assets/banner-readme.png)
+When you flip maintenance on from the admin dashboard, every non-admin user is disabled at the API level and greeted by a full-screen overlay showing your release notes, a live countdown and a time-based progress bar — so they know exactly what you're doing and when they can come back.
 
-Put announcements where your users will actually see them: a customisable banner at the top of Jellyfin, with rotating messages, scheduling, and link support.
+## Why this exists
+
+Jellyfin's default behaviour when you want to take the server down for updates is:
+
+1. Disable users manually one by one, or
+2. Just stop the container and let people hit a connection error.
+
+Neither is great. This plugin gives your users a polished, informative "please wait" screen while you work — and makes it a small window of anticipation rather than a dead end.
 
 ## Features
 
-<img src="./assets/demo.gif" width="100%" alt="Demo" />
+- **Full-screen maintenance overlay** shown on top of the Jellyfin UI — and on the login page too, so freshly-disabled users see the same message instead of a raw "account disabled" error.
+- **Live countdown** that adapts with the remaining time: an absolute target hour (e.g. "Retour prévu à 21h30"), a rough relative hint ("≈ 25 min"), and precise minutes+seconds once you drop below 5 minutes.
+- **Time-based progress bar** driven by the scheduled start/end. Pulses amber when you overshoot the window, so you're never "stuck at 99%".
+- **Admin-configurable release notes** — add as many sections as you need, each with an emoji, a title, and a markdown body (supports `**bold**`, `*italic*`, and bullet lists).
+- **Live markdown preview** and character counters right next to the textarea in the admin UI.
+- **Preview mode** via a button in the config page — opens the overlay with your real saved settings in a new tab, without activating maintenance or kicking anyone.
+- **Cinema theme** — warm velours palette, drifting aurora background with a gold/midnight contrast, slowly-rotating film reel, gently crackling ember particles, brushed-metal card border on capable browsers. All designed to degrade cleanly on low-end smart TVs.
+- **Three performance tiers**, auto-detected:
+  - `full` — desktop and modern mobile browsers (all effects)
+  - `reduced` — Tizen/webOS/Fire TV/Android TV (no particles, static background)
+  - `minimal` — anything with `prefers-reduced-motion` set (solid background, no animation)
+- **Embedded typography** — the title font (Instrument Serif) is inlined as base64 so the overlay looks identical on every device, regardless of what's installed locally.
+- **Scheduled activation / deactivation** and **scheduled restart** — set a window once and let it run automatically.
+- **Admin dismiss button** so you can keep working on the server without being boxed out by your own overlay. On the login page the same button appears as "Accès administrateur →" so you can always reach the login form.
 
-- 🔄 Rotating messages with configurable display and pause durations
-- 🎨 Per-message background and text colour with a named preset palette
-- 📅 Flexible per-message scheduling: always, fixed date range, annual (e.g. Christmas), weekly, or daily time window
-- 📌 Permanent banner library: save multiple entries and pick the active one; supersedes all rotation messages when enabled
-- 🎛️ Configurable dismiss controls: show/hide × and "hide all" buttons, with custom sizes and label
-- 🔗 Optional click-through URL per message; clicking the banner opens a link in a new tab
-- 🙈 Option to hide the banner while browsing the admin dashboard
-- 🔁 Cross-tab dismiss sync: dismissing a message in one tab instantly hides it in all other open tabs
-- 🛠️ **Maintenance mode** _(new)_: instantly block non-admin users at the API level with a
-  full-screen overlay; overlay also appears on the login page so kicked-out users see an
-  explanation; optional link to an external status page; schedule activation, deactivation, and
-  server restarts automatically
+## Requirements
 
-## Prerequisites
+- Jellyfin **10.11.6** or newer (`targetAbi: 10.11.6.0`).
+- Two prerequisite plugins, both already active:
+  - **JavaScript Injector** ([n00bcodr/Jellyfin-JavaScript-Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector)) — injects our script into the web UI.
+  - **File Transformation** ([IAmParadox27/jellyfin-plugin-file-transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)) — used by JavaScript Injector to modify `index.html`.
 
-Install these three components **in order** before adding JellyFlare:
-
-1. **Jellyfin 10.11.6 or later** ([jellyfin.org](https://jellyfin.org)); earlier versions are not supported.
-
-2. **File Transformation** (by IAmParadox27), required by JS Injector.
-   Add this repository in **Dashboard → Plugins → Repositories**:
-
-   ```plain
-   https://www.iamparadox.dev/jellyfin/plugins/manifest.json
-   ```
-
-   Then install **File Transformation** from the Catalog.
-
-3. **JavaScript Injector** (by n00bcodr), delivers the banner script to the browser.
-   Add this repository in **Dashboard → Plugins → Repositories**:
-
-   ```plain
-   https://raw.githubusercontent.com/n00bcodr/jellyfin-plugins/main/10.11/manifest.json
-   ```
-
-   Then install **JavaScript Injector** from the Catalog.
-
-> **Important:** use the **10.11 manifest URLs** listed above for JS Injector (and File Transformation).
-> The old 10.10 builds silently fail on Jellyfin 10.11.
+Without those two, MaintenanceDeluxe has no way to render anything.
 
 ## Installation
 
-### Via plugin repository _(recommended)_
+In Jellyfin → **Dashboard → Plugins → Repositories**, add this URL:
 
-1. Go to **Dashboard → Plugins → Repositories** and add:
+```
+https://raw.githubusercontent.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/main/manifest.json
+```
 
-   ```plain
-   https://raw.githubusercontent.com/MorganKryze/jellyflare/main/manifest.json
-   ```
+Then go to the **Catalog** tab, install **MaintenanceDeluxe**, and restart Jellyfin.
 
-2. Go to **Catalog**, find **JellyFlare**, and install it.
-3. Restart Jellyfin, then open **Dashboard → Plugins → JellyFlare**.
+After the restart, the plugin appears under **My plugins** with a full config page.
 
-### Manual
+## Usage
 
-1. Download the ZIP from the [latest release](https://github.com/MorganKryze/jellyflare/releases/latest).
-2. Create `<data-dir>/plugins/JellyFlare/` and unzip the archive into it.
-3. Restart Jellyfin, then open **Dashboard → Plugins → JellyFlare**.
+### Flipping maintenance on
 
-## Why JellyFlare?
+1. Go to **My plugins → MaintenanceDeluxe → Maintenance** tab.
+2. Tick **Active**, optionally set a **Scheduled end** time.
+3. Fill in the **Overlay content** section:
+   - Title (defaults to "Serveur en maintenance")
+   - Subtitle (defaults to "On peaufine le serveur. Rendez-vous juste après.")
+   - As many release-notes sections as you want (click **+ Add a section**).
+4. Click **Save**.
 
-You can already inject arbitrary CSS or JS into Jellyfin using JS Injector alone. So why add another plugin?
+Your users on the web, mobile browsers, or opening `/web/` in their TV's browser will see the overlay until you flip maintenance back off. Users of the official native Samsung/LG TV apps will just see a "disabled account" error — that's a constraint of those apps, not of this plugin.
 
-Because maintaining a hand-written script gets old fast. JellyFlare gives you:
+### The preview button
 
-- **A proper admin UI**: add, edit, and reorder messages from the dashboard; no file editing, no restarts.
-- **Scheduling**: show a message only during a fixed date range, every Christmas, specific weekdays, or a daily time window; the script handles it automatically.
-- **A permanent-banner library**: save multiple pinned entries and switch the active one in one click.
-- **Persistence**: configuration is stored by Jellyfin and survives upgrades; nothing lives in a file you have to back up manually.
+Next to the **Overlay content** heading there's a **Preview** button. It opens a new tab with `?md-preview=1`, which loads your real saved settings (title, subtitle, release notes) into the overlay — but doesn't activate maintenance or disable anyone. Use it freely to iterate on your wording and content.
 
-If a one-liner banner is all you need, a raw JS Injector script is fine. If you want something you can actually manage, JellyFlare is the upgrade.
+### The admin dismiss
 
-## Configuration
+Once you're logged in as admin and maintenance is active, you'll see a small **Accès admin** button at the bottom of the overlay. Click it and it goes away for the rest of the session, so you can keep using Jellyfin. It reappears on the next tab/reload or after deactivation.
 
-The plugin page has four tabs. See [docs/configuration.md](./docs/configuration.md) for field-level details.
+On the login page (before auth) the same button reads **Accès administrateur →** — so you can always get back into the admin even if your own maintenance is on.
 
-### 📌 Permanent tab
+## Building from source
 
-Pin a banner that overrides all rotation messages, useful for outage notices or time-sensitive announcements. Manage a library of entries and switch the active one without losing the others.
+Requires .NET SDK 9.0.
 
-<details>
-<summary>Screenshot</summary>
+```
+dotnet build --configuration Release
+```
 
-![Permanent tab](./assets/screenshots/permanent.png)
+Output DLL: `Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll`
 
-</details>
+## Preview.html — design iteration without Jellyfin
 
-### 🔄 Rotation tab
-
-Manage the pool of rotating messages: add, reorder, enable/disable individual entries, and set display timing. Each message has its own colour, optional URL, and schedule.
-
-<details>
-<summary>Screenshot</summary>
-
-![Rotation tab](./assets/screenshots/rotation.png)
-
-</details>
-
-### ⚙️ Settings tab
-
-Control visibility (optionally show on admin pages, off by default), appearance (font size, banner height, alignment, transition speed), timing (display and pause durations), dismiss controls (permanent dismissibility, rotation × and "hide all" buttons, shared button size), and the named colour preset palette.
-
-<details>
-<summary>Screenshot</summary>
-
-![Settings tab](./assets/screenshots/settings.png)
-
-</details>
-
-### 🛠️ Maintenance tab _(new)_
-
-Put the server into maintenance mode with one click: all non-admin users are disabled at the
-API level and see a full-screen overlay (on every page, including the login screen). Set a
-custom message and an optional link to an external status page. Admins can dismiss the overlay
-to keep working. Deactivating re-enables only the users who were active before maintenance
-started. Use the Automation section to schedule a maintenance window (activate and optionally
-deactivate at a set time) or trigger a server restart automatically.
-
-<details>
-<summary>Screenshot</summary>
-
-![Maintenance tab](./assets/screenshots/maintenance.png)
-
-</details>
-
-## Project status
-
-JellyFlare has reached a state I consider feature-complete for what I originally set out to build, so I do not plan to drive large new features myself going forward. The plugin is stable, documented, and working well in daily use.
-
-That said, I am still here. Bug reports, feature ideas, and pull requests are always welcome; [open an issue](https://github.com/MorganKryze/JellyFlare/issues/new/choose) and I will read it. Where JellyFlare goes from here will be shaped by the community as much as by me, so if there is something you want to see, please bring it.
-
-## Troubleshooting
-
-**Banner not showing?**
-
-- Confirm all three prerequisites are installed and Jellyfin has been restarted after each one.
-- Check that you used the **10.11 manifest URLs** listed in Prerequisites. The 10.10 builds silently fail.
-- In the Jellyfin admin, verify that **JS Injector** and **File Transformation** both show as _Active_ (not just installed).
-- Open your browser's developer console and look for errors from `banner.js`; a 404 means JellyFlare's API is unreachable, likely a missing restart.
-
-If the issue persists, [open a bug report](https://github.com/MorganKryze/JellyFlare/issues/new/choose). The template will ask for the details needed to diagnose it.
-
-## Development
-
-See [docs/development.md](./docs/development.md) for build instructions, the Docker dev loop, and the release workflow.
-
-## Security
-
-To report a vulnerability privately, use **Security → Report a vulnerability** on the GitHub
-repository page. See [SECURITY.md](./.github/SECURITY.md) for the full security policy and a
-disclosure of all known considerations.
-
-## AI Disclosure
-
-Parts of this project were developed and documented with AI assistance. All code and content were reviewed, tested, and validated by me personally.
+A standalone `preview.html` sits at the root of the repo. Open it in any browser and you get the overlay rendered with slider controls to tweak remaining time, total duration, performance tier, and number of release notes. Useful for CSS tweaks before touching the plugin.
 
 ## License
 
-GNU General Public License v3. See [LICENSE](LICENSE). Use, modify, and redistribute freely, but any distributed derivative must also be GPL v3 and open source.
+GPL-3.0. See `LICENSE`.

@@ -1156,11 +1156,7 @@
         };
     }
 
-    if (isPreviewMode()) {
-        MAINTENANCE = mockMaintenance();
-        IS_ADMIN = true;
-        applyMaintenanceState();
-        // Visual "PREVIEW" badge so admin can't confuse it with real maintenance.
+    function addPreviewBadge() {
         setTimeout(function () {
             var overlay = document.getElementById("jf-md-overlay");
             if (!overlay) return;
@@ -1175,6 +1171,40 @@
             badge.textContent = "Pr\u00e9visualisation";
             overlay.appendChild(badge);
         }, 120);
+    }
+
+    function applyPreviewFallback(maint) {
+        var m = maint || {};
+        // Force the overlay to render in preview mode, regardless of backend state.
+        m.isActive = true;
+        // If no schedule configured, synthesise one so the countdown and bar have
+        // something to render. We keep a 55-min window centred around now-20/now+35.
+        var now = new Date();
+        if (!m.scheduledStart) m.scheduledStart = new Date(now.getTime() - 20 * 60 * 1000).toISOString();
+        if (!m.scheduledEnd) m.scheduledEnd = new Date(now.getTime() + 35 * 60 * 1000).toISOString();
+        if (!m.activatedAt) m.activatedAt = m.scheduledStart;
+        // If no release notes, fall back to demo so the preview has visible content.
+        if (!m.releaseNotes || m.releaseNotes.length === 0) {
+            var mock = mockMaintenance();
+            m.releaseNotes = mock.releaseNotes;
+        }
+        return m;
+    }
+
+    if (isPreviewMode()) {
+        IS_ADMIN = true;
+        // Fetch the REAL saved config so admins see their own customisation in preview.
+        // Only the fields not yet filled (no schedule, no release notes) fall back to
+        // sensible demo data. isActive is forced true for rendering only \u2014 the server
+        // state is unchanged and no user is actually blocked.
+        fetch("/MaintenanceDeluxe/maintenance")
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (maint) {
+                MAINTENANCE = applyPreviewFallback(maint);
+                applyMaintenanceState();
+                addPreviewBadge();
+            });
         return;
     }
 
