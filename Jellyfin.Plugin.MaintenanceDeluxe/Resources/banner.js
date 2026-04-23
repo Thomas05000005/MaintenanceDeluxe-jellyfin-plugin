@@ -1169,20 +1169,7 @@
                 "background:rgba(209,128,51,.18);border:1px solid rgba(209,128,51,.55);",
                 "color:#d18033;font-size:10px;font-weight:600;letter-spacing:.18em;",
                 "text-transform:uppercase;font-family:'Geist Mono',monospace;"
-        
-        "@supports ((mask-composite:exclude) or (-webkit-mask-composite:xor)){",
-        ".jf-md-card{border-color:transparent;}",
-        ".jf-md-card::before{content:\"\";position:absolute;inset:0;padding:1px;",
-        "border-radius:inherit;pointer-events:none;",
-        "background:conic-gradient(from 45deg,#6B3A2A,#C9A96E,#F4D89B,#E4C88B,#C9A96E,#8B4A3A,#6B3A2A,#C9A96E,#8B4A3A);",
-        "-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);",
-        "-webkit-mask-composite:xor;",
-        "mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);",
-        "mask-composite:exclude;}",
-        "}",
-        ".jf-md-tier-reduced .jf-md-beam,",
-        ".jf-md-tier-minimal .jf-md-beam{animation:none;opacity:.35;}",
-    ].join("");
+            ].join("");
             badge.textContent = "Pr\u00e9visualisation";
             overlay.appendChild(badge);
         }, 120);
