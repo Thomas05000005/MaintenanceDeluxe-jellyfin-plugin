@@ -290,6 +290,49 @@
           font-family: inherit;
         }
         .jf-rn-template:hover { background: rgba(201,169,110,0.15); border-color: rgba(201,169,110,0.4); }
+
+        /* Expand-preview fullscreen mode */
+        #jf-appearance-section.jf-app-expanded {
+          position: fixed; inset: 0; z-index: 9999;
+          background: #000; padding: 0; margin: 0; border: 0;
+          overflow: hidden;
+        }
+        #jf-appearance-section.jf-app-expanded > *:not(#appearanceLayout):not(.jf-app-exit-bar) { display: none; }
+        #jf-appearance-section.jf-app-expanded #appearanceLayout {
+          display: grid; grid-template-columns: minmax(0,1fr) 340px;
+          gap: 0; height: 100vh; margin: 0; align-items: stretch;
+        }
+        #jf-appearance-section.jf-app-expanded #appearanceControls {
+          padding: 20px 24px; overflow-y: auto;
+          background: rgba(20,15,14,0.92); backdrop-filter: blur(8px);
+          border-left: 1px solid rgba(255,255,255,0.08);
+          order: 2;
+        }
+        #jf-appearance-section.jf-app-expanded #appearancePreview {
+          min-height: 100vh; border-radius: 0; border: 0; order: 1;
+        }
+        #jf-appearance-section.jf-app-expanded #appPreviewIframe {
+          min-height: 100vh;
+        }
+        #jf-appearance-section.jf-app-expanded.jf-app-panel-hidden #appearanceControls { display: none; }
+        #jf-appearance-section.jf-app-expanded.jf-app-panel-hidden #appearanceLayout {
+          grid-template-columns: 1fr;
+        }
+        .jf-app-exit-bar {
+          display: none; position: fixed; top: 16px; right: 16px; z-index: 10000;
+          gap: 8px; align-items: center;
+        }
+        #jf-appearance-section.jf-app-expanded .jf-app-exit-bar { display: flex; }
+        .jf-app-exit-bar button {
+          background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.25);
+          border-radius: 6px; padding: 6px 12px; cursor: pointer;
+          font-size: 12px; font-family: inherit;
+        }
+        .jf-app-exit-bar button:hover { background: rgba(255,255,255,0.15); }
+        .jf-app-exit-bar kbd {
+          background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px;
+          font-size: 10px; font-family: monospace; margin-left: 4px;
+        }
       </style>
       <div data-role="content">
         <div class="content-primary">
@@ -954,6 +997,97 @@
                 </div>
               </div>
 
+              <!-- Appearance section -->
+              <div id="jf-appearance-section" style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
+                <div class="jf-app-exit-bar">
+                  <button type="button" id="appTogglePanel" title="Hide/show the settings panel (H)">Hide panel <kbd>H</kbd></button>
+                  <button type="button" id="appExitExpand" title="Exit expand mode (Esc)">Exit <kbd>Esc</kbd></button>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:1em;flex-wrap:wrap">
+                  <h3 class="sectionTitle" style="margin:0 0 0.5em 0">Appearance</h3>
+                  <button type="button" id="appExpandPreview" is="emby-button" class="emby-button" style="font-size:12px">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">open_in_full</span>
+                    Expand preview
+                  </button>
+                </div>
+                <div class="fieldDescription" style="margin-bottom:1.2em">
+                  Customise the overlay look. The live preview on the right reflects your changes instantly without saving. Click <b>Save</b> at the bottom of the page to apply changes to real users.
+                </div>
+
+                <div id="appearanceLayout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,44%);gap:1.2em;align-items:start;margin-bottom:1em">
+                  <div id="appearanceControls" style="display:flex;flex-direction:column;gap:1em;min-width:0">
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2em 1.6em">
+                  <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="appAccentColor">Accent colour</label>
+                    <div style="display:flex;gap:0.4em;align-items:center">
+                      <input id="appAccentColor" type="color" value="#C9A96E" style="width:48px;height:36px;padding:2px;border-radius:4px;background:transparent;border:1px solid rgba(255,255,255,0.15);cursor:pointer" />
+                      <input id="appAccentColorHex" is="emby-input" type="text" maxlength="7" placeholder="#C9A96E" style="flex:1;font-family:monospace;text-transform:uppercase" />
+                    </div>
+                    <div class="fieldDescription">Drives all gold highlights. Palette variants are derived automatically.</div>
+                  </div>
+
+                  <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" for="appBgTint">Background tint</label>
+                    <div style="display:flex;gap:0.4em;align-items:center">
+                      <input id="appBgTint" type="color" value="#1A1412" style="width:48px;height:36px;padding:2px;border-radius:4px;background:transparent;border:1px solid rgba(255,255,255,0.15);cursor:pointer" />
+                      <input id="appBgTintHex" is="emby-input" type="text" maxlength="7" placeholder="#1A1412" style="flex:1;font-family:monospace;text-transform:uppercase" />
+                    </div>
+                    <div class="fieldDescription">Card + overlay background tint.</div>
+                  </div>
+                </div>
+
+                <div class="inputContainer" style="margin-bottom:1em">
+                  <label class="inputLabel inputLabelUnfocused" for="appCardOpacity">Card opacity: <span id="appCardOpacityValue" style="font-family:monospace;opacity:.7">0.72</span></label>
+                  <input id="appCardOpacity" type="range" min="0.40" max="1.00" step="0.02" value="0.72" style="width:100%" />
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8em 1.6em;margin-bottom:1em">
+                  <div>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Animation speed</div>
+                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
+                      <label><input type="radio" name="appAnimSpeed" value="off" /> Off</label>
+                      <label><input type="radio" name="appAnimSpeed" value="slow" /> Slow</label>
+                      <label><input type="radio" name="appAnimSpeed" value="normal" checked /> Normal</label>
+                      <label><input type="radio" name="appAnimSpeed" value="fast" /> Fast</label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Particle density</div>
+                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
+                      <label><input type="radio" name="appParticles" value="none" /> None</label>
+                      <label><input type="radio" name="appParticles" value="low" /> Low</label>
+                      <label><input type="radio" name="appParticles" value="normal" checked /> Normal</label>
+                      <label><input type="radio" name="appParticles" value="dense" /> Dense</label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Card border</div>
+                    <div style="display:flex;gap:0.3em;flex-wrap:wrap">
+                      <label><input type="radio" name="appBorder" value="full" checked /> Full</label>
+                      <label><input type="radio" name="appBorder" value="simple" /> Simple</label>
+                      <label><input type="radio" name="appBorder" value="none" /> None</label>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-top:0.6em">
+                  <button type="button" id="appResetDefaults" is="emby-button" class="emby-button">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle;margin-right:4px">refresh</span>
+                    Reset appearance to defaults
+                  </button>
+                </div>
+                  </div>
+                  <div id="appearancePreview" style="position:relative;min-height:460px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,0.08)">
+                    <iframe id="appPreviewIframe" src="about:blank" title="Live preview" style="width:100%;height:100%;min-height:460px;border:0;display:block"></iframe>
+                    <div id="appPreviewPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:13px;pointer-events:none">Loading live preview...</div>
+                  </div>
+                </div>
+                <div class="fieldDescription" style="margin-top:0.6em;opacity:.6">The live preview uses the current admin form values, not saved config. It updates instantly as you type or pick colours.</div>
+              </div>
+
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <details>
                   <summary><span id="jf-maintenance-affected-summary">Users affected</span></summary>
@@ -1094,7 +1228,13 @@
             scheduledRestart: null,
             customTitle: '',
             customSubtitle: '',
-            releaseNotes: []
+            releaseNotes: [],
+            accentColor: '#C9A96E',
+            bgTint: '#1A1412',
+            cardOpacity: 0.72,
+            animationSpeed: 'normal',
+            particleDensity: 'normal',
+            borderStyle: 'full'
           };
 
           var ANNUAL_PRESETS = [
@@ -2304,6 +2444,11 @@
               });
             });
 
+            initAppearanceWiring();
+            initLivePreview();
+            wireLivePreviewListeners();
+            initExpandMode();
+
             document
               .getElementById('previewOverlayBtn')
               .addEventListener('click', function () {
@@ -2860,6 +3005,288 @@
             return out.slice(0, MAX_RELEASE_NOTES);
           }
 
+          // ── Appearance (colour, opacity, anim, particles, border) ──────────
+          var APP_HEX_RE = /^#[0-9a-fA-F]{6}$/;
+          var APP_ANIM_OPTIONS = ['off', 'slow', 'normal', 'fast'];
+          var APP_PARTICLE_OPTIONS = ['none', 'low', 'normal', 'dense'];
+          var APP_BORDER_OPTIONS = ['full', 'simple', 'none'];
+
+          function validHex(v, fallback) {
+            return v && APP_HEX_RE.test(v) ? v.toUpperCase() : fallback;
+          }
+          function pickRadio(name, valid, fallback) {
+            var checked = document.querySelector('input[name="' + name + '"]:checked');
+            var v = checked ? checked.value : fallback;
+            return valid.indexOf(v) >= 0 ? v : fallback;
+          }
+          function setRadio(name, value) {
+            var els = document.querySelectorAll('input[name="' + name + '"]');
+            for (var i = 0; i < els.length; i++) els[i].checked = (els[i].value === value);
+          }
+
+          function applyAppearanceUi(m) {
+            var accent = validHex(m && m.accentColor, MAINTENANCE_DEFAULTS.accentColor);
+            var bgTint = validHex(m && m.bgTint, MAINTENANCE_DEFAULTS.bgTint);
+            var opacity = (m && typeof m.cardOpacity === 'number')
+              ? Math.max(0.40, Math.min(1.00, m.cardOpacity))
+              : MAINTENANCE_DEFAULTS.cardOpacity;
+            var anim = (m && APP_ANIM_OPTIONS.indexOf(m.animationSpeed) >= 0)
+              ? m.animationSpeed : MAINTENANCE_DEFAULTS.animationSpeed;
+            var parts = (m && APP_PARTICLE_OPTIONS.indexOf(m.particleDensity) >= 0)
+              ? m.particleDensity : MAINTENANCE_DEFAULTS.particleDensity;
+            var border = (m && APP_BORDER_OPTIONS.indexOf(m.borderStyle) >= 0)
+              ? m.borderStyle : MAINTENANCE_DEFAULTS.borderStyle;
+
+            var accentColorEl = document.getElementById('appAccentColor');
+            var accentHexEl = document.getElementById('appAccentColorHex');
+            var bgTintEl = document.getElementById('appBgTint');
+            var bgTintHexEl = document.getElementById('appBgTintHex');
+            var opacityEl = document.getElementById('appCardOpacity');
+            var opacityValueEl = document.getElementById('appCardOpacityValue');
+            if (accentColorEl) accentColorEl.value = accent;
+            if (accentHexEl) accentHexEl.value = accent;
+            if (bgTintEl) bgTintEl.value = bgTint;
+            if (bgTintHexEl) bgTintHexEl.value = bgTint;
+            if (opacityEl) opacityEl.value = String(opacity);
+            if (opacityValueEl) opacityValueEl.textContent = opacity.toFixed(2);
+            setRadio('appAnimSpeed', anim);
+            setRadio('appParticles', parts);
+            setRadio('appBorder', border);
+          }
+
+          function collectAppearance() {
+            var accentColorEl = document.getElementById('appAccentColor');
+            var accentHexEl = document.getElementById('appAccentColorHex');
+            var bgTintEl = document.getElementById('appBgTint');
+            var bgTintHexEl = document.getElementById('appBgTintHex');
+            var opacityEl = document.getElementById('appCardOpacity');
+            var accent = validHex(
+              (accentHexEl && accentHexEl.value) || (accentColorEl && accentColorEl.value),
+              MAINTENANCE_DEFAULTS.accentColor
+            );
+            var bg = validHex(
+              (bgTintHexEl && bgTintHexEl.value) || (bgTintEl && bgTintEl.value),
+              MAINTENANCE_DEFAULTS.bgTint
+            );
+            var opacity = opacityEl ? parseFloat(opacityEl.value) : MAINTENANCE_DEFAULTS.cardOpacity;
+            if (isNaN(opacity)) opacity = MAINTENANCE_DEFAULTS.cardOpacity;
+            return {
+              accentColor: accent,
+              bgTint: bg,
+              cardOpacity: Math.max(0.40, Math.min(1.00, opacity)),
+              animationSpeed: pickRadio('appAnimSpeed', APP_ANIM_OPTIONS, MAINTENANCE_DEFAULTS.animationSpeed),
+              particleDensity: pickRadio('appParticles', APP_PARTICLE_OPTIONS, MAINTENANCE_DEFAULTS.particleDensity),
+              borderStyle: pickRadio('appBorder', APP_BORDER_OPTIONS, MAINTENANCE_DEFAULTS.borderStyle)
+            };
+          }
+
+          // ── Live preview iframe ────────────────────────────────────────────
+          var PREVIEW_IFRAME_SRC = 'MaintenanceDeluxe/preview.html?md-preview=live';
+          var _previewReady = false;
+          var _previewPending = false;
+          var _previewTimer = null;
+
+          function buildPreviewConfig() {
+            var msgEl = document.getElementById('maintenanceMessage');
+            var statusEl = document.getElementById('maintenanceStatusUrl');
+            var customTitleEl = document.getElementById('maintenanceCustomTitle');
+            var customSubtitleEl = document.getElementById('maintenanceCustomSubtitle');
+            var scheduledStartEl = document.getElementById('scheduledStart');
+            var scheduledEndEl = document.getElementById('scheduledEnd');
+            var app = collectAppearance();
+            return {
+              isActive: true,
+              message: (msgEl && msgEl.value.trim()) || '',
+              statusUrl: (statusEl && statusEl.value.trim()) || '',
+              customTitle: (customTitleEl && customTitleEl.value.trim()) || '',
+              customSubtitle: (customSubtitleEl && customSubtitleEl.value.trim()) || '',
+              scheduledStart: scheduledStartEl && scheduledStartEl.value
+                ? localToUtcIso(scheduledStartEl.value) : null,
+              scheduledEnd: scheduledEndEl && scheduledEndEl.value
+                ? localToUtcIso(scheduledEndEl.value) : null,
+              scheduleEnabled: !!(scheduledStartEl && scheduledStartEl.value),
+              releaseNotes: collectReleaseNotes(),
+              accentColor: app.accentColor,
+              bgTint: app.bgTint,
+              cardOpacity: app.cardOpacity,
+              animationSpeed: app.animationSpeed,
+              particleDensity: app.particleDensity,
+              borderStyle: app.borderStyle
+            };
+          }
+
+          function sendPreviewUpdate() {
+            var iframe = document.getElementById('appPreviewIframe');
+            if (!iframe || !iframe.contentWindow || !_previewReady) return;
+            try {
+              iframe.contentWindow.postMessage({
+                type: 'md-preview-update',
+                config: buildPreviewConfig()
+              }, '*');
+            } catch (e) { /* ignore */ }
+          }
+
+          // Throttled: coalesces bursts of changes within 100ms into a single post.
+          function queuePreviewUpdate() {
+            _previewPending = true;
+            if (_previewTimer) return;
+            _previewTimer = setTimeout(function () {
+              _previewTimer = null;
+              if (_previewPending) {
+                _previewPending = false;
+                sendPreviewUpdate();
+              }
+            }, 100);
+          }
+
+          function initLivePreview() {
+            var iframe = document.getElementById('appPreviewIframe');
+            var placeholder = document.getElementById('appPreviewPlaceholder');
+            if (!iframe) return;
+            // Listen for ready/handshake messages from the iframe so we can send the
+            // initial state without guessing the right moment.
+            window.addEventListener('message', function (ev) {
+              if (!ev || !ev.data || ev.data.type !== 'md-preview-ready') return;
+              if (iframe.contentWindow !== ev.source) return;
+              _previewReady = true;
+              if (placeholder) placeholder.style.display = 'none';
+              sendPreviewUpdate();
+            });
+            // Give the iframe an URL resolved against the ApiClient base so it works
+            // regardless of whether Jellyfin is at / or a sub-path.
+            iframe.src = ApiClient.getUrl(PREVIEW_IFRAME_SRC);
+          }
+
+          // ── Expand / fullscreen mode ──────────────────────────────────────
+          function initExpandMode() {
+            var section = document.getElementById('jf-appearance-section');
+            var expandBtn = document.getElementById('appExpandPreview');
+            var exitBtn = document.getElementById('appExitExpand');
+            var toggleBtn = document.getElementById('appTogglePanel');
+            if (!section) return;
+
+            function enterExpand() {
+              section.classList.add('jf-app-expanded');
+              document.body.style.overflow = 'hidden';
+            }
+            function exitExpand() {
+              section.classList.remove('jf-app-expanded');
+              section.classList.remove('jf-app-panel-hidden');
+              document.body.style.overflow = '';
+            }
+            function togglePanel() {
+              var hidden = section.classList.toggle('jf-app-panel-hidden');
+              if (toggleBtn) toggleBtn.firstChild.nodeValue = (hidden ? 'Show panel ' : 'Hide panel ');
+            }
+
+            if (expandBtn) expandBtn.addEventListener('click', enterExpand);
+            if (exitBtn) exitBtn.addEventListener('click', exitExpand);
+            if (toggleBtn) toggleBtn.addEventListener('click', togglePanel);
+
+            // Hotkeys are only active while expanded.
+            document.addEventListener('keydown', function (ev) {
+              if (!section.classList.contains('jf-app-expanded')) return;
+              // Ignore typing in inputs so H inside a text field still types 'h'.
+              var t = ev.target;
+              var tag = t && t.tagName;
+              var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+                || (t && t.isContentEditable);
+              if (ev.key === 'Escape') {
+                ev.preventDefault();
+                exitExpand();
+              } else if ((ev.key === 'h' || ev.key === 'H') && !typing) {
+                ev.preventDefault();
+                togglePanel();
+              }
+            });
+          }
+
+          function wireLivePreviewListeners() {
+            // Any input in the Appearance block or in the overlay content inputs
+            // triggers a throttled preview push.
+            var ids = [
+              'maintenanceMessage', 'maintenanceStatusUrl',
+              'maintenanceCustomTitle', 'maintenanceCustomSubtitle',
+              'scheduledStart', 'scheduledEnd',
+              'appAccentColor', 'appAccentColorHex',
+              'appBgTint', 'appBgTintHex',
+              'appCardOpacity'
+            ];
+            ids.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.addEventListener('input', queuePreviewUpdate);
+            });
+            ['appAnimSpeed', 'appParticles', 'appBorder'].forEach(function (name) {
+              document.querySelectorAll('input[name="' + name + '"]').forEach(function (el) {
+                el.addEventListener('change', queuePreviewUpdate);
+              });
+            });
+            // Release notes changes (existing rows + newly added rows). We delegate
+            // on the container so dynamically-added rows are covered automatically.
+            var list = document.getElementById('releaseNotesList');
+            if (list) {
+              list.addEventListener('input', queuePreviewUpdate);
+              list.addEventListener('click', function (ev) {
+                // Template buttons live outside the list but add rows to it; cover
+                // the common "delete/reorder" interactions too.
+                var tag = ev.target && ev.target.tagName;
+                if (tag === 'BUTTON' || (ev.target && ev.target.closest && ev.target.closest('button'))) {
+                  queuePreviewUpdate();
+                }
+              });
+            }
+            document.querySelectorAll('.jf-rn-template').forEach(function (btn) {
+              btn.addEventListener('click', function () { setTimeout(queuePreviewUpdate, 0); });
+            });
+            var addBtn = document.getElementById('addReleaseNote');
+            if (addBtn) addBtn.addEventListener('click', function () { setTimeout(queuePreviewUpdate, 0); });
+            var resetBtn = document.getElementById('appResetDefaults');
+            if (resetBtn) resetBtn.addEventListener('click', function () { setTimeout(queuePreviewUpdate, 0); });
+          }
+
+          // Wires the color picker <-> hex text sync, opacity slider display,
+          // reset-defaults button. Called once during pageshow setup.
+          function initAppearanceWiring() {
+            var accentColorEl = document.getElementById('appAccentColor');
+            var accentHexEl = document.getElementById('appAccentColorHex');
+            var bgTintEl = document.getElementById('appBgTint');
+            var bgTintHexEl = document.getElementById('appBgTintHex');
+            var opacityEl = document.getElementById('appCardOpacity');
+            var opacityValueEl = document.getElementById('appCardOpacityValue');
+            var resetBtn = document.getElementById('appResetDefaults');
+
+            function bindColorPair(colorEl, hexEl) {
+              if (!colorEl || !hexEl) return;
+              colorEl.addEventListener('input', function () { hexEl.value = colorEl.value.toUpperCase(); });
+              hexEl.addEventListener('input', function () {
+                var v = hexEl.value.trim();
+                if (APP_HEX_RE.test(v)) colorEl.value = v;
+              });
+            }
+            bindColorPair(accentColorEl, accentHexEl);
+            bindColorPair(bgTintEl, bgTintHexEl);
+
+            if (opacityEl && opacityValueEl) {
+              opacityEl.addEventListener('input', function () {
+                var v = parseFloat(opacityEl.value);
+                opacityValueEl.textContent = isNaN(v) ? '?' : v.toFixed(2);
+              });
+            }
+
+            if (resetBtn) {
+              resetBtn.addEventListener('click', function () {
+                applyAppearanceUi({
+                  accentColor: MAINTENANCE_DEFAULTS.accentColor,
+                  bgTint: MAINTENANCE_DEFAULTS.bgTint,
+                  cardOpacity: MAINTENANCE_DEFAULTS.cardOpacity,
+                  animationSpeed: MAINTENANCE_DEFAULTS.animationSpeed,
+                  particleDensity: MAINTENANCE_DEFAULTS.particleDensity,
+                  borderStyle: MAINTENANCE_DEFAULTS.borderStyle
+                });
+              });
+            }
+          }
+
           function moveReleaseNote(row, direction) {
             var parent = row.parentNode;
             if (!parent) return;
@@ -2896,6 +3323,8 @@
               if (customTitleInput) customTitleInput.value = m.customTitle || '';
               if (customSubtitleInput) customSubtitleInput.value = m.customSubtitle || '';
               renderReleaseNotes(m.releaseNotes || []);
+
+              applyAppearanceUi(m);
             }
 
             var affectedSummary = document.getElementById('jf-maintenance-affected-summary');
@@ -2974,6 +3403,7 @@
             var customTitle = (document.getElementById('maintenanceCustomTitle').value.trim()) || null;
             var customSubtitle = (document.getElementById('maintenanceCustomSubtitle').value.trim()) || null;
             var releaseNotes = collectReleaseNotes();
+            var appearance = collectAppearance();
 
             return ApiClient.ajax({
               type: 'POST',
@@ -2988,7 +3418,13 @@
                 scheduledRestart: scheduledRestart,
                 customTitle: customTitle,
                 customSubtitle: customSubtitle,
-                releaseNotes: releaseNotes
+                releaseNotes: releaseNotes,
+                accentColor: appearance.accentColor,
+                bgTint: appearance.bgTint,
+                cardOpacity: appearance.cardOpacity,
+                animationSpeed: appearance.animationSpeed,
+                particleDensity: appearance.particleDensity,
+                borderStyle: appearance.borderStyle
               }),
               contentType: 'application/json'
             }).then(function () {

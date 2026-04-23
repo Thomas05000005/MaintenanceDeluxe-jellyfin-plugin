@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.2.0.0",
+        "checksum": "",
+        "changelog": "v0.2.0 - Appearance customization with live preview. New admin section lets you pick accent color, background tint, card opacity, animation speed (off/slow/normal/fast), particle density (none/low/normal/dense), and card border style (full gradient / simple gold / none). A live preview iframe reflects every change instantly without saving. Expand button gives a fullscreen view with toggleable settings panel (H hotkey) and Esc to exit. All colors are now derived from a single accent pick, so the palette stays coherent whatever hue you choose.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.2.0/MaintenanceDeluxe-v0.2.0.zip",
+        "timestamp": ""
+      },
+      {
         "version": "0.1.13.0",
         "checksum": "5190E1CE00F11DD5749934621DEF36AE",
         "changelog": "v0.1.13 - UI FIX: gold card border was truncated when release notes made the overlay taller than the viewport. The card had its own internal scroll (max-height:92vh) so the ::before gold gradient didn't extend through scrolled content. Fix: overlay scrolls instead of card, card grows to full content height so the border wraps everything, and background layers (blobs, beams, grain, particles) are pinned to viewport with position:fixed.",

@@ -57,6 +57,33 @@ public class BannerController : ControllerBase
         return File(stream, "application/javascript");
     }
 
+    /// <summary>Serves a minimal admin preview shell used by the config page's live-preview iframe.</summary>
+    [HttpGet("preview.html")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("text/html")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ContentResult GetPreviewShell()
+    {
+        const string html = @"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+<meta charset=""utf-8"">
+<title>MaintenanceDeluxe preview</title>
+<meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+<style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden;}</style>
+</head>
+<body>
+<script src=""/MaintenanceDeluxe/banner.js""></script>
+</body>
+</html>";
+        return new ContentResult
+        {
+            Content = html,
+            ContentType = "text/html; charset=utf-8",
+            StatusCode = 200
+        };
+    }
+
     /// <summary>Saves the plugin configuration.</summary>
     [HttpPost("config")]
     [Authorize(Policy = "RequiresElevation")]
@@ -194,6 +221,11 @@ public class BannerController : ControllerBase
         config.MaintenanceMode.ReleaseNotes = NormaliseReleaseNotes(maintenance.ReleaseNotes);
         config.MaintenanceMode.Theme = NormaliseTheme(maintenance.Theme);
         config.MaintenanceMode.AccentColor = NormaliseHexColor(maintenance.AccentColor);
+        config.MaintenanceMode.CardOpacity = Math.Clamp(maintenance.CardOpacity, 0.40, 1.00);
+        config.MaintenanceMode.BgTint = NormaliseHexColor(maintenance.BgTint);
+        config.MaintenanceMode.AnimationSpeed = NormaliseAnimationSpeed(maintenance.AnimationSpeed);
+        config.MaintenanceMode.ParticleDensity = NormaliseParticleDensity(maintenance.ParticleDensity);
+        config.MaintenanceMode.BorderStyle = NormaliseBorderStyle(maintenance.BorderStyle);
 
         if (!wasActive && maintenance.IsActive)
         {
@@ -334,5 +366,35 @@ public class BannerController : ControllerBase
         if (string.IsNullOrWhiteSpace(value)) return "✨";
         var trimmed = value.Trim();
         return trimmed.Length > MaxIconLength ? trimmed[..MaxIconLength] : trimmed;
+    }
+
+    private static readonly HashSet<string> _validAnimationSpeeds =
+        new(StringComparer.Ordinal) { "off", "slow", "normal", "fast" };
+
+    /// <summary>Whitelists animation speed preset; fallback "normal".</summary>
+    private static string NormaliseAnimationSpeed(string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && _validAnimationSpeeds.Contains(value)) return value;
+        return "normal";
+    }
+
+    private static readonly HashSet<string> _validParticleDensities =
+        new(StringComparer.Ordinal) { "none", "low", "normal", "dense" };
+
+    /// <summary>Whitelists particle density preset; fallback "normal".</summary>
+    private static string NormaliseParticleDensity(string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && _validParticleDensities.Contains(value)) return value;
+        return "normal";
+    }
+
+    private static readonly HashSet<string> _validBorderStyles =
+        new(StringComparer.Ordinal) { "full", "simple", "none" };
+
+    /// <summary>Whitelists card border style; fallback "full".</summary>
+    private static string NormaliseBorderStyle(string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && _validBorderStyles.Contains(value)) return value;
+        return "full";
     }
 }

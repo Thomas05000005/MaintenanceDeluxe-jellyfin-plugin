@@ -253,6 +253,26 @@ public class MaintenanceSetting
     /// <summary>Gets or sets the custom hex accent colour (e.g. "#C9A96E"). Null = use theme default.</summary>
     [JsonPropertyName("accentColor")]
     public string? AccentColor { get; set; }
+
+    /// <summary>Gets or sets the card background opacity (0.40–1.00). Default 0.72.</summary>
+    [JsonPropertyName("cardOpacity")]
+    public double CardOpacity { get; set; } = 0.72;
+
+    /// <summary>Gets or sets the custom hex background tint (e.g. "#1A1412"). Null = use theme default.</summary>
+    [JsonPropertyName("bgTint")]
+    public string? BgTint { get; set; }
+
+    /// <summary>Gets or sets the animation speed preset: "off" | "slow" | "normal" (default) | "fast".</summary>
+    [JsonPropertyName("animationSpeed")]
+    public string AnimationSpeed { get; set; } = "normal";
+
+    /// <summary>Gets or sets the particle density preset: "none" | "low" | "normal" (default) | "dense".</summary>
+    [JsonPropertyName("particleDensity")]
+    public string ParticleDensity { get; set; } = "normal";
+
+    /// <summary>Gets or sets the card border style: "full" (conic gold gradient, default) | "simple" (flat gold) | "none".</summary>
+    [JsonPropertyName("borderStyle")]
+    public string BorderStyle { get; set; } = "full";
 }
 
 /// <summary>
