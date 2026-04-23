@@ -337,7 +337,7 @@
         }
         #jf-appearance-section.jf-app-expanded > *:not(#appearanceLayout):not(.jf-app-exit-bar) { display: none; }
         #jf-appearance-section.jf-app-expanded #appearanceLayout {
-          display: grid; grid-template-columns: minmax(0,1fr) 340px;
+          display: grid; grid-template-columns: minmax(0,1fr) 300px;
           gap: 0; height: 100vh; margin: 0; align-items: stretch;
         }
         #jf-appearance-section.jf-app-expanded #appearanceControls {
@@ -1052,8 +1052,8 @@
                   Personnalise l'apparence de l'overlay. L'aperçu à droite reflète tes changements en direct, sans avoir besoin de sauvegarder. Clique sur <b>Save</b> en bas de la page pour appliquer aux utilisateurs.
                 </div>
 
-                <div id="appearanceLayout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,44%);gap:1.2em;align-items:start;margin-bottom:1em">
-                  <div id="appearanceControls" style="display:flex;flex-direction:column;gap:1em;min-width:0">
+                <div id="appearanceLayout" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,40%);gap:1.2em;align-items:start;margin-bottom:1em">
+                  <div id="appearanceControls" style="display:flex;flex-direction:column;gap:0.8em;min-width:0">
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.2em 1.6em">
                   <div class="inputContainer">
@@ -1083,22 +1083,40 @@
                 <div style="display:grid;grid-template-columns:1fr;gap:0.8em;margin-bottom:1em">
                   <div>
                     <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Vitesse des animations</div>
-                    <div class="jf-segmented">
-                      <label><input type="radio" name="appAnimSpeed" value="off" /> Désactivées</label>
-                      <label><input type="radio" name="appAnimSpeed" value="slow" /> Lentes</label>
-                      <label><input type="radio" name="appAnimSpeed" value="normal" checked /> Normales</label>
-                      <label><input type="radio" name="appAnimSpeed" value="fast" /> Rapides</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.6em;align-items:center">
+                      <div class="jf-segmented">
+                        <label><input type="radio" name="appAnimSpeed" value="off" /> Désactivées</label>
+                        <label><input type="radio" name="appAnimSpeed" value="slow" /> Lentes</label>
+                        <label><input type="radio" name="appAnimSpeed" value="normal" checked /> Normales</label>
+                        <label><input type="radio" name="appAnimSpeed" value="fast" /> Rapides</label>
+                      </div>
+                      <label style="display:inline-flex;align-items:center;gap:0.35em;font-size:12.5px;opacity:.85">
+                        Précis :
+                        <input id="appAnimScale" type="number" min="0" max="5" step="0.1" value="1"
+                          style="width:64px;padding:5px 7px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:inherit;font-family:monospace;font-size:12.5px" />
+                        ×
+                      </label>
                     </div>
+                    <div class="fieldDescription" style="margin-top:0.3em">0 = désactivé, 1 = normal, 2 = 2× plus lent, 0.5 = 2× plus rapide.</div>
                   </div>
 
                   <div>
                     <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Densité des particules</div>
-                    <div class="jf-segmented">
-                      <label><input type="radio" name="appParticles" value="none" /> Aucune</label>
-                      <label><input type="radio" name="appParticles" value="low" /> Faible</label>
-                      <label><input type="radio" name="appParticles" value="normal" checked /> Normale</label>
-                      <label><input type="radio" name="appParticles" value="dense" /> Dense</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.6em;align-items:center">
+                      <div class="jf-segmented">
+                        <label><input type="radio" name="appParticles" value="none" /> Aucune</label>
+                        <label><input type="radio" name="appParticles" value="low" /> Faible</label>
+                        <label><input type="radio" name="appParticles" value="normal" checked /> Normale</label>
+                        <label><input type="radio" name="appParticles" value="dense" /> Dense</label>
+                      </div>
+                      <label style="display:inline-flex;align-items:center;gap:0.35em;font-size:12.5px;opacity:.85">
+                        Précis :
+                        <input id="appParticleCount" type="number" min="0" max="500" step="1" value="22"
+                          style="width:72px;padding:5px 7px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:inherit;font-family:monospace;font-size:12.5px" />
+                        particules
+                      </label>
                     </div>
+                    <div class="fieldDescription" style="margin-top:0.3em">0 à 500. Au-delà de 100 attention aux perfs sur TV et vieux mobiles.</div>
                   </div>
 
                   <div>
@@ -1118,8 +1136,8 @@
                   </button>
                 </div>
                   </div>
-                  <div id="appearancePreview" style="position:relative;min-height:460px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,0.08)">
-                    <iframe id="appPreviewIframe" src="about:blank" title="Aperçu en direct" style="width:100%;height:100%;min-height:460px;border:0;display:block"></iframe>
+                  <div id="appearancePreview" style="position:sticky;top:1em;min-height:540px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,0.08)">
+                    <iframe id="appPreviewIframe" src="about:blank" title="Aperçu en direct" style="width:100%;height:100%;min-height:540px;border:0;display:block"></iframe>
                     <div id="appPreviewPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:13px;pointer-events:none">Chargement de l'aperçu…</div>
                   </div>
                 </div>
@@ -1272,7 +1290,9 @@
             cardOpacity: 0.72,
             animationSpeed: 'normal',
             particleDensity: 'normal',
-            borderStyle: 'full'
+            borderStyle: 'full',
+            animationScale: null,
+            particleCount: null
           };
 
           var ANNUAL_PRESETS = [
@@ -3048,6 +3068,22 @@
           var APP_ANIM_OPTIONS = ['off', 'slow', 'normal', 'fast'];
           var APP_PARTICLE_OPTIONS = ['none', 'low', 'normal', 'dense'];
           var APP_BORDER_OPTIONS = ['full', 'simple', 'none'];
+          // Must stay in sync with MD_ANIM_SCALE / MD_PARTICLE_COUNT in banner.js
+          var APP_ANIM_SCALE_BY_PRESET = { off: 0, slow: 2, normal: 1, fast: 0.5 };
+          var APP_PARTICLES_BY_PRESET = { none: 0, low: 10, normal: 22, dense: 40 };
+
+          function presetFromAnimScale(scale) {
+            for (var k in APP_ANIM_SCALE_BY_PRESET) {
+              if (APP_ANIM_SCALE_BY_PRESET[k] === scale) return k;
+            }
+            return null;
+          }
+          function presetFromParticleCount(count) {
+            for (var k in APP_PARTICLES_BY_PRESET) {
+              if (APP_PARTICLES_BY_PRESET[k] === count) return k;
+            }
+            return null;
+          }
 
           function validHex(v, fallback) {
             return v && APP_HEX_RE.test(v) ? v.toUpperCase() : fallback;
@@ -3074,6 +3110,14 @@
               ? m.particleDensity : MAINTENANCE_DEFAULTS.particleDensity;
             var border = (m && APP_BORDER_OPTIONS.indexOf(m.borderStyle) >= 0)
               ? m.borderStyle : MAINTENANCE_DEFAULTS.borderStyle;
+            // Numeric overrides: if present, they drive the numeric inputs AND should
+            // (re)select the matching preset when the value happens to equal a preset.
+            var animScale = (m && typeof m.animationScale === 'number')
+              ? Math.max(0, Math.min(5, m.animationScale))
+              : APP_ANIM_SCALE_BY_PRESET[anim];
+            var partCount = (m && typeof m.particleCount === 'number')
+              ? Math.max(0, Math.min(500, m.particleCount))
+              : APP_PARTICLES_BY_PRESET[parts];
 
             var accentColorEl = document.getElementById('appAccentColor');
             var accentHexEl = document.getElementById('appAccentColorHex');
@@ -3081,14 +3125,21 @@
             var bgTintHexEl = document.getElementById('appBgTintHex');
             var opacityEl = document.getElementById('appCardOpacity');
             var opacityValueEl = document.getElementById('appCardOpacityValue');
+            var animScaleEl = document.getElementById('appAnimScale');
+            var partCountEl = document.getElementById('appParticleCount');
             if (accentColorEl) accentColorEl.value = accent;
             if (accentHexEl) accentHexEl.value = accent;
             if (bgTintEl) bgTintEl.value = bgTint;
             if (bgTintHexEl) bgTintHexEl.value = bgTint;
             if (opacityEl) opacityEl.value = String(opacity);
             if (opacityValueEl) opacityValueEl.textContent = opacity.toFixed(2);
-            setRadio('appAnimSpeed', anim);
-            setRadio('appParticles', parts);
+            if (animScaleEl) animScaleEl.value = String(animScale);
+            if (partCountEl) partCountEl.value = String(partCount);
+            // If the numeric value matches a preset, highlight it; otherwise clear.
+            var animPreset = presetFromAnimScale(animScale);
+            var partPreset = presetFromParticleCount(partCount);
+            setRadio('appAnimSpeed', animPreset || '');
+            setRadio('appParticles', partPreset || '');
             setRadio('appBorder', border);
           }
 
@@ -3098,6 +3149,8 @@
             var bgTintEl = document.getElementById('appBgTint');
             var bgTintHexEl = document.getElementById('appBgTintHex');
             var opacityEl = document.getElementById('appCardOpacity');
+            var animScaleEl = document.getElementById('appAnimScale');
+            var partCountEl = document.getElementById('appParticleCount');
             var accent = validHex(
               (accentHexEl && accentHexEl.value) || (accentColorEl && accentColorEl.value),
               MAINTENANCE_DEFAULTS.accentColor
@@ -3108,13 +3161,17 @@
             );
             var opacity = opacityEl ? parseFloat(opacityEl.value) : MAINTENANCE_DEFAULTS.cardOpacity;
             if (isNaN(opacity)) opacity = MAINTENANCE_DEFAULTS.cardOpacity;
+            var animScale = animScaleEl ? parseFloat(animScaleEl.value) : NaN;
+            var partCount = partCountEl ? parseInt(partCountEl.value, 10) : NaN;
             return {
               accentColor: accent,
               bgTint: bg,
               cardOpacity: Math.max(0.40, Math.min(1.00, opacity)),
               animationSpeed: pickRadio('appAnimSpeed', APP_ANIM_OPTIONS, MAINTENANCE_DEFAULTS.animationSpeed),
               particleDensity: pickRadio('appParticles', APP_PARTICLE_OPTIONS, MAINTENANCE_DEFAULTS.particleDensity),
-              borderStyle: pickRadio('appBorder', APP_BORDER_OPTIONS, MAINTENANCE_DEFAULTS.borderStyle)
+              borderStyle: pickRadio('appBorder', APP_BORDER_OPTIONS, MAINTENANCE_DEFAULTS.borderStyle),
+              animationScale: isNaN(animScale) ? null : Math.max(0, Math.min(5, animScale)),
+              particleCount: isNaN(partCount) ? null : Math.max(0, Math.min(500, partCount))
             };
           }
 
@@ -3149,7 +3206,9 @@
               cardOpacity: app.cardOpacity,
               animationSpeed: app.animationSpeed,
               particleDensity: app.particleDensity,
-              borderStyle: app.borderStyle
+              borderStyle: app.borderStyle,
+              animationScale: app.animationScale,
+              particleCount: app.particleCount
             };
           }
 
@@ -3248,7 +3307,8 @@
               'scheduledStart', 'scheduledEnd',
               'appAccentColor', 'appAccentColorHex',
               'appBgTint', 'appBgTintHex',
-              'appCardOpacity'
+              'appCardOpacity',
+              'appAnimScale', 'appParticleCount'
             ];
             ids.forEach(function (id) {
               var el = document.getElementById(id);
@@ -3283,7 +3343,7 @@
           }
 
           // Wires the color picker <-> hex text sync, opacity slider display,
-          // reset-defaults button. Called once during pageshow setup.
+          // preset <-> numeric two-way binding, reset-defaults button.
           function initAppearanceWiring() {
             var accentColorEl = document.getElementById('appAccentColor');
             var accentHexEl = document.getElementById('appAccentColorHex');
@@ -3291,6 +3351,8 @@
             var bgTintHexEl = document.getElementById('appBgTintHex');
             var opacityEl = document.getElementById('appCardOpacity');
             var opacityValueEl = document.getElementById('appCardOpacityValue');
+            var animScaleEl = document.getElementById('appAnimScale');
+            var partCountEl = document.getElementById('appParticleCount');
             var resetBtn = document.getElementById('appResetDefaults');
 
             function bindColorPair(colorEl, hexEl) {
@@ -3311,6 +3373,40 @@
               });
             }
 
+            // Two-way binding: preset click fills the numeric input; typing a number
+            // (re-)selects the matching preset if the value happens to match, else
+            // clears the preset highlight.
+            document.querySelectorAll('input[name="appAnimSpeed"]').forEach(function (r) {
+              r.addEventListener('change', function () {
+                if (!animScaleEl || !r.checked) return;
+                var s = APP_ANIM_SCALE_BY_PRESET[r.value];
+                if (s != null) animScaleEl.value = String(s);
+              });
+            });
+            document.querySelectorAll('input[name="appParticles"]').forEach(function (r) {
+              r.addEventListener('change', function () {
+                if (!partCountEl || !r.checked) return;
+                var n = APP_PARTICLES_BY_PRESET[r.value];
+                if (n != null) partCountEl.value = String(n);
+              });
+            });
+            if (animScaleEl) {
+              animScaleEl.addEventListener('input', function () {
+                var v = parseFloat(animScaleEl.value);
+                if (isNaN(v)) return;
+                var preset = presetFromAnimScale(v);
+                setRadio('appAnimSpeed', preset || '');
+              });
+            }
+            if (partCountEl) {
+              partCountEl.addEventListener('input', function () {
+                var v = parseInt(partCountEl.value, 10);
+                if (isNaN(v)) return;
+                var preset = presetFromParticleCount(v);
+                setRadio('appParticles', preset || '');
+              });
+            }
+
             if (resetBtn) {
               resetBtn.addEventListener('click', function () {
                 applyAppearanceUi({
@@ -3319,7 +3415,9 @@
                   cardOpacity: MAINTENANCE_DEFAULTS.cardOpacity,
                   animationSpeed: MAINTENANCE_DEFAULTS.animationSpeed,
                   particleDensity: MAINTENANCE_DEFAULTS.particleDensity,
-                  borderStyle: MAINTENANCE_DEFAULTS.borderStyle
+                  borderStyle: MAINTENANCE_DEFAULTS.borderStyle,
+                  animationScale: null,
+                  particleCount: null
                 });
               });
             }
@@ -3462,7 +3560,9 @@
                 cardOpacity: appearance.cardOpacity,
                 animationSpeed: appearance.animationSpeed,
                 particleDensity: appearance.particleDensity,
-                borderStyle: appearance.borderStyle
+                borderStyle: appearance.borderStyle,
+                animationScale: appearance.animationScale,
+                particleCount: appearance.particleCount
               }),
               contentType: 'application/json'
             }).then(function () {

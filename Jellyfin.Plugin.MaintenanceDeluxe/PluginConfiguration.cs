@@ -266,9 +266,21 @@ public class MaintenanceSetting
     [JsonPropertyName("animationSpeed")]
     public string AnimationSpeed { get; set; } = "normal";
 
-    /// <summary>Gets or sets the particle density preset: "none" | "low" | "normal" (default) | "dense".</summary>
+    /// <summary>Gets or sets the particle density preset: "none" | "low" | "normal" (default) | "dense".
+    /// Used as a fallback when <see cref="ParticleCount"/> is null.</summary>
     [JsonPropertyName("particleDensity")]
     public string ParticleDensity { get; set; } = "normal";
+
+    /// <summary>Gets or sets an explicit particle count (0..500). When non-null, overrides the
+    /// <see cref="ParticleDensity"/> preset. Use this to fine-tune beyond the preset values.</summary>
+    [JsonPropertyName("particleCount")]
+    public int? ParticleCount { get; set; }
+
+    /// <summary>Gets or sets an explicit animation speed multiplier (0..5.0, where 1.0 is normal,
+    /// 0 disables animations, &lt;1 is faster, &gt;1 is slower). Overrides the <see cref="AnimationSpeed"/>
+    /// preset when non-null.</summary>
+    [JsonPropertyName("animationScale")]
+    public double? AnimationScale { get; set; }
 
     /// <summary>Gets or sets the card border style: "full" (conic gold gradient, default) | "simple" (flat gold) | "none".</summary>
     [JsonPropertyName("borderStyle")]

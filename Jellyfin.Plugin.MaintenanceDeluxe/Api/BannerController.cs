@@ -232,6 +232,12 @@ public class BannerController : ControllerBase
         config.MaintenanceMode.AnimationSpeed = NormaliseAnimationSpeed(maintenance.AnimationSpeed);
         config.MaintenanceMode.ParticleDensity = NormaliseParticleDensity(maintenance.ParticleDensity);
         config.MaintenanceMode.BorderStyle = NormaliseBorderStyle(maintenance.BorderStyle);
+        config.MaintenanceMode.ParticleCount = maintenance.ParticleCount.HasValue
+            ? Math.Clamp(maintenance.ParticleCount.Value, 0, 500)
+            : (int?)null;
+        config.MaintenanceMode.AnimationScale = maintenance.AnimationScale.HasValue
+            ? Math.Clamp(maintenance.AnimationScale.Value, 0.0, 5.0)
+            : (double?)null;
 
         if (!wasActive && maintenance.IsActive)
         {

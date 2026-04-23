@@ -743,9 +743,20 @@
         if (!isNaN(opacity) && opacity >= 0.40 && opacity <= 1.00) {
             overlay.style.setProperty("--md-card-opacity", String(opacity));
         }
-        var anim = (m && m.animationSpeed) || "normal";
-        overlay.setAttribute("data-anim", anim);
-        overlay.style.setProperty("--md-anim-scale", String(MD_ANIM_SCALE[anim] != null ? MD_ANIM_SCALE[anim] : 1));
+        // Animation: numeric override wins over the preset. scale=0 means "off".
+        var animScale;
+        if (m && typeof m.animationScale === "number") {
+            animScale = Math.max(0, Math.min(5, m.animationScale));
+        } else {
+            var anim = (m && m.animationSpeed) || "normal";
+            animScale = MD_ANIM_SCALE[anim] != null ? MD_ANIM_SCALE[anim] : 1;
+        }
+        if (animScale === 0) {
+            overlay.setAttribute("data-anim", "off");
+        } else {
+            overlay.setAttribute("data-anim", (m && m.animationSpeed) || "normal");
+        }
+        overlay.style.setProperty("--md-anim-scale", String(animScale));
 
         overlay.setAttribute("data-particles", (m && m.particleDensity) || "normal");
         overlay.setAttribute("data-border", (m && m.borderStyle) || "full");
@@ -753,6 +764,9 @@
 
     function mdParticleCount(m, tier) {
         if (tier !== "full") return 0;
+        if (m && typeof m.particleCount === "number") {
+            return Math.max(0, Math.min(500, m.particleCount));
+        }
         var density = (m && m.particleDensity) || "normal";
         return MD_PARTICLE_COUNT[density] != null ? MD_PARTICLE_COUNT[density] : 22;
     }
