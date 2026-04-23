@@ -9,12 +9,12 @@
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.3.0",
-        "checksum": "4A6E6FE8419D717A3AB7953B2689A77A",
-        "changelog": "v0.1.3 - Fix French accent rendering. All non-ASCII characters in banner.js now escaped as JS Unicode (u00e9, u2248 etc.) so the overlay renders correctly regardless of the HTTP Content-Type charset served by JS Injector.",
+        "version": "0.1.4.0",
+        "checksum": "73806077BC7E44528F571FC0A8B79526",
+        "changelog": "v0.1.4 - Major overlay reliability fix. Added navigation listeners (hashchange/popstate/viewshow) so the overlay re-attaches on SPA navigation (fixes login page case). Added MutationObserver safety net that re-attaches the overlay if React removes it from the body. Preview mode now falls back to sessionStorage if React Router strips the URL query. Added debug console logs.",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.3/MaintenanceDeluxe-v0.1.3.zip",
-        "timestamp": "2026-04-23T13:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.4/MaintenanceDeluxe-v0.1.4.zip",
+        "timestamp": "2026-04-23T14:00:00"
       }
     ]
   }

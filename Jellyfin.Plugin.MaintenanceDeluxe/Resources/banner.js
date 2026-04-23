@@ -1103,12 +1103,19 @@
 
     // Preview mode short-circuit: ?md-preview=1 renders the overlay with mock data
     // so admins can iterate the design without activating maintenance for real users.
-    // We check the FULL URL (search + hash + href) because Jellyfin's SPA router
-    // may move the query into the hash, strip it, or re-insert it later.
+    // React Router (HashRouter) can call history.replaceState at boot time, which
+    // strips query strings from window.location. We therefore cache the flag in
+    // sessionStorage the first time we see it in the URL; subsequent checks (after
+    // SPA nav) read from sessionStorage.
     function isPreviewMode() {
         try {
             var href = window.location.href || "";
-            return /[?&#]md-preview=1(?:[&#]|$)/.test(href);
+            if (/[?&#]md-preview=1(?:[&#]|$)/.test(href)) {
+                try { sessionStorage.setItem("jf-md-preview", "1"); } catch (e) {}
+                return true;
+            }
+            try { return sessionStorage.getItem("jf-md-preview") === "1"; } catch (e) {}
+            return false;
         } catch (e) { return false; }
     }
 
@@ -1182,12 +1189,56 @@
         return;
     }
 
+    // Diagnostic log (helps users/devs troubleshoot when overlay doesn't appear).
+    try { console.debug("[MaintenanceDeluxe] script loaded", {
+        href: window.location.href, readyState: document.readyState
+    }); } catch (e) {}
+
+    // Re-fetches /MaintenanceDeluxe/maintenance and applies state. Safe to call often.
+    function refetchAndApplyMaintenance() {
+        return fetch("/MaintenanceDeluxe/maintenance")
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (maint) {
+                if (!maint) return;
+                MAINTENANCE = maint;
+                applyMaintenanceState();
+            });
+    }
+
+    // Re-check and re-attach the overlay on SPA navigations. Essential so that
+    // users arriving on the login page via client-side routing still see the
+    // overlay even if our initial run happened before login.html was mounted.
+    function installMaintenanceNavWatchers() {
+        try { window.addEventListener("hashchange", refetchAndApplyMaintenance); } catch (e) {}
+        try { window.addEventListener("popstate", refetchAndApplyMaintenance); } catch (e) {}
+        try { document.addEventListener("viewshow", refetchAndApplyMaintenance); } catch (e) {}
+
+        // Safety net: if React or any other lib removes our overlay from the
+        // body, re-attach it immediately. Covers the case where Jellyfin's React
+        // mounts login.html AFTER we have appended our overlay.
+        if (window.MutationObserver) {
+            try {
+                var mo = new MutationObserver(function () {
+                    if (MAINTENANCE && MAINTENANCE.isActive
+                        && maintenanceOverlay
+                        && !document.body.contains(maintenanceOverlay)
+                        && !(IS_ADMIN && adminDismissed)) {
+                        document.body.appendChild(maintenanceOverlay);
+                    }
+                });
+                mo.observe(document.body, { childList: true });
+            } catch (e) {}
+        }
+    }
+
     // Fetch maintenance state without auth \u2014 works even on the login page.
     fetch("/MaintenanceDeluxe/maintenance")
         .then(function (r) { return r.ok ? r.json() : null; })
         .catch(function () { return null; })
         .then(function (maint) {
             MAINTENANCE = maint;
+            installMaintenanceNavWatchers();
 
             var token = getToken();
             if (!token) {
