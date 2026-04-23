@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.1.13.0",
+        "checksum": "5190E1CE00F11DD5749934621DEF36AE",
+        "changelog": "v0.1.13 - UI FIX: gold card border was truncated when release notes made the overlay taller than the viewport. The card had its own internal scroll (max-height:92vh) so the ::before gold gradient didn't extend through scrolled content. Fix: overlay scrolls instead of card, card grows to full content height so the border wraps everything, and background layers (blobs, beams, grain, particles) are pinned to viewport with position:fixed.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.13/MaintenanceDeluxe-v0.1.13.zip",
+        "timestamp": "2026-04-23T23:00:00"
+      },
+      {
         "version": "0.1.12.0",
         "checksum": "E8A943B27D5B21ACB5BC9EDEB0BC370E",
         "changelog": "v0.1.12 - CRITICAL FIX: Save button stopped reacting as soon as any field was modified. Root cause: a TypeError in collectMessages() aborted initDom before the Save handler got wired, because release-note rows shared the .jf-msg-row class with rotation messages and had no .jf-msg-detail. Fix: excluded .jf-rn-row from the rotation collector + defensive null guard in collectRowData.",
