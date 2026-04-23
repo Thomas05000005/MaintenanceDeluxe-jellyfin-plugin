@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.2.2.0",
-        "checksum": "",
-        "changelog": "v0.2.2 - Fine-tune beyond the presets. Every Animation speed and Particle density preset now has a companion numeric input (0-5× scale for animations, 0-500 for particle count). Click a preset to fill the number; type a number to override with any value in-range. Layout: appearance preview is now sticky (it follows you as you scroll the controls column), iframe min-height bumped to 540px so long release notes fit, controls column is tighter, expand-mode settings panel narrowed from 340px to 300px so the preview gets more room.",
+        "checksum": "8654AB63FA4A28D81BE9ACC401559556",
+        "changelog": "v0.2.2 - Fine-tune beyond the presets. Every Animation speed and Particle density preset now has a companion numeric input (0-5\u00d7 scale for animations, 0-500 for particle count). Click a preset to fill the number; type a number to override with any value in-range. Layout: appearance preview is now sticky (it follows you as you scroll the controls column), iframe min-height bumped to 540px so long release notes fit, controls column is tighter, expand-mode settings panel narrowed from 340px to 300px so the preview gets more room.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.2.2/MaintenanceDeluxe-v0.2.2.zip",
-        "timestamp": ""
+        "timestamp": "2026-04-23T16:46:06"
       },
       {
         "version": "0.2.1.0",
