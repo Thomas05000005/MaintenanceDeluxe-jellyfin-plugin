@@ -48,5 +48,5 @@ jobs:
             -o /tmp/configPage_inline.js
           node --check /tmp/configPage_inline.js
 
-      - name: Version coherence (csproj / meta.json / manifest.json)
+      - name: Version coherence (csproj / manifest.json)
         run: python scripts/check_version_coherence.py

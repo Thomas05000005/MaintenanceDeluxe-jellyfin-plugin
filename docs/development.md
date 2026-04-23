@@ -80,20 +80,19 @@ Two GitHub Actions workflows guard the repo:
   - `banner.js` contains only ASCII (via `scripts/escape_non_ascii.py --check`).
   - `banner.js` is syntactically valid JS (`node --check`).
   - The inline `<script>` block in `configPage.html` is syntactically valid JS (extracted via `scripts/check_inline_script.py` then `node --check`). This check would have caught the v0.1.11 and v0.1.12 regressions that silently froze the admin UI.
-  - The version string agrees across `MaintenanceDeluxe.csproj`, `deploy/MaintenanceDeluxe/meta.json`, and `manifest.json` (via `scripts/check_version_coherence.py`).
+  - The version string agrees between `MaintenanceDeluxe.csproj` and `manifest.json` (via `scripts/check_version_coherence.py`). `deploy/MaintenanceDeluxe/meta.json` is a derived artefact built from `manifest.json` at release time and is not tracked in git.
 
-- **`.github/workflows/release.yml`** — runs on any pushed tag matching `v*`. Re-runs all `ci.yml` checks as a gate, verifies the tag matches the declared versions, builds the DLL, zips it with `meta.json`, computes MD5, creates a GitHub release with the zip attached, patches `manifest.json` in place to set the real checksum + timestamp, and commits the patched manifest back to `main`.
+- **`.github/workflows/release.yml`** — runs on any pushed tag matching `v*`. Re-runs all `ci.yml` checks as a gate, verifies the tag matches the declared version, builds the DLL, generates `meta.json` from `manifest.json` inline, zips both, computes MD5, creates a GitHub release with the zip attached and the changelog from `manifest.json`, patches `manifest.json` in place on `main` with the real checksum + timestamp, then commits the patched manifest back.
 
 ## Publishing a new version
 
 The workflow is now tag-driven. Everything the release workflow does is automated — you only decide the version number and changelog.
 
 1. `make bump V=X.Y.Z` — sets `<AssemblyVersion>` and `<FileVersion>` to `X.Y.Z.0`.
-2. Edit `deploy/MaintenanceDeluxe/meta.json`: update `version` to `X.Y.Z.0`, rewrite `changelog`, set `timestamp`.
-3. Prepend a new entry to the `versions` array in `manifest.json` at the repo root. The `checksum` and `timestamp` fields are filled in by the release workflow — leave them as placeholders (`""` is fine) or reuse the previous values; they get overwritten.
-4. If you edited `banner.js` and introduced non-ASCII characters, run `python scripts/escape_non_ascii.py Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js`.
-5. Commit everything, push `main`.
-6. `git tag vX.Y.Z && git push origin vX.Y.Z` — the release workflow fires on the tag, runs the full gate, builds, creates the GitHub release, patches `manifest.json`'s checksum+timestamp, and commits the patched file back to `main`.
-7. Wait for the workflow run to turn green on the Actions tab. Jellyfin clients that already added the manifest URL will see the new version on their next catalog refresh.
+2. Prepend a new entry to the `versions` array in `manifest.json` at the repo root. Fill in `version` (`X.Y.Z.0`), `changelog` (end-user facing release notes), `targetAbi`, and `sourceUrl` (`https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/vX.Y.Z/MaintenanceDeluxe-vX.Y.Z.zip`). The `checksum` and `timestamp` fields are filled in by the release workflow — leave them as placeholders (`""` is fine) or reuse the previous values; they get overwritten.
+3. If you edited `banner.js` and introduced non-ASCII characters, run `python scripts/escape_non_ascii.py Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js`.
+4. Commit everything, push `main`.
+5. `git tag vX.Y.Z && git push origin vX.Y.Z` — the release workflow fires on the tag, runs the full gate, builds, generates the bundled `meta.json`, creates the GitHub release, patches `manifest.json`'s checksum+timestamp, and commits the patched file back to `main`.
+6. Wait for the workflow run to turn green on the Actions tab. Jellyfin clients that already added the manifest URL will see the new version on their next catalog refresh.
 
 To test the release pipeline without publishing a real version, push an rc tag: `git tag v0.2.0-rc1 && git push origin v0.2.0-rc1`. The workflow treats it like any `v*` tag.

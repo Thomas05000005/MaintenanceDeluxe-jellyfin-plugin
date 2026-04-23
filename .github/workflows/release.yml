@@ -56,7 +56,7 @@ jobs:
             -o /tmp/configPage_inline.js
           node --check /tmp/configPage_inline.js
 
-      - name: Version coherence (csproj / meta.json / manifest.json)
+      - name: Version coherence (csproj / manifest.json)
         run: python scripts/check_version_coherence.py
 
       - name: Tag matches csproj version
@@ -72,9 +72,35 @@ jobs:
       - name: Build Release
         run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
 
-      - name: Stage deploy/MaintenanceDeluxe/
+      - name: Generate deploy bundle (DLL + meta.json derived from manifest.json)
         run: |
+          mkdir -p deploy/MaintenanceDeluxe
           cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll deploy/MaintenanceDeluxe/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path("manifest.json").read_text(encoding="utf-8"))[0]
+          v = m["versions"][0]
+          meta = {
+              "category": m["category"],
+              "changelog": v["changelog"],
+              "description": m["description"],
+              "guid": m["guid"],
+              "name": m["name"],
+              "overview": m["overview"],
+              "owner": m["owner"],
+              "targetAbi": v["targetAbi"],
+              "timestamp": v["timestamp"],
+              "version": v["version"],
+              "status": "Active",
+              "autoUpdate": True,
+              "assemblies": [],
+          }
+          Path("deploy/MaintenanceDeluxe/meta.json").write_text(
+              json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+          )
+          print("Generated deploy/MaintenanceDeluxe/meta.json from manifest.json")
+          PY
 
       - name: Create zip
         id: zip
@@ -92,10 +118,10 @@ jobs:
           echo "MD5: $CHECKSUM"
 
       # ─── create GitHub release ──────────────────────────────────────────────
-      - name: Extract changelog from meta.json
+      - name: Extract changelog from manifest.json
         id: changelog
         run: |
-          python -c "import json; print(json.load(open('deploy/MaintenanceDeluxe/meta.json'))['changelog'])" > /tmp/changelog.txt
+          python -c "import json; print(json.load(open('manifest.json'))[0]['versions'][0]['changelog'])" > /tmp/changelog.txt
           echo "path=/tmp/changelog.txt" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
