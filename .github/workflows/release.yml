@@ -62,9 +62,9 @@ jobs:
       - name: Tag matches csproj version
         run: |
           EXPECTED="${{ steps.version.outputs.dll_version }}"
-          ACTUAL=$(python scripts/check_version_coherence.py | awk -F': ' '/csproj/{print $2}')
+          ACTUAL=$(python scripts/check_version_coherence.py | awk -F': ' '/^csproj /{print $2; exit}')
           if [ "$EXPECTED" != "$ACTUAL" ]; then
-            echo "error: tag ${{ steps.version.outputs.tag }} implies version $EXPECTED but csproj has $ACTUAL" >&2
+            echo "error: tag ${{ steps.version.outputs.tag }} implies version [$EXPECTED] but csproj has [$ACTUAL]" >&2
             exit 1
           fi
 
