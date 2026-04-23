@@ -42,7 +42,18 @@
     var MAINTENANCE = null;
     var IS_ADMIN = false;
     var maintenanceOverlay = null;
-    var adminDismissed = false;
+    // adminDismissed persists in sessionStorage so a full reload or
+    // React-driven remount doesn't drop the admin's explicit decision
+    // to hide the overlay for this tab session.
+    function getAdminDismissed() {
+        try { return sessionStorage.getItem('jf-md-admin-dismissed') === '1'; } catch (e) { return false; }
+    }
+    function setAdminDismissed(v) {
+        try {
+            if (v) sessionStorage.setItem('jf-md-admin-dismissed', '1');
+            else sessionStorage.removeItem('jf-md-admin-dismissed');
+        } catch (e) {}
+    }
     var maintenanceTimerId = null;
     var MD_STYLES_INJECTED = false;
     var OVERLAY_Z_INDEX = 1000000; // above BANNER_Z_INDEX (999999)
@@ -866,7 +877,7 @@
         var dismissBtn = card.querySelector(".jf-md-dismiss");
         if (dismissBtn) {
             dismissBtn.addEventListener("click", function () {
-                adminDismissed = true;
+                setAdminDismissed(true);
                 removeMaintenanceOverlay();
             });
         }
@@ -915,11 +926,17 @@
     function applyMaintenanceState() {
         if (!MAINTENANCE) return;
         if (MAINTENANCE.isActive) {
-            if (!maintenanceOverlay && !(IS_ADMIN && adminDismissed)) {
+            // Never block an authenticated admin on admin-facing pages \u2014 they need
+            // the UI to manage the very feature that's blocking everybody else.
+            if (IS_ADMIN && isAdminPage()) {
+                if (maintenanceOverlay) removeMaintenanceOverlay();
+                return;
+            }
+            if (!maintenanceOverlay && !(IS_ADMIN && getAdminDismissed())) {
                 showMaintenanceOverlay(MAINTENANCE, IS_ADMIN);
             }
         } else {
-            adminDismissed = false;
+            setAdminDismissed(false);
             // If the overlay is showing, the user was blocked \u2014 smooth reconnect.
             // If not (admin had dismissed, or maintenance was never shown this session), just clean up.
             if (maintenanceOverlay) {
@@ -1242,7 +1259,7 @@
                     if (MAINTENANCE && MAINTENANCE.isActive
                         && maintenanceOverlay
                         && !document.body.contains(maintenanceOverlay)
-                        && !(IS_ADMIN && adminDismissed)) {
+                        && !(IS_ADMIN && getAdminDismissed())) {
                         document.body.appendChild(maintenanceOverlay);
                     }
                 });

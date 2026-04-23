@@ -5,16 +5,16 @@
     "owner": "Thomas05000005",
     "category": "General",
     "overview": "Premium maintenance overlay with live countdown and rich release notes.",
-    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), quick-add templates, emoji palette, markdown live preview, character counters. Preview button auto-saves the current form and renders the overlay with your real settings without activating maintenance.",
+    "description": "Premium cinema-themed maintenance overlay for Jellyfin. Full-screen velours-and-gold overlay with a drifting aurora background, a rotating film-reel logo, crackling ember particles and a brushed-metal card border. Live countdown adapts to the remaining time, time-based progress bar turns amber when you overshoot the window. Admin-configurable release notes (icon + title + markdown body, up to 20 sections), quick-add templates, emoji palette, markdown live preview, character counters. Overlay is suppressed on admin pages so admins can always access their UI. Preview button auto-saves then opens the overlay with your real settings.",
     "imageUrl": "",
     "versions": [
       {
-        "version": "0.1.8.0",
-        "checksum": "AC4100D327CA521605ACCAC5ACA98AD9",
-        "changelog": "v0.1.8 - Save chain made resilient: the maintenance fields now always persist, even if the general banner/preset config save fails (previously a broken banner URL would silently block the maintenance save). Preview button auto-saves before opening, so you always see your latest edits. Release-note templates: 6 quick-add buttons (Movies, Series, Update, Cleanup, Security, Network) to scaffold sections in one click.",
+        "version": "0.1.9.0",
+        "checksum": "EB52505C13F9DAC1EC4BE50C4383D40E",
+        "changelog": "v0.1.9 - Overlay no longer appears on admin pages (dashboard, configurationpage, plugins, users, etc.) so you can always access your UI while maintenance is active. Admin dismiss now persists in sessionStorage across reloads and SPA navigation within the same tab.",
         "targetAbi": "10.11.6.0",
-        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.8/MaintenanceDeluxe-v0.1.8.zip",
-        "timestamp": "2026-04-23T18:00:00"
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.1.9/MaintenanceDeluxe-v0.1.9.zip",
+        "timestamp": "2026-04-23T19:00:00"
       }
     ]
   }
