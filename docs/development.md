@@ -67,15 +67,33 @@ Safari in private mode and some Firefox configs refuse to download external font
 
 JavaScript Injector's `CustomJavaScriptController.cs` responds with `Content-Type: application/javascript` without a `charset`. Some browsers default to Latin-1 in that case, which would mangle French accents. Escaping every non-ASCII character in `banner.js` to a JS Unicode escape (`é`, `—`, etc.) sidesteps the issue entirely — the JS parser decodes the escape at parse time, regardless of the byte-level charset.
 
-A helper Python script (`_escape_all.py`, not committed) does the conversion before each build.
+The helper lives at `scripts/escape_non_ascii.py`. Run it in two modes:
+- `python scripts/escape_non_ascii.py <file.js>` — rewrites the file in place.
+- `python scripts/escape_non_ascii.py --check <file.js>` — exits 1 if any non-ASCII char is present (used by CI).
+
+## Continuous integration
+
+Two GitHub Actions workflows guard the repo:
+
+- **`.github/workflows/ci.yml`** — runs on every PR and push to `main`. Validates:
+  - C# compiles (`dotnet build --configuration Release`).
+  - `banner.js` contains only ASCII (via `scripts/escape_non_ascii.py --check`).
+  - `banner.js` is syntactically valid JS (`node --check`).
+  - The inline `<script>` block in `configPage.html` is syntactically valid JS (extracted via `scripts/check_inline_script.py` then `node --check`). This check would have caught the v0.1.11 and v0.1.12 regressions that silently froze the admin UI.
+  - The version string agrees across `MaintenanceDeluxe.csproj`, `deploy/MaintenanceDeluxe/meta.json`, and `manifest.json` (via `scripts/check_version_coherence.py`).
+
+- **`.github/workflows/release.yml`** — runs on any pushed tag matching `v*`. Re-runs all `ci.yml` checks as a gate, verifies the tag matches the declared versions, builds the DLL, zips it with `meta.json`, computes MD5, creates a GitHub release with the zip attached, patches `manifest.json` in place to set the real checksum + timestamp, and commits the patched manifest back to `main`.
 
 ## Publishing a new version
 
-1. Bump `<AssemblyVersion>` and `<FileVersion>` in `MaintenanceDeluxe.csproj`.
-2. Run the ASCII-escape helper on `banner.js` if you edited it.
-3. `dotnet build --configuration Release`.
-4. Zip `Jellyfin.Plugin.MaintenanceDeluxe.dll` + a matching `meta.json` into a flat archive.
-5. Compute the MD5 of the zip.
-6. `gh release create vX.Y.Z path/to/zip --title "vX.Y.Z" --notes "..."`.
-7. Update `manifest.json` at the repo root: bump `version`, `sourceUrl`, `checksum`, `timestamp`.
-8. Commit and push — Jellyfin clients that already added the manifest URL will see the update on their next catalog refresh.
+The workflow is now tag-driven. Everything the release workflow does is automated — you only decide the version number and changelog.
+
+1. `make bump V=X.Y.Z` — sets `<AssemblyVersion>` and `<FileVersion>` to `X.Y.Z.0`.
+2. Edit `deploy/MaintenanceDeluxe/meta.json`: update `version` to `X.Y.Z.0`, rewrite `changelog`, set `timestamp`.
+3. Prepend a new entry to the `versions` array in `manifest.json` at the repo root. The `checksum` and `timestamp` fields are filled in by the release workflow — leave them as placeholders (`""` is fine) or reuse the previous values; they get overwritten.
+4. If you edited `banner.js` and introduced non-ASCII characters, run `python scripts/escape_non_ascii.py Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js`.
+5. Commit everything, push `main`.
+6. `git tag vX.Y.Z && git push origin vX.Y.Z` — the release workflow fires on the tag, runs the full gate, builds, creates the GitHub release, patches `manifest.json`'s checksum+timestamp, and commits the patched file back to `main`.
+7. Wait for the workflow run to turn green on the Actions tab. Jellyfin clients that already added the manifest URL will see the new version on their next catalog refresh.
+
+To test the release pipeline without publishing a real version, push an rc tag: `git tag v0.2.0-rc1 && git push origin v0.2.0-rc1`. The workflow treats it like any `v*` tag.

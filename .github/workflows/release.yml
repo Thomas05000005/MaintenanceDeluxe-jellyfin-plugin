@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: build, package, release, update manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (tag)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"   # e.g. v0.2.0
+          VERSION="${TAG#v}"         # strip leading v -> 0.2.0
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "dll_version=${VERSION}.0" >> "$GITHUB_OUTPUT"
+
+      # ─── gate: reuse the CI checks so a broken tag never releases ───────────
+      - name: Check banner.js is ASCII-safe
+        run: python scripts/escape_non_ascii.py --check Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js
+
+      - name: Syntax check banner.js
+        run: node --check Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js
+
+      - name: Syntax check configPage.html inline scripts
+        run: |
+          python scripts/check_inline_script.py \
+            Jellyfin.Plugin.MaintenanceDeluxe/Configuration/configPage.html \
+            -o /tmp/configPage_inline.js
+          node --check /tmp/configPage_inline.js
+
+      - name: Version coherence (csproj / meta.json / manifest.json)
+        run: python scripts/check_version_coherence.py
+
+      - name: Tag matches csproj version
+        run: |
+          EXPECTED="${{ steps.version.outputs.dll_version }}"
+          ACTUAL=$(python scripts/check_version_coherence.py | awk -F': ' '/csproj/{print $2}')
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "error: tag ${{ steps.version.outputs.tag }} implies version $EXPECTED but csproj has $ACTUAL" >&2
+            exit 1
+          fi
+
+      # ─── build + package ────────────────────────────────────────────────────
+      - name: Build Release
+        run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+
+      - name: Stage deploy/MaintenanceDeluxe/
+        run: |
+          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll deploy/MaintenanceDeluxe/
+
+      - name: Create zip
+        id: zip
+        run: |
+          ZIP_NAME="MaintenanceDeluxe-${{ steps.version.outputs.tag }}.zip"
+          (cd deploy/MaintenanceDeluxe && zip -j "${GITHUB_WORKSPACE}/$ZIP_NAME" Jellyfin.Plugin.MaintenanceDeluxe.dll meta.json)
+          echo "name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "path=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Compute MD5 checksum
+        id: md5
+        run: |
+          CHECKSUM=$(md5sum "${{ steps.zip.outputs.path }}" | awk '{print toupper($1)}')
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "MD5: $CHECKSUM"
+
+      # ─── create GitHub release ──────────────────────────────────────────────
+      - name: Extract changelog from meta.json
+        id: changelog
+        run: |
+          python -c "import json; print(json.load(open('deploy/MaintenanceDeluxe/meta.json'))['changelog'])" > /tmp/changelog.txt
+          echo "path=/tmp/changelog.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "${{ steps.zip.outputs.path }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file "${{ steps.changelog.outputs.path }}"
+
+      # ─── patch manifest.json on main, commit back ──────────────────────────
+      - name: Switch to main and patch manifest.json
+        env:
+          TAG_VERSION: ${{ steps.version.outputs.dll_version }}
+          CHECKSUM: ${{ steps.md5.outputs.checksum }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          tag_version = os.environ["TAG_VERSION"]
+          checksum = os.environ["CHECKSUM"]
+          timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+          p = Path("manifest.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          top = data[0]["versions"][0]
+
+          if top["version"] != tag_version:
+              raise SystemExit(
+                  f"error: manifest.json versions[0].version is {top['version']!r} "
+                  f"but the tag implies {tag_version!r}. Refusing to patch — "
+                  f"main branch is out of sync with the released tag."
+              )
+
+          top["checksum"] = checksum
+          top["timestamp"] = timestamp
+          p.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          print(f"Patched manifest.json: version={tag_version}, checksum={checksum}, timestamp={timestamp}")
+          PY
+
+      - name: Commit manifest.json back to main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add manifest.json
+          if git diff --cached --quiet; then
+            echo "No manifest changes to commit (checksum and timestamp already current)."
+          else
+            git commit -m "chore: auto-update manifest.json checksum + timestamp for ${{ steps.version.outputs.tag }}"
+            git push origin main
+          fi
