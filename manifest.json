@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.1.1",
-        "checksum": "PENDING_RELEASE_PATCH",
+        "checksum": "3A03EB14D78E04265F337C9ADE949CF1",
         "changelog": "v0.3.1.1 - Patch CSS sur la liste blanche : les checkboxes natives Jellyfin (is='emby-checkbox') chevauchaient les noms d'utilisateurs en mode flex. Le widget passe en grid 2 colonnes (checkbox 1.6em fixe + label flex), checkboxes HTML natives avec sizing explicite, plus de chevauchement possible quel que soit le nombre d'utilisateurs.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.1.1/MaintenanceDeluxe-v0.3.1.1.zip",
-        "timestamp": "2026-04-28T00:00:00"
+        "timestamp": "2026-04-28T19:47:49"
       },
       {
         "version": "0.3.1.0",
