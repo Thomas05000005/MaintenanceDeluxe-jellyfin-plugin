@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
@@ -21,6 +23,7 @@ public class MaintenanceScheduleTask : IScheduledTask
 {
     private readonly IUserManager _userManager;
     private readonly ISystemManager _systemManager;
+    private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<MaintenanceScheduleTask> _logger;
 
     // One-time flag per process lifetime — reset on restart, which is the intended behaviour.
@@ -30,10 +33,12 @@ public class MaintenanceScheduleTask : IScheduledTask
     public MaintenanceScheduleTask(
         IUserManager userManager,
         ISystemManager systemManager,
+        IHttpClientFactory httpFactory,
         ILogger<MaintenanceScheduleTask> logger)
     {
         _userManager = userManager;
         _systemManager = systemManager;
+        _httpFactory = httpFactory;
         _logger = logger;
     }
 
@@ -88,6 +93,9 @@ public class MaintenanceScheduleTask : IScheduledTask
         {
             _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance activation triggered at {Time}.", now);
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
+            var freshMaint = Plugin.Instance?.Configuration.MaintenanceMode;
+            if (freshMaint is not null)
+                await WebhookNotifier.NotifyAsync(freshMaint.Webhook, WebhookEvent.Activated, freshMaint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
         }
 
         // Reload after possible activation.
@@ -102,7 +110,21 @@ public class MaintenanceScheduleTask : IScheduledTask
             && maint.IsActive)
         {
             _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance deactivation triggered at {Time}.", now);
+            // Snapshot counts before DeactivateAsync clears the lists.
+            var snapshot = new MaintenanceSetting
+            {
+                IsActive = maint.IsActive,
+                Message = maint.Message,
+                StatusUrl = maint.StatusUrl,
+                CustomTitle = maint.CustomTitle,
+                CustomSubtitle = maint.CustomSubtitle,
+                ScheduledRestart = maint.ScheduledRestart,
+                MaintenanceDisabledUserIds = new List<string>(maint.MaintenanceDisabledUserIds),
+                WhitelistedUserIds = new List<string>(maint.WhitelistedUserIds)
+            };
+            var hookSettings = maint.Webhook;
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
+            await WebhookNotifier.NotifyAsync(hookSettings, WebhookEvent.Deactivated, snapshot, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
 
             // Clear the schedule so the activation check doesn't immediately re-trigger.
             // Also clear ScheduledRestart if it was inside the window (admin's intent was likely

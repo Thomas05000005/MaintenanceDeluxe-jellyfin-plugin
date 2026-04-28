@@ -212,6 +212,12 @@ public class MaintenanceSetting
     [JsonPropertyName("maintenanceDisabledUserIds")]
     public List<string> MaintenanceDisabledUserIds { get; set; } = new();
 
+    /// <summary>Gets or sets the IDs of users excluded from maintenance disabling.
+    /// These users keep their access during maintenance (e.g. admin's family, on-call staff).
+    /// Edge case: a user added here AFTER activation remains disabled until the next toggle.</summary>
+    [JsonPropertyName("whitelistedUserIds")]
+    public List<string> WhitelistedUserIds { get; set; } = new();
+
     /// <summary>Gets or sets whether scheduled auto-activate/deactivate is enabled.</summary>
     [JsonPropertyName("scheduleEnabled")]
     public bool ScheduleEnabled { get; set; }
@@ -285,6 +291,107 @@ public class MaintenanceSetting
     /// <summary>Gets or sets the card border style: "full" (conic gold gradient, default) | "simple" (flat gold) | "none".</summary>
     [JsonPropertyName("borderStyle")]
     public string BorderStyle { get; set; } = "full";
+
+    /// <summary>Gets or sets the webhook notification settings (Discord, Slack, or generic).</summary>
+    [JsonPropertyName("webhook")]
+    public WebhookSettings Webhook { get; set; } = new();
+}
+
+/// <summary>
+/// Public-facing snapshot of maintenance state. Strips UUID lists and webhook URL so the
+/// unauthenticated <c>GET /MaintenanceDeluxe/maintenance</c> endpoint cannot leak user IDs
+/// or the webhook secret to the login page / banner script.
+/// </summary>
+public class PublicMaintenanceSnapshot
+{
+#pragma warning disable CS1591 // Public-facing fields mirror MaintenanceSetting; doc lives there.
+    [JsonPropertyName("isActive")]
+    public bool IsActive { get; set; }
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+    [JsonPropertyName("statusUrl")]
+    public string? StatusUrl { get; set; }
+    [JsonPropertyName("scheduleEnabled")]
+    public bool ScheduleEnabled { get; set; }
+    [JsonPropertyName("scheduledStart")]
+    public DateTime? ScheduledStart { get; set; }
+    [JsonPropertyName("scheduledEnd")]
+    public DateTime? ScheduledEnd { get; set; }
+    [JsonPropertyName("scheduledRestart")]
+    public DateTime? ScheduledRestart { get; set; }
+    [JsonPropertyName("activatedAt")]
+    public DateTime? ActivatedAt { get; set; }
+    [JsonPropertyName("customTitle")]
+    public string? CustomTitle { get; set; }
+    [JsonPropertyName("customSubtitle")]
+    public string? CustomSubtitle { get; set; }
+    [JsonPropertyName("releaseNotes")]
+    public List<ReleaseNoteSection> ReleaseNotes { get; set; } = new();
+    [JsonPropertyName("theme")]
+    public string Theme { get; set; } = "velours";
+    [JsonPropertyName("accentColor")]
+    public string? AccentColor { get; set; }
+    [JsonPropertyName("cardOpacity")]
+    public double CardOpacity { get; set; } = 0.72;
+    [JsonPropertyName("bgTint")]
+    public string? BgTint { get; set; }
+    [JsonPropertyName("animationSpeed")]
+    public string AnimationSpeed { get; set; } = "normal";
+    [JsonPropertyName("particleDensity")]
+    public string ParticleDensity { get; set; } = "normal";
+    [JsonPropertyName("particleCount")]
+    public int? ParticleCount { get; set; }
+    [JsonPropertyName("animationScale")]
+    public double? AnimationScale { get; set; }
+    [JsonPropertyName("borderStyle")]
+    public string BorderStyle { get; set; } = "full";
+
+    public static PublicMaintenanceSnapshot From(MaintenanceSetting m) => new()
+    {
+        IsActive = m.IsActive,
+        Message = m.Message,
+        StatusUrl = m.StatusUrl,
+        ScheduleEnabled = m.ScheduleEnabled,
+        ScheduledStart = m.ScheduledStart,
+        ScheduledEnd = m.ScheduledEnd,
+        ScheduledRestart = m.ScheduledRestart,
+        ActivatedAt = m.ActivatedAt,
+        CustomTitle = m.CustomTitle,
+        CustomSubtitle = m.CustomSubtitle,
+        ReleaseNotes = m.ReleaseNotes,
+        Theme = m.Theme,
+        AccentColor = m.AccentColor,
+        CardOpacity = m.CardOpacity,
+        BgTint = m.BgTint,
+        AnimationSpeed = m.AnimationSpeed,
+        ParticleDensity = m.ParticleDensity,
+        ParticleCount = m.ParticleCount,
+        AnimationScale = m.AnimationScale,
+        BorderStyle = m.BorderStyle
+    };
+#pragma warning restore CS1591
+}
+
+/// <summary>
+/// Webhook notification settings. Format (Discord / Slack / Generic) is auto-detected from the URL.
+/// </summary>
+public class WebhookSettings
+{
+    /// <summary>Gets or sets the webhook URL. Must be HTTPS. Null/empty = no webhook configured.</summary>
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether webhook notifications are sent.</summary>
+    [JsonPropertyName("enabled")]
+    public bool Enabled { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether to notify when maintenance activates. Default true.</summary>
+    [JsonPropertyName("notifyOnActivate")]
+    public bool NotifyOnActivate { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether to notify when maintenance deactivates. Default true.</summary>
+    [JsonPropertyName("notifyOnDeactivate")]
+    public bool NotifyOnDeactivate { get; set; } = true;
 }
 
 /// <summary>

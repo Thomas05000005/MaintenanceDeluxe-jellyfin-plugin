@@ -49,8 +49,10 @@ internal static class MaintenanceHelper
                 .Select(u => u.Id.ToString())
                 .ToList();
 
+            var whitelist = maint.WhitelistedUserIds ?? new List<string>();
             var toDisable = nonAdmins
                 .Where(u => !u.Permissions.Any(p => p.Kind == PermissionKind.IsDisabled && p.Value))
+                .Where(u => !whitelist.Contains(u.Id.ToString()))
                 .ToList();
 
             var successfullyDisabled = new List<string>();

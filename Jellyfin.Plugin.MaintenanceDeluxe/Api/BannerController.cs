@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 using MediaBrowser.Controller.Library;
@@ -17,12 +21,14 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 /// <summary>
 /// REST API for the MaintenanceDeluxe plugin.
 /// <list type="bullet">
-///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (read-only state for the login-page overlay)</item>
+///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (UUID-stripped snapshot for the login-page overlay)</item>
 ///   <item><c>GET /MaintenanceDeluxe/banner.js</c> — public (script injected on every page; same bytes as the JavaScriptInjector copy)</item>
 ///   <item><c>GET /MaintenanceDeluxe/preview.html</c> — public (HTML shell consumed by the admin live-preview iframe; iframe navigation does not carry Authorization headers)</item>
 ///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (full plugin config, only authenticated clients)</item>
 ///   <item><c>POST /MaintenanceDeluxe/config</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only write)</item>
 ///   <item><c>POST /MaintenanceDeluxe/maintenance</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only toggle)</item>
+///   <item><c>POST /MaintenanceDeluxe/maintenance/test-webhook</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only webhook check)</item>
+///   <item><c>GET /MaintenanceDeluxe/users-summary</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only users list for the whitelist widget)</item>
 /// </list>
 /// </summary>
 [ApiController]
@@ -30,12 +36,18 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 public class BannerController : ControllerBase
 {
     private readonly IUserManager _userManager;
+    private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<BannerController> _logger;
 
+    // Per-IP rate-limit for /test-webhook (1 call / 5s).
+    private static readonly ConcurrentDictionary<string, DateTime> _testWebhookLastCall = new();
+    private static readonly TimeSpan _testWebhookCooldown = TimeSpan.FromSeconds(5);
+
     /// <summary>Initializes a new instance of <see cref="BannerController"/>.</summary>
-    public BannerController(IUserManager userManager, ILogger<BannerController> logger)
+    public BannerController(IUserManager userManager, IHttpClientFactory httpFactory, ILogger<BannerController> logger)
     {
         _userManager = userManager;
+        _httpFactory = httpFactory;
         _logger = logger;
     }
 
@@ -190,16 +202,19 @@ public class BannerController : ControllerBase
 
     /// <summary>Returns the current maintenance mode configuration.
     /// Public (no [Authorize]) so the login-page overlay works for unauthenticated users.
+    /// Returns a stripped-down snapshot — UUID lists (whitelist, disabled, pre-disabled)
+    /// and webhook URL are excluded so they never leak to anonymous callers.
     /// Returns 503 if the plugin instance is not yet initialised.</summary>
     [HttpGet("maintenance")]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public ActionResult<MaintenanceSetting> GetMaintenance()
+    public ActionResult<PublicMaintenanceSnapshot> GetMaintenance()
     {
         if (Plugin.Instance is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
-        return Ok(Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting());
+        var maint = Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting();
+        return Ok(PublicMaintenanceSnapshot.From(maint));
     }
 
     /// <summary>Saves the maintenance mode configuration. Handles user enable/disable transitions server-side.</summary>
@@ -223,6 +238,14 @@ public class BannerController : ControllerBase
             && maintenance.ScheduledEnd.Value <= maintenance.ScheduledStart.Value)
             return BadRequest("scheduledEnd must be after scheduledStart.");
 
+        // Webhook URL must be https:// (no http:// — secrets in webhook tokens must not transit cleartext).
+        if (maintenance.Webhook is not null && !string.IsNullOrWhiteSpace(maintenance.Webhook.Url))
+        {
+            if (!Uri.TryCreate(maintenance.Webhook.Url, UriKind.Absolute, out var hookUri)
+                || hookUri.Scheme != Uri.UriSchemeHttps)
+                return BadRequest("Webhook URL must be a valid https:// URL.");
+        }
+
         var config = Plugin.Instance.Configuration;
         var wasActive = config.MaintenanceMode.IsActive;
 
@@ -233,6 +256,15 @@ public class BannerController : ControllerBase
         config.MaintenanceMode.ScheduledStart = maintenance.ScheduledStart;
         config.MaintenanceMode.ScheduledEnd = maintenance.ScheduledEnd;
         config.MaintenanceMode.ScheduledRestart = maintenance.ScheduledRestart;
+
+        // Whitelist: only keep well-formed GUIDs to prevent garbage drifting in.
+        config.MaintenanceMode.WhitelistedUserIds = (maintenance.WhitelistedUserIds ?? new())
+            .Where(id => Guid.TryParse(id, out _))
+            .Distinct()
+            .ToList();
+
+        // Webhook settings — Url already validated above as https:// or empty.
+        config.MaintenanceMode.Webhook = maintenance.Webhook ?? new WebhookSettings();
 
         // Rich overlay content — normalised (trim/truncate/whitelist) before persistence.
         config.MaintenanceMode.CustomTitle = NormaliseOptionalString(maintenance.CustomTitle, MaxTitleLength);
@@ -258,12 +290,26 @@ public class BannerController : ControllerBase
             Plugin.Instance.UpdateConfiguration(config);
             Plugin.Instance.SaveConfiguration();
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
+            await WebhookNotifier.NotifyAsync(
+                Plugin.Instance.Configuration.MaintenanceMode.Webhook,
+                WebhookEvent.Activated,
+                Plugin.Instance.Configuration.MaintenanceMode,
+                _httpFactory,
+                _logger).ConfigureAwait(false);
         }
         else if (wasActive && !maintenance.IsActive)
         {
+            // Snapshot counts BEFORE deactivation clears the lists.
+            var snapshotForNotif = ClonePublicFields(Plugin.Instance.Configuration.MaintenanceMode);
             Plugin.Instance.UpdateConfiguration(config);
             Plugin.Instance.SaveConfiguration();
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
+            await WebhookNotifier.NotifyAsync(
+                Plugin.Instance.Configuration.MaintenanceMode.Webhook,
+                WebhookEvent.Deactivated,
+                snapshotForNotif,
+                _httpFactory,
+                _logger).ConfigureAwait(false);
         }
         else
         {
@@ -273,6 +319,75 @@ public class BannerController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>Sends a test payload to the supplied webhook URL. Rate-limited to 1 call / 5 s per IP.</summary>
+    [HttpPost("maintenance/test-webhook")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> TestWebhook([FromBody] TestWebhookRequest body, CancellationToken ct)
+    {
+        if (body is null || string.IsNullOrWhiteSpace(body.Url))
+            return BadRequest(new { error = "Webhook URL is required." });
+
+        if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+            return BadRequest(new { error = "Webhook URL must be a valid https:// URL." });
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var now = DateTime.UtcNow;
+        if (_testWebhookLastCall.TryGetValue(ip, out var last) && now - last < _testWebhookCooldown)
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Patiente quelques secondes avant un nouveau test." });
+        _testWebhookLastCall[ip] = now;
+
+        var (status, response) = await WebhookNotifier.TestAsync(body.Url, _httpFactory, _logger, ct).ConfigureAwait(false);
+        return Ok(new { statusCode = status, body = response });
+    }
+
+    /// <summary>Returns a lightweight summary of all Jellyfin users for the whitelist multi-select widget.</summary>
+    [HttpGet("users-summary")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetUsersSummary()
+    {
+        var users = _userManager.Users
+            .Select(u => new
+            {
+                id = u.Id.ToString(),
+                name = u.Username,
+                isAdministrator = u.Permissions.Any(p => p.Kind == Jellyfin.Database.Implementations.Enums.PermissionKind.IsAdministrator && p.Value),
+                isDisabled = u.Permissions.Any(p => p.Kind == Jellyfin.Database.Implementations.Enums.PermissionKind.IsDisabled && p.Value)
+            })
+            .OrderBy(u => u.name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Ok(users);
+    }
+
+    /// <summary>Body shape for the test-webhook endpoint.</summary>
+    public class TestWebhookRequest
+    {
+        /// <summary>Gets or sets the webhook URL to test.</summary>
+        public string? Url { get; set; }
+    }
+
+    /// <summary>Snapshots the count-bearing fields of MaintenanceSetting so a deactivation
+    /// notification can report accurate counts even after the lists have been cleared.</summary>
+    private static MaintenanceSetting ClonePublicFields(MaintenanceSetting m) => new()
+    {
+        IsActive = m.IsActive,
+        Message = m.Message,
+        StatusUrl = m.StatusUrl,
+        CustomTitle = m.CustomTitle,
+        CustomSubtitle = m.CustomSubtitle,
+        ScheduledStart = m.ScheduledStart,
+        ScheduledEnd = m.ScheduledEnd,
+        ScheduledRestart = m.ScheduledRestart,
+        ActivatedAt = m.ActivatedAt,
+        MaintenanceDisabledUserIds = new List<string>(m.MaintenanceDisabledUserIds),
+        WhitelistedUserIds = new List<string>(m.WhitelistedUserIds)
+    };
 
     private static readonly HashSet<string> _validScheduleTypes =
         new(StringComparer.Ordinal) { "always", "fixed", "annual", "weekly", "daily" };

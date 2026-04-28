@@ -1144,6 +1144,48 @@
                 <div class="fieldDescription" style="margin-top:0.6em;opacity:.6">L'aperçu utilise les valeurs du formulaire actuel (pas la config enregistrée). Il se met à jour en direct à chaque modification.</div>
               </div>
 
+              <!-- Section Notifications (webhook Discord / Slack / générique) -->
+              <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Notifications</h3>
+                <div class="fieldDescription" style="margin-bottom:1.2em">
+                  Envoie une notification à un webhook à chaque activation/désactivation de la maintenance. Le format (Discord, Slack, ou générique JSON) est auto-détecté à partir de l'URL.
+                </div>
+                <div class="inputContainer" style="margin-bottom:0.8em">
+                  <label class="inputLabel inputLabelUnfocused" for="webhookUrl">URL du webhook</label>
+                  <input id="webhookUrl" is="emby-input" type="url" placeholder="https://discord.com/api/webhooks/... ou https://hooks.slack.com/services/..." />
+                  <div class="fieldDescription">HTTPS uniquement. Laisse vide pour désactiver complètement.</div>
+                </div>
+                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.4em">
+                  <input id="webhookEnabled" type="checkbox" is="emby-checkbox" />
+                  <span>Activer les notifications</span>
+                </label>
+                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.4em">
+                  <input id="webhookNotifyOnActivate" type="checkbox" is="emby-checkbox" checked />
+                  <span>Notifier à l'activation de la maintenance</span>
+                </label>
+                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.8em">
+                  <input id="webhookNotifyOnDeactivate" type="checkbox" is="emby-checkbox" checked />
+                  <span>Notifier à la désactivation de la maintenance</span>
+                </label>
+                <button type="button" id="webhookTestBtn" class="jf-reset-btn">
+                  <span class="material-icons">send</span>
+                  Tester la notification
+                </button>
+                <div id="webhookTestResult" style="margin-top:0.6em;font-size:13px;display:none"></div>
+              </div>
+
+              <!-- Section Liste blanche -->
+              <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Liste blanche</h3>
+                <div class="fieldDescription" style="margin-bottom:1.2em">
+                  Les utilisateurs cochés ici <b>conserveront leur accès</b> pendant la maintenance. Idéal pour ta famille, l'équipe d'astreinte ou un compte de test.<br>
+                  <i style="opacity:.7">Note : un utilisateur ajouté à la liste blanche après le démarrage de la maintenance restera désactivé jusqu'au prochain toggle.</i>
+                </div>
+                <div id="whitelistContainer" style="display:flex;flex-direction:column;gap:0.4em;max-height:280px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:0.6em;background:rgba(0,0,0,0.18)">
+                  <div style="opacity:.6;font-style:italic">Chargement…</div>
+                </div>
+              </div>
+
               <div id="jf-maintenance-affected" style="margin-bottom:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
                 <details>
                   <summary><span id="jf-maintenance-affected-summary">Utilisateurs affectés</span></summary>
@@ -3215,7 +3257,9 @@
               particleDensity: app.particleDensity,
               borderStyle: app.borderStyle,
               animationScale: app.animationScale,
-              particleCount: app.particleCount
+              particleCount: app.particleCount,
+              whitelistedUserIds: (typeof getCheckedWhitelist === 'function') ? getCheckedWhitelist() : [],
+              webhook: (typeof getWebhookFromUi === 'function') ? getWebhookFromUi() : null
             };
           }
 
@@ -3495,6 +3539,54 @@
             if (addBtn) addBtn.addEventListener('click', function () { setTimeout(queuePreviewUpdate, 0); });
             var resetBtn = document.getElementById('appResetDefaults');
             if (resetBtn) resetBtn.addEventListener('click', function () { setTimeout(queuePreviewUpdate, 0); });
+
+            // Webhook test button — POSTs to /test-webhook and shows the response inline.
+            var testBtn = document.getElementById('webhookTestBtn');
+            if (testBtn) {
+              testBtn.addEventListener('click', function () {
+                var urlEl = document.getElementById('webhookUrl');
+                var resultEl = document.getElementById('webhookTestResult');
+                var url = (urlEl && urlEl.value || '').trim();
+                if (!resultEl) return;
+                resultEl.style.display = 'block';
+                if (!url) {
+                  resultEl.style.color = '#e6a817';
+                  resultEl.textContent = 'Entre d’abord une URL de webhook.';
+                  return;
+                }
+                if (url.indexOf('https://') !== 0) {
+                  resultEl.style.color = '#e6a817';
+                  resultEl.textContent = 'L’URL du webhook doit commencer par https://.';
+                  return;
+                }
+                resultEl.style.color = '';
+                resultEl.textContent = 'Envoi en cours…';
+                testBtn.disabled = true;
+                ApiClient.ajax({
+                  type: 'POST',
+                  url: ApiClient.getUrl('MaintenanceDeluxe/maintenance/test-webhook'),
+                  data: JSON.stringify({ url: url }),
+                  contentType: 'application/json',
+                  dataType: 'json'
+                }).then(function (resp) {
+                  testBtn.disabled = false;
+                  var status = resp && resp.statusCode;
+                  if (status >= 200 && status < 300) {
+                    resultEl.style.color = '#4CAF50';
+                    resultEl.textContent = '✅ Notification envoyée (HTTP ' + status + '). Vérifie ton canal Discord/Slack.';
+                  } else {
+                    resultEl.style.color = '#c47';
+                    var bodyPreview = (resp && resp.body) ? String(resp.body).slice(0, 200) : '';
+                    resultEl.textContent = '❌ Échec (HTTP ' + (status || '?') + ') : ' + bodyPreview;
+                  }
+                }).catch(function (err) {
+                  testBtn.disabled = false;
+                  resultEl.style.color = '#c47';
+                  var msg = (err && err.statusText) || (err && err.message) || 'Erreur réseau.';
+                  resultEl.textContent = '❌ ' + msg;
+                });
+              });
+            }
           }
 
           // Wires the color picker <-> hex text sync, opacity slider display,
@@ -3588,6 +3680,109 @@
             }
           }
 
+          // ── Whitelist users widget ────────────────────────────────────────
+          var _whitelistUsersCache = null;
+
+          function renderWhitelistWidget(users, checkedIds) {
+            var container = document.getElementById('whitelistContainer');
+            if (!container) return;
+            checkedIds = checkedIds || [];
+            var checkedSet = {};
+            checkedIds.forEach(function (id) { checkedSet[id] = true; });
+            var knownSet = {};
+            users.forEach(function (u) { knownSet[u.id] = true; });
+
+            var ghosts = checkedIds.filter(function (id) { return !knownSet[id]; });
+
+            if (!users.length && !ghosts.length) {
+              container.innerHTML = '<div style="opacity:.6;font-style:italic">Aucun utilisateur Jellyfin trouvé.</div>';
+              return;
+            }
+
+            var html = users.map(function (u) {
+              var checked = checkedSet[u.id] ? ' checked' : '';
+              var adminBadge = u.isAdministrator
+                ? ' <span style="font-size:11px;opacity:.6;margin-left:0.4em">(admin — toujours actif)</span>'
+                : '';
+              var disabledBadge = u.isDisabled && !u.isAdministrator
+                ? ' <span style="font-size:11px;opacity:.6;margin-left:0.4em">(actuellement désactivé)</span>'
+                : '';
+              return '<label class="emby-checkbox-label" style="display:flex;align-items:center;gap:0.5em;padding:0.2em 0;cursor:pointer">'
+                + '<input type="checkbox" is="emby-checkbox" class="jf-whitelist-checkbox" data-user-id="' + escAttr(u.id) + '"' + checked + ' />'
+                + '<span>' + escHtml(u.name) + adminBadge + disabledBadge + '</span>'
+                + '</label>';
+            }).join('');
+
+            ghosts.forEach(function (id) {
+              html += '<div style="display:flex;align-items:center;gap:0.5em;opacity:.7;font-style:italic;padding:0.2em 0">'
+                + '<span>Utilisateur supprimé (' + escHtml(id) + ')</span>'
+                + '<button type="button" class="jf-reset-btn jf-whitelist-remove-ghost" data-ghost-id="' + escAttr(id) + '" style="margin-left:auto;padding:0.2em 0.5em;font-size:11px">Retirer</button>'
+                + '</div>';
+            });
+
+            container.innerHTML = html;
+
+            container.querySelectorAll('.jf-whitelist-remove-ghost').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                btn.parentElement.remove();
+              });
+            });
+          }
+
+          function loadWhitelistWidget(checkedIds) {
+            var container = document.getElementById('whitelistContainer');
+            if (!container) return;
+            if (_whitelistUsersCache) {
+              renderWhitelistWidget(_whitelistUsersCache, checkedIds);
+              return;
+            }
+            ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/users-summary'))
+              .then(function (users) {
+                _whitelistUsersCache = users || [];
+                renderWhitelistWidget(_whitelistUsersCache, checkedIds);
+              })
+              .catch(function () {
+                container.innerHTML = '<div style="opacity:.6;font-style:italic;color:#c47">Impossible de charger les utilisateurs.</div>';
+              });
+          }
+
+          function getCheckedWhitelist() {
+            var result = [];
+            document.querySelectorAll('.jf-whitelist-checkbox').forEach(function (cb) {
+              if (cb.checked) result.push(cb.getAttribute('data-user-id'));
+            });
+            // Preserve ghost IDs that weren't manually removed.
+            document.querySelectorAll('.jf-whitelist-remove-ghost').forEach(function (btn) {
+              var id = btn.getAttribute('data-ghost-id');
+              if (id && result.indexOf(id) === -1) result.push(id);
+            });
+            return result;
+          }
+
+          // ── Webhook UI ────────────────────────────────────────────────────
+          function applyWebhookUi(webhook) {
+            var w = webhook || {};
+            var urlEl = document.getElementById('webhookUrl');
+            var enabledEl = document.getElementById('webhookEnabled');
+            var notifActEl = document.getElementById('webhookNotifyOnActivate');
+            var notifDeactEl = document.getElementById('webhookNotifyOnDeactivate');
+            if (urlEl) urlEl.value = w.url || '';
+            if (enabledEl) enabledEl.checked = !!w.enabled;
+            if (notifActEl) notifActEl.checked = w.notifyOnActivate !== false;
+            if (notifDeactEl) notifDeactEl.checked = w.notifyOnDeactivate !== false;
+          }
+
+          function getWebhookFromUi() {
+            return {
+              url: (document.getElementById('webhookUrl').value || '').trim() || null,
+              enabled: !!document.getElementById('webhookEnabled').checked,
+              notifyOnActivate: !!document.getElementById('webhookNotifyOnActivate').checked,
+              notifyOnDeactivate: !!document.getElementById('webhookNotifyOnDeactivate').checked
+            };
+          }
+
+          function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
           function applyMaintenanceUi(m) {
             var badge = document.getElementById('maintenanceStatusBadge');
             var msgInput = document.getElementById('maintenanceMessage');
@@ -3617,6 +3812,8 @@
               renderReleaseNotes(m.releaseNotes || []);
 
               applyAppearanceUi(m);
+              applyWebhookUi(m.webhook);
+              loadWhitelistWidget(m.whitelistedUserIds || []);
             }
 
             var affectedSummary = document.getElementById('jf-maintenance-affected-summary');
@@ -3718,12 +3915,16 @@
                 particleDensity: appearance.particleDensity,
                 borderStyle: appearance.borderStyle,
                 animationScale: appearance.animationScale,
-                particleCount: appearance.particleCount
+                particleCount: appearance.particleCount,
+                whitelistedUserIds: getCheckedWhitelist(),
+                webhook: getWebhookFromUi()
               }),
               contentType: 'application/json'
             }).then(function () {
-              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/maintenance'))
-                .then(function (m) { applyMaintenanceUi(m); });
+              // Re-fetch /config (admin-only) so we get the FULL maintenanceMode including
+              // UUID lists; the public /maintenance endpoint strips those for privacy.
+              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+                .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
             });
           }
 
@@ -3758,13 +3959,13 @@
             .addEventListener('pageshow', function () {
               initDom();
               checkDependencies();
-              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config')).then(
-                function (config) {
+              // /config is admin-only and contains the FULL maintenanceMode including UUID lists.
+              // /maintenance (public) strips them for privacy, so the admin UI must use /config.
+              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+                .then(function (config) {
                   populatePage(config);
-                }
-              );
-              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/maintenance'))
-                .then(function (m) { applyMaintenanceUi(m); })
+                  applyMaintenanceUi(config && config.maintenanceMode);
+                })
                 .catch(function () {});
             });
         })();

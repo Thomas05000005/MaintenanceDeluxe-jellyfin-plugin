@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.3.1.0",
+        "checksum": "PENDING_RELEASE_PATCH",
+        "changelog": "v0.3.1 - Webhooks Discord/Slack + whitelist utilisateurs. (1) Notifications webhook : envoie un payload HTTP a chaque activation/desactivation de maintenance. Format Discord, Slack ou JSON generique auto-detecte depuis l'URL. Bouton 'Tester la notification' avec rate-limit 1 appel/5s par IP. URL HTTPS uniquement (pas de http://). Si le webhook est down, la maintenance s'active/se desactive quand meme - le webhook ne peut jamais bloquer le toggle. Doc payloads : docs/webhooks.md. (2) Liste blanche utilisateurs : nouveau widget multi-select dans la section Maintenance qui liste tous les utilisateurs Jellyfin. Les utilisateurs coches conservent leur acces pendant la maintenance (parfait pour la famille, l'astreinte, un compte de test). Les utilisateurs supprimes apparaissent en italique avec un bouton 'Retirer'. Edge case : un user ajoute apres l'activation reste desactive jusqu'au prochain toggle. (3) Privacy : l'endpoint public /MaintenanceDeluxe/maintenance ne renvoie plus les listes UUID (whitelist, disabled, pre-disabled) ni l'URL webhook - elles ne fuitent plus aux callers anonymes. Le admin UI passe par /config (auth) qui contient le state complet. (4) Backend : nouveau WebhookNotifier statique avec timeout 5s + 1 retry. Endpoint POST /maintenance/test-webhook et GET /users-summary, tous deux RequiresElevation.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.1/MaintenanceDeluxe-v0.3.1.zip",
+        "timestamp": "2026-04-28T00:00:00"
+      },
+      {
         "version": "0.3.0.0",
         "checksum": "1D5FC99FDF9E758AD395A2F6CEB1FFC5",
         "changelog": "v0.3.0 - Quality release: bug fixes + anti-data-loss + French admin UI. (1) Bugs: BannerController endpoints now return 503 if the plugin instance is not yet initialised instead of serving phantom defaults; ScheduledRestart is preserved when set after a maintenance window (only cleared if it was inside the window); MutationObserver and hideScrollObserver are now properly torn down on pagehide (no more memory leak after long sessions); live-preview postMessage receiver enforces same-origin checks (no cross-origin injection of overlay config). (2) Anti-data-loss: orange dot badge next to Save when there are unsaved changes, browser warning if you try to close the tab with unsaved changes, automatic localStorage draft autosaved every 500ms with restore prompt on next load, inline validation that flags scheduledEnd before scheduledStart and scheduledRestart in the past. (3) French admin UI: the Maintenance tab, Save button, save-confirmation modal, alerts and validations are fully translated to French. (4) The live-preview iframe now shows a clear fallback after a 5s timeout if the iframe never reports ready.",
