@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.3.1.1",
+        "checksum": "PENDING_RELEASE_PATCH",
+        "changelog": "v0.3.1.1 - Patch CSS sur la liste blanche : les checkboxes natives Jellyfin (is='emby-checkbox') chevauchaient les noms d'utilisateurs en mode flex. Le widget passe en grid 2 colonnes (checkbox 1.6em fixe + label flex), checkboxes HTML natives avec sizing explicite, plus de chevauchement possible quel que soit le nombre d'utilisateurs.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.1.1/MaintenanceDeluxe-v0.3.1.1.zip",
+        "timestamp": "2026-04-28T00:00:00"
+      },
+      {
         "version": "0.3.1.0",
         "checksum": "EA5D22133DBF54B1298C01E3129ED26E",
         "changelog": "v0.3.1 - Webhooks Discord/Slack + whitelist utilisateurs. (1) Notifications webhook : envoie un payload HTTP a chaque activation/desactivation de maintenance. Format Discord, Slack ou JSON generique auto-detecte depuis l'URL. Bouton 'Tester la notification' avec rate-limit 1 appel/5s par IP. URL HTTPS uniquement (pas de http://). Si le webhook est down, la maintenance s'active/se desactive quand meme - le webhook ne peut jamais bloquer le toggle. Doc payloads : docs/webhooks.md. (2) Liste blanche utilisateurs : nouveau widget multi-select dans la section Maintenance qui liste tous les utilisateurs Jellyfin. Les utilisateurs coches conservent leur acces pendant la maintenance (parfait pour la famille, l'astreinte, un compte de test). Les utilisateurs supprimes apparaissent en italique avec un bouton 'Retirer'. Edge case : un user ajoute apres l'activation reste desactive jusqu'au prochain toggle. (3) Privacy : l'endpoint public /MaintenanceDeluxe/maintenance ne renvoie plus les listes UUID (whitelist, disabled, pre-disabled) ni l'URL webhook - elles ne fuitent plus aux callers anonymes. Le admin UI passe par /config (auth) qui contient le state complet. (4) Backend : nouveau WebhookNotifier statique avec timeout 5s + 1 retry. Endpoint POST /maintenance/test-webhook et GET /users-summary, tous deux RequiresElevation.",

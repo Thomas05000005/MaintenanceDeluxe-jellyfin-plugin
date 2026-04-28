@@ -3707,9 +3707,9 @@
               var disabledBadge = u.isDisabled && !u.isAdministrator
                 ? ' <span style="font-size:11px;opacity:.6;margin-left:0.4em">(actuellement désactivé)</span>'
                 : '';
-              return '<label class="emby-checkbox-label" style="display:flex;align-items:center;gap:0.5em;padding:0.2em 0;cursor:pointer">'
-                + '<input type="checkbox" is="emby-checkbox" class="jf-whitelist-checkbox" data-user-id="' + escAttr(u.id) + '"' + checked + ' />'
-                + '<span>' + escHtml(u.name) + adminBadge + disabledBadge + '</span>'
+              return '<label style="display:grid;grid-template-columns:1.6em 1fr;align-items:center;gap:0.6em;padding:0.25em 0.2em;cursor:pointer;border-radius:4px">'
+                + '<input type="checkbox" class="jf-whitelist-checkbox" data-user-id="' + escAttr(u.id) + '"' + checked + ' style="width:1.1em;height:1.1em;cursor:pointer;margin:0" />'
+                + '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(u.name) + adminBadge + disabledBadge + '</span>'
                 + '</label>';
             }).join('');
 

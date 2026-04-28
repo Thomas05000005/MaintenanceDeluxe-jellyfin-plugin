@@ -36,11 +36,19 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          TAG="${GITHUB_REF_NAME}"   # e.g. v0.2.0
-          VERSION="${TAG#v}"         # strip leading v -> 0.2.0
+          TAG="${GITHUB_REF_NAME}"   # e.g. v0.2.0 or v0.3.1.1
+          VERSION="${TAG#v}"         # strip leading v -> 0.2.0 / 0.3.1.1
+          # AssemblyVersion is W.X.Y.Z (4 parts max). If the tag already has 4 parts,
+          # use as-is; otherwise pad with .0 to reach 4 parts.
+          DOTS=$(echo "$VERSION" | tr -cd . | wc -c)
+          if [ "$DOTS" -ge 3 ]; then
+            DLL_VERSION="$VERSION"
+          else
+            DLL_VERSION="${VERSION}.0"
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "dll_version=${VERSION}.0" >> "$GITHUB_OUTPUT"
+          echo "dll_version=$DLL_VERSION" >> "$GITHUB_OUTPUT"
 
       # ─── gate: reuse the CI checks so a broken tag never releases ───────────
       - name: Check banner.js is ASCII-safe
