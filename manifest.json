@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.3.2.0",
+        "checksum": "PENDING_RELEASE_PATCH",
+        "changelog": "v0.3.2 - Power-user features + filet de securite tests. (1) Export / Import config JSON : bouton Exporter dans le tab Maintenance qui telecharge la config en JSON (URL webhook strippee par <redacted>). Bouton Importer ouvre une preview modal avec validation (refus si webhook URL pas redacted). L'import touche que le formulaire, le serveur reste intact tant que tu n'as pas clique Enregistrer. (2) Uptime Kuma helper : bouton 'Construire depuis Uptime Kuma' a cote du champ URL de statut. Modal qui demande l'URL de l'instance + slug, genere l'URL finale et permet de la tester via HEAD no-cors. (3) Validation contraste WCAG : warning soft sous le picker de couleur d'accent si le ratio avec le fond est < 4.5:1 (norme AA). Calcul de luminance relative selon la formule officielle WCAG 2.1. (4) Projet de tests xUnit : 61 tests unitaires sur les fonctions pures (DetectFormat, NormaliseHexColor, NormaliseTheme, NormaliseAnimationSpeed/ParticleDensity/BorderStyle, NormaliseReleaseNotes, IsUrlSafe). Etape dotnet test ajoutee au workflow CI - aucune PR ne pourra plus casser une normalisation sans s'en rendre compte. (5) CHANGELOG.md au format Keep a Changelog avec backfill complet depuis v0.2.0.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.2/MaintenanceDeluxe-v0.3.2.zip",
+        "timestamp": "2026-04-28T00:00:00"
+      },
+      {
         "version": "0.3.1.1",
         "checksum": "3A03EB14D78E04265F337C9ADE949CF1",
         "changelog": "v0.3.1.1 - Patch CSS sur la liste blanche : les checkboxes natives Jellyfin (is='emby-checkbox') chevauchaient les noms d'utilisateurs en mode flex. Le widget passe en grid 2 colonnes (checkbox 1.6em fixe + label flex), checkboxes HTML natives avec sizing explicite, plus de chevauchement possible quel que soit le nombre d'utilisateurs.",

@@ -35,6 +35,9 @@ jobs:
       - name: Build (Release)
         run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
 
+      - name: Run xUnit tests
+        run: dotnet test --configuration Release Jellyfin.Plugin.MaintenanceDeluxe.Tests/Jellyfin.Plugin.MaintenanceDeluxe.Tests.csproj --logger "console;verbosity=normal"
+
       - name: Check banner.js is ASCII-safe
         run: python scripts/escape_non_ascii.py --check Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js
 

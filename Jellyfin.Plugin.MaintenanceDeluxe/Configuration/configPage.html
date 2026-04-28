@@ -984,7 +984,13 @@
                 <label class="inputLabel inputLabelUnfocused" for="maintenanceStatusUrl">URL de la page de statut (optionnel)</label>
                 <input id="maintenanceStatusUrl" is="emby-input" type="url"
                   placeholder="https://status.example.com" />
-                <div class="fieldDescription">Affichée comme un lien dans l'overlay pour permettre aux utilisateurs de consulter le statut du serveur.</div>
+                <div class="fieldDescription" style="display:flex;justify-content:space-between;align-items:center;gap:0.6em;flex-wrap:wrap">
+                  <span>Affichée comme un lien dans l'overlay pour permettre aux utilisateurs de consulter le statut du serveur.</span>
+                  <button type="button" id="mdKumaBtn" class="jf-reset-btn" style="font-size:12px;padding:4px 10px">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle">analytics</span>
+                    Construire depuis Uptime Kuma
+                  </button>
+                </div>
               </div>
 
               <!-- ── Contenu de l'overlay (titre, sous-titre, notes de version) ─ -->
@@ -1062,6 +1068,7 @@
                       <input id="appAccentColorHex" is="emby-input" type="text" maxlength="7" placeholder="#C9A96E" style="flex:1;font-family:monospace;text-transform:uppercase" />
                     </div>
                     <div class="fieldDescription">Pilote toutes les touches dorées. Les variantes sont dérivées automatiquement.</div>
+                    <div id="mdContrastWarning" style="display:none;margin-top:0.3em;font-size:12px;color:#e6a817"></div>
                   </div>
 
                   <div class="inputContainer">
@@ -1225,8 +1232,72 @@
                 </div>
               </div>
 
+              <!-- Section Sauvegarde / Restauration -->
+              <div style="margin-top:1.6em;padding-top:1.2em;border-top:1px solid rgba(255,255,255,0.07)">
+                <h3 class="sectionTitle" style="margin-bottom:0.5em">Sauvegarde de la configuration</h3>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                  Exporte la config actuelle au format JSON pour la sauvegarder ou la copier sur un autre serveur. <b>L'URL du webhook est strippée à l'export</b> ; elle reste intacte sur le serveur lors d'un import.
+                </div>
+                <div style="display:flex;gap:0.6em;flex-wrap:wrap">
+                  <button type="button" id="mdExportConfigBtn" class="jf-reset-btn">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle">file_download</span>
+                    Exporter la config
+                  </button>
+                  <button type="button" id="mdImportConfigBtn" class="jf-reset-btn">
+                    <span class="material-icons" style="font-size:16px;vertical-align:middle">file_upload</span>
+                    Importer une config
+                  </button>
+                  <input type="file" id="mdImportFileInput" accept="application/json,.json" style="display:none" />
+                </div>
+                <div id="mdConfigIoResult" style="margin-top:0.6em;display:none;font-size:13px"></div>
+              </div>
+
             </div>
             <!-- /panel: maintenance -->
+
+            <!-- ── Modal: Uptime Kuma URL builder ─────────────────────────── -->
+            <div id="mdKumaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
+              <div style="background:#222;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:1.4em;max-width:520px;width:100%">
+                <h3 style="margin-top:0">Construire l'URL Uptime Kuma</h3>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                  Entre l'URL de ton instance Uptime Kuma (sans <code>/status/...</code>) et le slug de ta page publique. Le bouton <i>Tester</i> vérifie que l'URL répond.
+                </div>
+                <div class="inputContainer" style="margin-bottom:0.8em">
+                  <label class="inputLabel inputLabelUnfocused" for="mdKumaInstance">URL de l'instance Kuma</label>
+                  <input id="mdKumaInstance" is="emby-input" type="url" placeholder="https://kuma.example.com" />
+                </div>
+                <div class="inputContainer" style="margin-bottom:0.8em">
+                  <label class="inputLabel inputLabelUnfocused" for="mdKumaSlug">Slug de la page de statut</label>
+                  <input id="mdKumaSlug" is="emby-input" type="text" placeholder="films" />
+                </div>
+                <div class="inputContainer" style="margin-bottom:0.8em">
+                  <label class="inputLabel inputLabelUnfocused" for="mdKumaPreview">URL générée</label>
+                  <input id="mdKumaPreview" is="emby-input" type="text" readonly style="font-family:monospace;font-size:12.5px" />
+                </div>
+                <div id="mdKumaTestResult" style="margin-bottom:0.8em;font-size:13px;display:none"></div>
+                <div style="display:flex;gap:0.6em;justify-content:flex-end;flex-wrap:wrap">
+                  <button type="button" id="mdKumaTestBtn" class="jf-reset-btn">Tester l'URL</button>
+                  <button type="button" id="mdKumaCancelBtn" class="jf-reset-btn">Annuler</button>
+                  <button type="button" id="mdKumaApplyBtn" class="jf-reset-btn" style="background:rgba(201,169,110,0.18)">Utiliser cette URL</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Modal: Import preview ──────────────────────────────────── -->
+            <div id="mdImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
+              <div style="background:#222;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:1.4em;max-width:640px;width:100%;max-height:80vh;display:flex;flex-direction:column">
+                <h3 style="margin-top:0">Aperçu de l'import</h3>
+                <div class="fieldDescription" style="margin-bottom:1em">
+                  Vérifie le contenu avant d'écraser ton formulaire. <b>Aucune modification n'est envoyée au serveur</b> tant que tu n'as pas cliqué sur <i>Enregistrer</i> en bas de page.
+                </div>
+                <pre id="mdImportPreview" style="background:rgba(0,0,0,0.4);padding:0.8em;border-radius:4px;overflow:auto;max-height:50vh;font-size:11.5px;font-family:monospace"></pre>
+                <div id="mdImportWarnings" style="margin-top:0.6em;font-size:13px;color:#e6a817"></div>
+                <div style="display:flex;gap:0.6em;justify-content:flex-end;flex-wrap:wrap;margin-top:1em">
+                  <button type="button" id="mdImportCancelBtn" class="jf-reset-btn">Annuler</button>
+                  <button type="button" id="mdImportApplyBtn" class="jf-reset-btn" style="background:rgba(201,169,110,0.18)">Appliquer au formulaire</button>
+                </div>
+              </div>
+            </div>
 
             <br />
 
@@ -3587,6 +3658,88 @@
                 });
               });
             }
+
+            // Export / Import config
+            var expBtn = document.getElementById('mdExportConfigBtn');
+            if (expBtn) expBtn.addEventListener('click', exportConfig);
+            var impBtn = document.getElementById('mdImportConfigBtn');
+            var impFile = document.getElementById('mdImportFileInput');
+            if (impBtn && impFile) {
+              impBtn.addEventListener('click', function () { impFile.click(); });
+              impFile.addEventListener('change', function () {
+                if (impFile.files && impFile.files[0]) importConfigFromFile(impFile.files[0]);
+                impFile.value = '';
+              });
+            }
+            var impCancel = document.getElementById('mdImportCancelBtn');
+            if (impCancel) impCancel.addEventListener('click', function () {
+              document.getElementById('mdImportModal').style.display = 'none';
+              _pendingImport = null;
+            });
+            var impApply = document.getElementById('mdImportApplyBtn');
+            if (impApply) impApply.addEventListener('click', applyImportedConfig);
+
+            // Uptime Kuma helper
+            var kumaBtn = document.getElementById('mdKumaBtn');
+            var kumaModal = document.getElementById('mdKumaModal');
+            if (kumaBtn && kumaModal) {
+              kumaBtn.addEventListener('click', function () {
+                var current = (document.getElementById('maintenanceStatusUrl').value || '').trim();
+                var m = current.match(/^(https?:\/\/[^\/]+)\/status\/(.+)$/);
+                if (m) {
+                  document.getElementById('mdKumaInstance').value = m[1];
+                  document.getElementById('mdKumaSlug').value = m[2];
+                }
+                updateKumaPreview();
+                document.getElementById('mdKumaTestResult').style.display = 'none';
+                kumaModal.style.display = 'flex';
+              });
+              ['mdKumaInstance', 'mdKumaSlug'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateKumaPreview);
+              });
+              var kumaCancel = document.getElementById('mdKumaCancelBtn');
+              if (kumaCancel) kumaCancel.addEventListener('click', function () {
+                kumaModal.style.display = 'none';
+              });
+              var kumaApply = document.getElementById('mdKumaApplyBtn');
+              if (kumaApply) kumaApply.addEventListener('click', function () {
+                var url = document.getElementById('mdKumaPreview').value;
+                if (!url) return;
+                var statusEl = document.getElementById('maintenanceStatusUrl');
+                if (statusEl) {
+                  statusEl.value = url;
+                  setConfigDirty(true);
+                }
+                kumaModal.style.display = 'none';
+              });
+              var kumaTest = document.getElementById('mdKumaTestBtn');
+              if (kumaTest) kumaTest.addEventListener('click', function () {
+                var url = document.getElementById('mdKumaPreview').value;
+                var resEl = document.getElementById('mdKumaTestResult');
+                if (!url || !resEl) return;
+                resEl.style.display = 'block';
+                resEl.style.color = '';
+                resEl.textContent = 'Test en cours…';
+                // no-cors because most public status pages don't expose CORS headers.
+                // Success here only proves the URL is reachable, not that it returned 200.
+                fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' })
+                  .then(function () {
+                    resEl.style.color = '#4CAF50';
+                    resEl.textContent = '✅ URL atteignable.';
+                  })
+                  .catch(function () {
+                    resEl.style.color = '#c47';
+                    resEl.textContent = '❌ URL injoignable depuis ce navigateur.';
+                  });
+              });
+            }
+
+            // Contrast warning binding
+            ['appAccentColor', 'appAccentColorHex', 'appBgTint', 'appBgTintHex'].forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.addEventListener('input', updateContrastWarning);
+            });
           }
 
           // Wires the color picker <-> hex text sync, opacity slider display,
@@ -3928,6 +4081,227 @@
             });
           }
 
+          // ── WCAG contrast warning on accent color ─────────────────
+          function hexToRgb(hex) {
+            if (!hex) return null;
+            var h = hex.trim().replace('#', '');
+            if (h.length !== 6) return null;
+            var n = parseInt(h, 16);
+            if (isNaN(n)) return null;
+            return { r: (n >> 16) & 0xFF, g: (n >> 8) & 0xFF, b: n & 0xFF };
+          }
+          function relLuminance(rgb) {
+            function ch(c) { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+            return 0.2126 * ch(rgb.r) + 0.7152 * ch(rgb.g) + 0.0722 * ch(rgb.b);
+          }
+          function getContrastRatio(fgHex, bgHex) {
+            var fg = hexToRgb(fgHex), bg = hexToRgb(bgHex);
+            if (!fg || !bg) return null;
+            var l1 = relLuminance(fg), l2 = relLuminance(bg);
+            var hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+            return (hi + 0.05) / (lo + 0.05);
+          }
+          function updateContrastWarning() {
+            var warnEl = document.getElementById('mdContrastWarning');
+            var accentEl = document.getElementById('appAccentColorHex') || document.getElementById('appAccentColor');
+            var bgEl = document.getElementById('appBgTintHex') || document.getElementById('appBgTint');
+            if (!warnEl || !accentEl || !bgEl) return;
+            var ratio = getContrastRatio(accentEl.value, bgEl.value);
+            if (!ratio) { warnEl.style.display = 'none'; return; }
+            if (ratio < 4.5) {
+              warnEl.style.display = 'block';
+              warnEl.textContent = '⚠ Contraste avec le fond : ' + ratio.toFixed(2) + ':1 (WCAG AA = 4.5:1 minimum). Le texte risque d’être dur à lire.';
+            } else {
+              warnEl.style.display = 'none';
+            }
+          }
+
+          // ── Export / Import config JSON ───────────────────────────
+          var CONFIG_EXPORT_FORMAT = 'MaintenanceDeluxe-config-v1';
+          var WEBHOOK_REDACTED_PLACEHOLDER = '<redacted>';
+          var IMPORT_ALLOWED_TOP_KEYS = ['_format', '_exportedAt', '_pluginVersion', 'global', 'maintenance'];
+
+          function buildExportPayload(currentConfig) {
+            // Snapshot whole config but strip the webhook URL secret.
+            var maint = (currentConfig && currentConfig.maintenanceMode) || {};
+            var maintOut = JSON.parse(JSON.stringify(maint));
+            if (maintOut.webhook && maintOut.webhook.url) {
+              maintOut.webhook.url = WEBHOOK_REDACTED_PLACEHOLDER;
+            }
+            // Drop server-managed UUID lists — they are tied to live state, not portable.
+            delete maintOut.maintenanceDisabledUserIds;
+            delete maintOut.preDisabledUserIds;
+            delete maintOut.activatedAt;
+
+            var globalOut = JSON.parse(JSON.stringify(currentConfig || {}));
+            delete globalOut.maintenanceMode;
+            delete globalOut.lastModified;
+
+            return {
+              _format: CONFIG_EXPORT_FORMAT,
+              _exportedAt: new Date().toISOString(),
+              _pluginVersion: '0.3.2.0',
+              global: globalOut,
+              maintenance: maintOut
+            };
+          }
+
+          function exportConfig() {
+            var resultEl = document.getElementById('mdConfigIoResult');
+            ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+              .then(function (cfg) {
+                var payload = buildExportPayload(cfg);
+                var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                var stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.download = 'maintenancedeluxe-config-' + stamp + '.json';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                if (resultEl) {
+                  resultEl.style.display = 'block';
+                  resultEl.style.color = '#4CAF50';
+                  resultEl.textContent = '✅ Config exportée. URL webhook strippée par sécurité.';
+                }
+              })
+              .catch(function () {
+                if (resultEl) {
+                  resultEl.style.display = 'block';
+                  resultEl.style.color = '#c47';
+                  resultEl.textContent = '❌ Impossible de lire la config courante.';
+                }
+              });
+          }
+
+          var _pendingImport = null;
+
+          function validateImport(parsed) {
+            var warnings = [];
+            if (!parsed || typeof parsed !== 'object') {
+              return { valid: false, warnings: ['Le fichier n’est pas un JSON valide.'] };
+            }
+            if (parsed._format !== CONFIG_EXPORT_FORMAT) {
+              warnings.push('Format inattendu : ' + (parsed._format || '(absent)') + '. Attendu : ' + CONFIG_EXPORT_FORMAT + '.');
+            }
+            // Refuse extraneous top-level keys to avoid sneaky payloads.
+            Object.keys(parsed).forEach(function (k) {
+              if (IMPORT_ALLOWED_TOP_KEYS.indexOf(k) === -1) {
+                warnings.push('Clé inconnue ignorée : ' + k);
+              }
+            });
+            // Refuse a non-redacted webhook URL — exports must always strip it.
+            if (parsed.maintenance && parsed.maintenance.webhook && parsed.maintenance.webhook.url
+                && parsed.maintenance.webhook.url !== WEBHOOK_REDACTED_PLACEHOLDER
+                && parsed.maintenance.webhook.url.length > 0) {
+              return {
+                valid: false,
+                warnings: ['L’URL du webhook n’est pas strippée (<redacted>). Refus pour ne pas leaker un secret. Édite le fichier pour remplacer la valeur par <redacted>.']
+              };
+            }
+            return { valid: true, warnings: warnings };
+          }
+
+          function showImportPreview(parsed, warnings) {
+            var modal = document.getElementById('mdImportModal');
+            var preview = document.getElementById('mdImportPreview');
+            var warnEl = document.getElementById('mdImportWarnings');
+            if (!modal || !preview) return;
+            preview.textContent = JSON.stringify(parsed, null, 2);
+            if (warnEl) {
+              warnEl.textContent = (warnings && warnings.length) ? '⚠ ' + warnings.join(' | ') : '';
+            }
+            modal.style.display = 'flex';
+            _pendingImport = parsed;
+          }
+
+          function applyImportedConfig() {
+            if (!_pendingImport) return;
+            var resultEl = document.getElementById('mdConfigIoResult');
+            try {
+              if (_pendingImport.global) {
+                try { populatePage(_pendingImport.global); } catch (e) {}
+              }
+              if (_pendingImport.maintenance) {
+                var maint = JSON.parse(JSON.stringify(_pendingImport.maintenance));
+                // Webhook URL handling: <redacted> means "keep what's currently in the form".
+                if (maint.webhook && maint.webhook.url === WEBHOOK_REDACTED_PLACEHOLDER) {
+                  var currentUrlEl = document.getElementById('webhookUrl');
+                  maint.webhook.url = currentUrlEl ? currentUrlEl.value : '';
+                }
+                applyMaintenanceUi(maint);
+              }
+              setConfigDirty(true);
+              document.getElementById('mdImportModal').style.display = 'none';
+              if (resultEl) {
+                resultEl.style.display = 'block';
+                resultEl.style.color = '#4CAF50';
+                resultEl.textContent = '✅ Config importée dans le formulaire. Clique Enregistrer pour appliquer.';
+              }
+            } catch (e) {
+              if (resultEl) {
+                resultEl.style.display = 'block';
+                resultEl.style.color = '#c47';
+                resultEl.textContent = '❌ Erreur à l’application : ' + (e && e.message);
+              }
+            }
+            _pendingImport = null;
+          }
+
+          function importConfigFromFile(file) {
+            var resultEl = document.getElementById('mdConfigIoResult');
+            if (!file) return;
+            if (file.size > 1024 * 1024) {
+              if (resultEl) {
+                resultEl.style.display = 'block';
+                resultEl.style.color = '#c47';
+                resultEl.textContent = '❌ Fichier trop gros (> 1 Mo).';
+              }
+              return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+              var parsed;
+              try { parsed = JSON.parse(reader.result); }
+              catch (e) {
+                if (resultEl) {
+                  resultEl.style.display = 'block';
+                  resultEl.style.color = '#c47';
+                  resultEl.textContent = '❌ JSON invalide : ' + (e && e.message);
+                }
+                return;
+              }
+              var v = validateImport(parsed);
+              if (!v.valid) {
+                if (resultEl) {
+                  resultEl.style.display = 'block';
+                  resultEl.style.color = '#c47';
+                  resultEl.textContent = '❌ Refusé : ' + v.warnings.join(' | ');
+                }
+                return;
+              }
+              showImportPreview(parsed, v.warnings);
+            };
+            reader.readAsText(file);
+          }
+
+          // ── Uptime Kuma URL builder ───────────────────────────────
+          function buildKumaUrl(instance, slug) {
+            var inst = (instance || '').trim().replace(/\/+$/, '');
+            var s = (slug || '').trim().replace(/^\/+|\/+$/g, '');
+            if (!inst || !s) return '';
+            return inst + '/status/' + s;
+          }
+          function updateKumaPreview() {
+            var instEl = document.getElementById('mdKumaInstance');
+            var slugEl = document.getElementById('mdKumaSlug');
+            var prevEl = document.getElementById('mdKumaPreview');
+            if (!instEl || !slugEl || !prevEl) return;
+            prevEl.value = buildKumaUrl(instEl.value, slugEl.value);
+          }
+
           // ── pageshow: load fresh config each visit ────────────────
 
           function checkDependencies() {
@@ -3965,6 +4339,7 @@
                 .then(function (config) {
                   populatePage(config);
                   applyMaintenanceUi(config && config.maintenanceMode);
+                  setTimeout(updateContrastWarning, 50);
                 })
                 .catch(function () {});
             });

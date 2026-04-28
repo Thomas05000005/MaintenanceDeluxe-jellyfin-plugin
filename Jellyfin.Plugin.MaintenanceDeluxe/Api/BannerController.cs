@@ -432,7 +432,7 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Returns true for null/empty URLs and URLs starting with http://, https://, or /.</summary>
-    private static bool IsUrlSafe(string? url)
+    internal static bool IsUrlSafe(string? url)
     {
         if (string.IsNullOrEmpty(url)) return true;
         return url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
@@ -455,7 +455,7 @@ public class BannerController : ControllerBase
     private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
 
     /// <summary>Trims, truncates, and returns null for empty strings.</summary>
-    private static string? NormaliseOptionalString(string? value, int maxLength)
+    internal static string? NormaliseOptionalString(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
@@ -463,14 +463,14 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Whitelists the theme key, falling back to "velours" for unknown values.</summary>
-    private static string NormaliseTheme(string? value)
+    internal static string NormaliseTheme(string? value)
     {
         if (!string.IsNullOrEmpty(value) && _validThemes.Contains(value)) return value;
         return "velours";
     }
 
     /// <summary>Validates hex colour format (#RRGGBB). Returns null for invalid or empty input.</summary>
-    private static string? NormaliseHexColor(string? value)
+    internal static string? NormaliseHexColor(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
@@ -478,7 +478,7 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Caps the release notes list length and normalises each section's fields.</summary>
-    private static List<ReleaseNoteSection> NormaliseReleaseNotes(List<ReleaseNoteSection>? notes)
+    internal static List<ReleaseNoteSection> NormaliseReleaseNotes(List<ReleaseNoteSection>? notes)
     {
         if (notes is null || notes.Count == 0) return new List<ReleaseNoteSection>();
 
@@ -501,7 +501,7 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Keeps short icon strings (emoji / short identifier). Defaults to "✨" when empty.</summary>
-    private static string NormaliseIcon(string? value)
+    internal static string NormaliseIcon(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "✨";
         var trimmed = value.Trim();
@@ -512,7 +512,7 @@ public class BannerController : ControllerBase
         new(StringComparer.Ordinal) { "off", "slow", "normal", "fast" };
 
     /// <summary>Whitelists animation speed preset; fallback "normal".</summary>
-    private static string NormaliseAnimationSpeed(string? value)
+    internal static string NormaliseAnimationSpeed(string? value)
     {
         if (!string.IsNullOrEmpty(value) && _validAnimationSpeeds.Contains(value)) return value;
         return "normal";
@@ -522,7 +522,7 @@ public class BannerController : ControllerBase
         new(StringComparer.Ordinal) { "none", "low", "normal", "dense" };
 
     /// <summary>Whitelists particle density preset; fallback "normal".</summary>
-    private static string NormaliseParticleDensity(string? value)
+    internal static string NormaliseParticleDensity(string? value)
     {
         if (!string.IsNullOrEmpty(value) && _validParticleDensities.Contains(value)) return value;
         return "normal";
@@ -532,7 +532,7 @@ public class BannerController : ControllerBase
         new(StringComparer.Ordinal) { "full", "rotating", "simple", "none" };
 
     /// <summary>Whitelists card border style; fallback "full".</summary>
-    private static string NormaliseBorderStyle(string? value)
+    internal static string NormaliseBorderStyle(string? value)
     {
         if (!string.IsNullOrEmpty(value) && _validBorderStyles.Contains(value)) return value;
         return "full";

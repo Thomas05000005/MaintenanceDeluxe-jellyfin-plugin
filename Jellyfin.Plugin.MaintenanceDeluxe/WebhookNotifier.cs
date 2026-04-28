@@ -10,10 +10,13 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.MaintenanceDeluxe;
 
 /// <summary>The detected webhook payload flavour.</summary>
-internal enum WebhookFormat
+public enum WebhookFormat
 {
+    /// <summary>Discord embed-style payload.</summary>
     Discord,
+    /// <summary>Slack Block Kit payload.</summary>
     Slack,
+    /// <summary>Plain JSON payload for arbitrary integrations.</summary>
     Generic
 }
 
