@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.3.0",
-        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "checksum": "C3C93A08A188624436D4FF932A55A0DB",
         "changelog": "v0.3.3 - Audit complet du plugin : 12 fixes (2 securite + 8 robustesse + 2 polish). (1) Securite : GET /config retourne desormais un DTO BannerClientConfig sans webhook URL ni listes UUID (etait lisible par tout user authentifie) ; nouvel endpoint GET /config-admin (RequiresElevation) pour la page admin. (2) Securite : drift check periodique (toutes les 1 min) qui re-disable tout user re-enable manuellement pendant la maintenance, sans attendre le prochain restart serveur. (3) Rate-limit /test-webhook simplifie en single-timestamp global atomique (plus de memory leak, plus de bypass derriere reverse proxy). (4) Cache-Control max-age=10 sur GET /maintenance pour reduire la charge de polling. (5) JS Injector retry exponentiel 5/15/45/120/300/600 s (~18 min) au lieu de 3x5s, avec try/catch propre dans le Task.Run. (6) MaintenanceScheduleTask refactore : single Plugin.Instance read par tick, plus coherent. (7) SaveMaintenance : single SaveConfiguration au lieu de double save (fenetre de race fermee). (8) Webhook URL : log warning si host non Discord/Slack (generic webhooks toujours acceptes). (9) Borne sup scheduledRestart a 30 jours pour eviter les configs polluees. (10) Nouvelle notification webhook Restarting avant un restart serveur planifie + champ NotifyOnRestart (default true). (11) escHtml admin : ajout de l'apostrophe au escape map. (12) console.debug du banner.js guard derriere ?md-debug=1. 13 nouveaux tests xUnit (74 au total).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.3/MaintenanceDeluxe-v0.3.3.zip",
-        "timestamp": "2026-04-29T00:00:00"
+        "timestamp": "2026-04-29T05:05:42"
       },
       {
         "version": "0.3.2.0",
