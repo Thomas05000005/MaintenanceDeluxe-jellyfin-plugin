@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Users;
@@ -22,6 +23,42 @@ internal static class MaintenanceHelper
     // Serialises concurrent calls from the HTTP controller and the 1-min scheduled task.
     private static readonly SemaphoreSlim _mutex = new(1, 1);
 
+    // ── Pure decision helpers (extracted for unit-testability) ─────────────────
+    // These do no I/O and are exposed as `internal` so the test project can verify
+    // the partitioning logic without instantiating the Plugin singleton or mocking
+    // SaveConfiguration.
+
+    /// <summary>True if the user has the IsAdministrator permission set to true.</summary>
+    internal static bool IsAdmin(User u) =>
+        u.Permissions.Any(p => p.Kind == PermissionKind.IsAdministrator && p.Value);
+
+    /// <summary>True if the user has the IsDisabled permission set to true.</summary>
+    internal static bool IsDisabled(User u) =>
+        u.Permissions.Any(p => p.Kind == PermissionKind.IsDisabled && p.Value);
+
+    /// <summary>Returns the non-admin users that are currently enabled and NOT in the whitelist —
+    /// i.e. the users that activation should disable. Pure function: no I/O, no side effects.</summary>
+    internal static List<User> SelectUsersToDisable(IEnumerable<User> users, IReadOnlyCollection<string> whitelist)
+    {
+        return users
+            .Where(u => !IsAdmin(u))
+            .Where(u => !IsDisabled(u))
+            .Where(u => !whitelist.Contains(u.Id.ToString()))
+            .ToList();
+    }
+
+    /// <summary>Returns the IDs of non-admin users that are ALREADY disabled at activation time —
+    /// i.e. the users that deactivation must NOT re-enable (preserves admin's prior intent).
+    /// Pure function: no I/O, no side effects.</summary>
+    internal static List<string> SelectPreDisabledIds(IEnumerable<User> users)
+    {
+        return users
+            .Where(u => !IsAdmin(u))
+            .Where(IsDisabled)
+            .Select(u => u.Id.ToString())
+            .ToList();
+    }
+
     /// <summary>
     /// Disables all non-admin, non-already-disabled users and marks maintenance as active.
     /// No-op if maintenance is already active.
@@ -40,20 +77,10 @@ internal static class MaintenanceHelper
             var maint = config.MaintenanceMode;
             if (maint.IsActive) return;
 
-            var nonAdmins = userManager.Users
-                .Where(u => !u.Permissions.Any(p => p.Kind == PermissionKind.IsAdministrator && p.Value))
-                .ToList();
-
-            var preDisabled = nonAdmins
-                .Where(u => u.Permissions.Any(p => p.Kind == PermissionKind.IsDisabled && p.Value))
-                .Select(u => u.Id.ToString())
-                .ToList();
-
+            var allUsers = userManager.Users.ToList();
+            var preDisabled = SelectPreDisabledIds(allUsers);
             var whitelist = maint.WhitelistedUserIds ?? new List<string>();
-            var toDisable = nonAdmins
-                .Where(u => !u.Permissions.Any(p => p.Kind == PermissionKind.IsDisabled && p.Value))
-                .Where(u => !whitelist.Contains(u.Id.ToString()))
-                .ToList();
+            var toDisable = SelectUsersToDisable(allUsers, whitelist);
 
             var successfullyDisabled = new List<string>();
             foreach (var user in toDisable)

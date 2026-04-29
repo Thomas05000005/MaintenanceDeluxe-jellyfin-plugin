@@ -4,6 +4,27 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5.0] — 2026-04-29
+
+Couverture tests + dette CI/CD réduite.
+
+### Ajouté
+- **9 nouveaux tests xUnit** sur la logique de partition utilisateurs (`MaintenanceHelperTests`) :
+  - `SelectUsersToDisable_PicksOnlyEnabledNonAdminsNotInWhitelist` — vérifie que l'activation cible exactement les bons users
+  - `SelectUsersToDisable_EmptyWhitelist_DisablesAllEnabledNonAdmins`
+  - `SelectUsersToDisable_AllUsersAreAdmins_ReturnsEmpty`
+  - `SelectUsersToDisable_NoUsers_ReturnsEmpty`
+  - `SelectPreDisabledIds_OnlyReturnsAlreadyDisabledNonAdmins` — vérifie que les admins déjà disabled ne polluent pas la liste
+  - `SelectPreDisabledIds_AndSelectUsersToDisable_AreDisjoint` — **invariant critique** : un user ne peut jamais être à la fois "à désactiver" et "pré-disabled" (sinon `DeactivateAsync` ré-activerait à tort)
+  - `IsAdmin_RecognisesAdministratorPermission` (incluant le cas admin disabled)
+  - `IsDisabled_RecognisesDisabledPermission`
+  - `SelectUsersToDisable_WhitelistTakesPrecedenceOverEnabledStatus`
+- Total **83 tests** (74 v0.3.4 + 9 nouveaux), tous verts.
+
+### Modifié
+- **`MaintenanceHelper`** : 4 fonctions pures extraites (`IsAdmin`, `IsDisabled`, `SelectUsersToDisable`, `SelectPreDisabledIds`) en `internal static` pour permettre les tests sans Plugin singleton ni mock IUserManager. `ActivateAsync` réécrit pour les utiliser. **Aucun changement de comportement observable runtime** — seulement l'organisation interne devient testable. Pour les futurs refactorings, ces invariants sont désormais protégés par tests.
+- **GitHub Actions bumpées aux dernières majeures** : `actions/checkout@v6` (v4 → v6), `setup-dotnet@v5` (v4 → v5), `setup-node@v6` (v4 → v6), `setup-python@v6` (v5 → v6). Le `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` ajouté en v0.3.4 est retiré : les nouvelles actions ciblent Node.js 24 nativement.
+
 ## [0.3.4.0] — 2026-04-29
 
 Polish post-audit, suite directe à v0.3.3.
@@ -138,6 +159,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.5.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.5
 [0.3.4.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.4
 [0.3.3.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.3
 [0.3.2.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.2

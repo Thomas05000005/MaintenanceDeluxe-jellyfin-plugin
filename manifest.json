@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.3.5.0",
+        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "changelog": "v0.3.5 - Tests integration + bump GHA actions. (1) Couverture tests : refactoring leger de MaintenanceHelper qui extrait deux pure functions IsAdmin / IsDisabled / SelectUsersToDisable / SelectPreDisabledIds, plus 9 nouveaux tests xUnit qui verifient que la partition utilisateurs (admins / pre-disabled / whitelistes / a desactiver) est correcte dans tous les cas (incluant l'invariant critique disjoint des deux listes). 83 tests au total (74 v0.3.4 + 9 nouveaux). Aucun changement de comportement observable cote runtime, juste l'organisation interne plus testable. (2) GHA actions bumpees aux versions actuelles : actions/checkout@v6, setup-dotnet@v5, setup-node@v6, setup-python@v6 (etaient en v4/v4/v4/v5). Le FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 ajoute en v0.3.4 retire car les nouvelles actions ciblent Node.js 24 nativement.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.5/MaintenanceDeluxe-v0.3.5.zip",
+        "timestamp": "2026-04-29T00:00:00"
+      },
+      {
         "version": "0.3.4.0",
         "checksum": "BFA26712B819382E994B60493629C4AB",
         "changelog": "v0.3.4 - Polish post-audit (suite v0.3.3). (1) UX webhook : nouvelle checkbox 'Notifier avant un redemarrage serveur' dans le tab Maintenance pour piloter le NotifyOnRestart ajoute en v0.3.3 (par defaut active). (2) Drift check : log Information liste maintenant les usernames des comptes r\u00e9-disabled (plus juste les UUIDs), debug nettement plus rapide. (3) Headers HTTP : X-Content-Type-Options nosniff sur GET /banner.js et GET /preview.html ; X-Frame-Options SAMEORIGIN sur /preview.html ; Cache-Control public max-age=300 sur /banner.js. (4) Workflows GHA : opt-in Node.js 24 via FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true (les runners forceront Node 24 par defaut en juin 2026 et retireront Node 20 en septembre 2026). (5) Documentation : docs/webhooks.md mentionne maintenant l'evenement Restarting + champ NotifyOnRestart + warning host non-Discord/Slack ; README liste tous les endpoints API + flag ?md-debug=1.",
