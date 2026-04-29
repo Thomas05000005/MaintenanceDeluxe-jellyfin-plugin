@@ -1223,6 +1223,12 @@
         "0 0 120px -20px rgba(var(--md-accent-rgb),.25);}",
         "}",
         "#jf-md-overlay[data-anim=\"off\"][data-border=\"rotating\"] .jf-md-card::before{animation:none!important;}",
+        /* Admin-only: when the live-preview iframe is expanded to fullscreen by the
+           admin (Agrandir l'apercu button), let the card fill the available space
+           instead of staying compact and lost in aurora background. This class is
+           ONLY ever toggled inside the admin live-preview iframe via postMessage,
+           never on real end-user banner.js, so the production look is untouched. */
+        "#jf-md-overlay.jf-md-preview-expanded .jf-md-card{max-width:min(1400px,92vw)!important;}",
     ].join("");
 
     // --- Main loop ---
@@ -1402,7 +1408,20 @@
                 if (ev.source !== window.parent) return;
                 if (ev.origin !== allowedOrigin) return;
                 var data = ev && ev.data;
-                if (!data || data.type !== "md-preview-update" || !data.config) return;
+                if (!data) return;
+                // Admin-only signal: the live-preview was expanded/collapsed. We widen
+                // the card so it fills the now-large preview area instead of looking
+                // lost in aurora background. Real end-users never see this message
+                // because their banner runs outside live-preview mode.
+                if (data.type === "md-preview-expanded") {
+                    var ov = document.getElementById("jf-md-overlay");
+                    if (ov) {
+                        if (data.expanded) ov.classList.add("jf-md-preview-expanded");
+                        else ov.classList.remove("jf-md-preview-expanded");
+                    }
+                    return;
+                }
+                if (data.type !== "md-preview-update" || !data.config) return;
                 var incoming = data.config;
                 var merged = {};
                 for (var k1 in (MAINTENANCE || {})) merged[k1] = MAINTENANCE[k1];

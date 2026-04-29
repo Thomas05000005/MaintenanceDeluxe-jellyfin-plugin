@@ -3400,14 +3400,31 @@
             var toggleBtn = document.getElementById('appTogglePanel');
             if (!section) return;
 
+            // Tells the live-preview iframe to widen its card so it fills the now-large
+            // viewport area instead of looking lost in a sea of aurora background. This
+            // is admin-preview only — the message is never received by real end-users
+            // because their banner.js doesn't run in live-preview mode.
+            function notifyPreviewExpanded(expanded) {
+              var iframe = document.getElementById('appPreviewIframe');
+              if (!iframe || !iframe.contentWindow) return;
+              try {
+                iframe.contentWindow.postMessage(
+                  { type: 'md-preview-expanded', expanded: !!expanded },
+                  '*'
+                );
+              } catch (e) { /* iframe may be cross-origin or not loaded yet */ }
+            }
+
             function enterExpand() {
               section.classList.add('jf-app-expanded');
               document.body.style.overflow = 'hidden';
+              notifyPreviewExpanded(true);
             }
             function exitExpand() {
               section.classList.remove('jf-app-expanded');
               section.classList.remove('jf-app-panel-hidden');
               document.body.style.overflow = '';
+              notifyPreviewExpanded(false);
             }
             function togglePanel() {
               var hidden = section.classList.toggle('jf-app-panel-hidden');

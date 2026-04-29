@@ -4,6 +4,19 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6.0] — 2026-04-29
+
+Aperçu admin agrandi : la carte remplit la zone visible.
+
+### Modifié
+- **Mode "Agrandir l'aperçu" (côté admin) : la carte s'élargit pour occuper la zone**. Quand l'admin clique sur le bouton *Agrandir l'aperçu* dans la section Apparence, la carte de prévisualisation passe de 640 px (compact) à `min(1400px, 92vw)` — elle remplit maintenant la zone visible au lieu d'être centrée et perdue dans le fond aurora.
+- **Le rendu côté utilisateurs finaux est strictement inchangé.** Cette élargissement n'est appliqué que dans le contexte live-preview de la page admin (via une classe CSS `jf-md-preview-expanded` qui n'est jamais émise sur les sessions Jellyfin réelles).
+
+### Détails techniques
+- `configPage.html` : nouvelle fonction `notifyPreviewExpanded(bool)` qui envoie un `postMessage({type: 'md-preview-expanded', expanded})` à l'iframe à chaque entrée/sortie du mode agrandi (`enterExpand` / `exitExpand`).
+- `banner.js` : le handler `message` du mode live-preview reconnaît désormais `md-preview-expanded` et add/remove la classe `jf-md-preview-expanded` sur l'overlay. Same-origin guard et `event.source === window.parent` toujours en place.
+- CSS pure : `#jf-md-overlay.jf-md-preview-expanded .jf-md-card { max-width: min(1400px, 92vw) !important; }` — la limite 92vw garantit qu'on ne déborde jamais du viewport, y compris si l'admin a un écran 1280px.
+
 ## [0.3.5.0] — 2026-04-29
 
 Couverture tests + dette CI/CD réduite.
@@ -159,6 +172,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.6.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.6
 [0.3.5.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.5
 [0.3.4.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.4
 [0.3.3.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.3
