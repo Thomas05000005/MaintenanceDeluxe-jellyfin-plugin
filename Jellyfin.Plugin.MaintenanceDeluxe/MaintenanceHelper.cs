@@ -59,6 +59,63 @@ internal static class MaintenanceHelper
             .ToList();
     }
 
+    /// <summary>Output of <see cref="PartitionDeactivationTargets"/>: tracked IDs split into
+    /// the three classes the caller has to handle differently.</summary>
+    internal sealed record DeactivationPlan(
+        IReadOnlyList<(Guid Id, User User)> ToReEnable,
+        IReadOnlyList<string> MalformedIds,
+        IReadOnlyList<Guid> MissingUserIds);
+
+    /// <summary>Classifies tracked maintenance-disabled IDs into actionable groups.
+    /// Pure function — takes a lookup delegate so tests can pass an in-memory map without
+    /// instantiating a real <see cref="IUserManager"/>. Three output buckets:
+    /// (1) <c>ToReEnable</c>: well-formed GUID and the user still exists, ready to update;
+    /// (2) <c>MalformedIds</c>: not parseable as GUID — caller should warn-log and skip;
+    /// (3) <c>MissingUserIds</c>: parseable but user no longer in the database (deleted) —
+    /// caller should debug-log and skip.</summary>
+    internal static DeactivationPlan PartitionDeactivationTargets(
+        IEnumerable<string> trackedIds,
+        Func<Guid, User?> userLookup)
+    {
+        var toReEnable = new List<(Guid, User)>();
+        var malformed = new List<string>();
+        var missing = new List<Guid>();
+        foreach (var idStr in trackedIds)
+        {
+            if (!Guid.TryParse(idStr, out var guid))
+            {
+                malformed.Add(idStr);
+                continue;
+            }
+            var user = userLookup(guid);
+            if (user is null)
+            {
+                missing.Add(guid);
+                continue;
+            }
+            toReEnable.Add((guid, user));
+        }
+        return new DeactivationPlan(toReEnable, malformed, missing);
+    }
+
+    /// <summary>Returns the tracked users that are CURRENTLY enabled and therefore need
+    /// re-disabling (drift recovery). Skips malformed IDs and deleted users silently —
+    /// they're not actionable at this point. Pure function.</summary>
+    internal static List<(Guid Id, User User)> SelectUsersNeedingReDisable(
+        IEnumerable<string> trackedIds,
+        Func<Guid, User?> userLookup)
+    {
+        var result = new List<(Guid, User)>();
+        foreach (var idStr in trackedIds)
+        {
+            if (!Guid.TryParse(idStr, out var guid)) continue;
+            var user = userLookup(guid);
+            if (user is null) continue;
+            if (!IsDisabled(user)) result.Add((guid, user));
+        }
+        return result;
+    }
+
     /// <summary>
     /// Disables all non-admin, non-already-disabled users and marks maintenance as active.
     /// No-op if maintenance is already active.
@@ -67,6 +124,7 @@ internal static class MaintenanceHelper
     /// </summary>
     internal static async Task ActivateAsync(IUserManager userManager, ILogger? logger = null)
     {
+        using var _scope = logger?.BeginScope("Activate");
         await _mutex.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -122,6 +180,7 @@ internal static class MaintenanceHelper
     /// </summary>
     internal static async Task DeactivateAsync(IUserManager userManager, ILogger? logger = null)
     {
+        using var _scope = logger?.BeginScope("Deactivate");
         await _mutex.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -132,22 +191,15 @@ internal static class MaintenanceHelper
             var maint = config.MaintenanceMode;
             if (!maint.IsActive) return;
 
+            var plan = PartitionDeactivationTargets(maint.MaintenanceDisabledUserIds, userManager.GetUserById);
+            foreach (var bad in plan.MalformedIds)
+                logger?.LogWarning("[MaintenanceDeluxe] Skipping malformed user ID '{Id}' during deactivation.", bad);
+            foreach (var gone in plan.MissingUserIds)
+                logger?.LogDebug("[MaintenanceDeluxe] User {UserId} not found during deactivation (may have been deleted) — skipping.", gone);
+
             int reenabled = 0;
-            foreach (var idStr in maint.MaintenanceDisabledUserIds)
+            foreach (var (guid, user) in plan.ToReEnable)
             {
-                if (!Guid.TryParse(idStr, out var guid))
-                {
-                    logger?.LogWarning("[MaintenanceDeluxe] Skipping malformed user ID '{Id}' during deactivation.", idStr);
-                    continue;
-                }
-
-                var user = userManager.GetUserById(guid);
-                if (user is null)
-                {
-                    logger?.LogDebug("[MaintenanceDeluxe] User {UserId} not found during deactivation (may have been deleted) — skipping.", guid);
-                    continue;
-                }
-
                 try
                 {
                     var dto = userManager.GetUserDto(user, string.Empty);
@@ -184,6 +236,7 @@ internal static class MaintenanceHelper
     /// </summary>
     internal static async Task EnsureUsersDisabledAsync(IUserManager userManager, ILogger? logger = null)
     {
+        using var _scope = logger?.BeginScope("DriftCheck");
         await _mutex.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -193,35 +246,30 @@ internal static class MaintenanceHelper
             var maint = plugin.Configuration.MaintenanceMode;
             if (!maint.IsActive) return;
 
+            var driftedUsers = SelectUsersNeedingReDisable(maint.MaintenanceDisabledUserIds, userManager.GetUserById);
             int restored = 0;
             var restoredNames = new List<string>();
-            foreach (var idStr in maint.MaintenanceDisabledUserIds)
+            foreach (var (guid, user) in driftedUsers)
             {
-                if (!Guid.TryParse(idStr, out var guid)) continue;
-                var user = userManager.GetUserById(guid);
-                if (user is null) continue;
-
-                var isCurrentlyDisabled = user.Permissions.Any(p => p.Kind == PermissionKind.IsDisabled && p.Value);
-                if (!isCurrentlyDisabled)
+                try
                 {
-                    try
-                    {
-                        var dto = userManager.GetUserDto(user, string.Empty);
-                        var policy = dto.Policy ?? new UserPolicy();
-                        policy.IsDisabled = true;
-                        await userManager.UpdatePolicyAsync(guid, policy).ConfigureAwait(false);
-                        restored++;
-                        restoredNames.Add(user.Username ?? guid.ToString());
-                    }
-                    catch (Exception ex)
-                    {
-                        logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
-                    }
+                    var dto = userManager.GetUserDto(user, string.Empty);
+                    var policy = dto.Policy ?? new UserPolicy();
+                    policy.IsDisabled = true;
+                    await userManager.UpdatePolicyAsync(guid, policy).ConfigureAwait(false);
+                    restored++;
+                    restoredNames.Add(user.Username ?? guid.ToString());
+                }
+                catch (Exception ex)
+                {
+                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
                 }
             }
 
             if (restored > 0)
                 logger?.LogInformation("[MaintenanceDeluxe] Drift check re-disabled {Count} user(s) that were re-enabled mid-maintenance: {Users}.", restored, string.Join(", ", restoredNames));
+            else
+                logger?.LogTrace("[MaintenanceDeluxe] Drift check ran, no drift detected ({Tracked} tracked users still consistent).", maint.MaintenanceDisabledUserIds.Count);
         }
         finally
         {

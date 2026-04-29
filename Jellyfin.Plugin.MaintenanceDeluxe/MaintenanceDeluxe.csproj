@@ -4,8 +4,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <AssemblyName>Jellyfin.Plugin.MaintenanceDeluxe</AssemblyName>
     <RootNamespace>Jellyfin.Plugin.MaintenanceDeluxe</RootNamespace>
-    <AssemblyVersion>0.3.6.0</AssemblyVersion>
-    <FileVersion>0.3.6.0</FileVersion>
+    <AssemblyVersion>0.3.7.0</AssemblyVersion>
+    <FileVersion>0.3.7.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
@@ -31,6 +31,8 @@
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <None Remove="Configuration\admin.js" />
+    <EmbeddedResource Include="Configuration\admin.js" />
     <None Remove="Resources\banner.js" />
     <EmbeddedResource Include="Resources\banner.js" />
   </ItemGroup>

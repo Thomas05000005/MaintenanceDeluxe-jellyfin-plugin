@@ -22,6 +22,7 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 /// <list type="bullet">
 ///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (UUID-stripped snapshot for the login-page overlay)</item>
 ///   <item><c>GET /MaintenanceDeluxe/banner.js</c> — public (script injected on every page; same bytes as the JavaScriptInjector copy)</item>
+///   <item><c>GET /MaintenanceDeluxe/admin.js</c> — public (admin config-page script; same security model as banner.js — UI only, all admin actions gated by RequiresElevation on their endpoints)</item>
 ///   <item><c>GET /MaintenanceDeluxe/preview.html</c> — public (HTML shell consumed by the admin live-preview iframe; iframe navigation does not carry Authorization headers)</item>
 ///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (banner-client view; <see cref="BannerClientConfig"/>, no admin-only data)</item>
 ///   <item><c>GET /MaintenanceDeluxe/config-admin</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (full <see cref="PluginConfiguration"/> incl. webhook URL and user UUID lists)</item>
@@ -108,6 +109,26 @@ public class BannerController : ControllerBase
         // Cache 5 min: the script is identical for the lifetime of a plugin version,
         // so this dramatically cuts repeat-fetch traffic without delaying real updates
         // (a Jellyfin restart is required to load a new DLL anyway).
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Cache-Control"] = "public, max-age=300";
+        return File(stream, "application/javascript");
+    }
+
+    /// <summary>Serves the admin config-page client script. Public (no [Authorize]) for the
+    /// same reason as banner.js: a &lt;script src&gt; tag in configPage.html cannot send the
+    /// Authorization header, and admin-only operations are still gated server-side via
+    /// the [Authorize(Policy="RequiresElevation")] attributes on the actual config endpoints.
+    /// The admin.js code itself contains no secrets — it just renders the UI and POSTs to
+    /// authenticated endpoints.</summary>
+    [HttpGet("admin.js")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult GetAdminScript()
+    {
+        var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.js");
+        if (stream is null)
+            return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["Cache-Control"] = "public, max-age=300";
         return File(stream, "application/javascript");

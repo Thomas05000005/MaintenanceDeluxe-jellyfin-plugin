@@ -44,12 +44,15 @@ jobs:
       - name: Syntax check banner.js
         run: node --check Jellyfin.Plugin.MaintenanceDeluxe/Resources/banner.js
 
-      - name: Syntax check configPage.html inline scripts
+      - name: Syntax check admin.js
+        run: node --check Jellyfin.Plugin.MaintenanceDeluxe/Configuration/admin.js
+
+      - name: Verify configPage.html no longer has inline script (extracted to admin.js since v0.3.7)
         run: |
-          python scripts/check_inline_script.py \
-            Jellyfin.Plugin.MaintenanceDeluxe/Configuration/configPage.html \
-            -o /tmp/configPage_inline.js
-          node --check /tmp/configPage_inline.js
+          if grep -qE '<script[^>]*>[^<]' Jellyfin.Plugin.MaintenanceDeluxe/Configuration/configPage.html; then
+            echo "error: configPage.html contains inline script content. Move it to admin.js." >&2
+            exit 1
+          fi
 
       - name: Version coherence (csproj / manifest.json)
         run: python scripts/check_version_coherence.py

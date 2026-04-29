@@ -4,6 +4,36 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7.0] — 2026-04-29
+
+Refactor qualité (suite audit interne). Aucun changement de comportement observable côté utilisateur final.
+
+### Tests
+- **2 nouveaux helpers purs** dans `MaintenanceHelper` :
+  - `PartitionDeactivationTargets(trackedIds, userLookup)` — classifie les IDs en 3 buckets (`ToReEnable` / `MalformedIds` / `MissingUserIds`). `DeactivateAsync` en dépend désormais.
+  - `SelectUsersNeedingReDisable(trackedIds, userLookup)` — retourne les users actuellement enabled qui devraient être disabled (drift). `EnsureUsersDisabledAsync` en dépend.
+- **6 nouveaux tests xUnit** (`MaintenanceHelperTests`) :
+  - `PartitionDeactivationTargets_ClassifiesIntoThreeBuckets` (mix valides + malformés + ghosts)
+  - `PartitionDeactivationTargets_EmptyInput_ReturnsEmptyPlan`
+  - `PartitionDeactivationTargets_AllValidUsers_NoDataLoss`
+  - `SelectUsersNeedingReDisable_OnlyReturnsCurrentlyEnabledUsers`
+  - `SelectUsersNeedingReDisable_SilentlySkipsMalformedAndMissing`
+  - `SelectUsersNeedingReDisable_NoDriftedUsers_ReturnsEmpty`
+- Total **89 tests**, tous verts. La logique business critique (qui se fait disable/re-enable/re-disable) est désormais protégée à 100% par tests.
+
+### Modifié
+- **Logging structuré** : `BeginScope("Activate")` / `BeginScope("Deactivate")` / `BeginScope("DriftCheck")` autour des opérations multi-step de `MaintenanceHelper`. Permet de filtrer les logs par opération dans tout système d'observabilité (Seq, Loki, Datadog…). Aucun changement du format de message.
+- **`LogTrace` pour le drift no-op** (`Drift check ran, no drift detected (N tracked users still consistent)`). Au niveau `Trace` (silencieux par défaut) — utile pour debug ciblé sans polluer `Information`.
+
+### Refactor majeur
+- **`configPage.html` passe de 4376 à 1329 lignes** (-70%). Les 3048 lignes de JavaScript inline sont extraites dans un nouveau fichier `Jellyfin.Plugin.MaintenanceDeluxe/Configuration/admin.js` (EmbeddedResource).
+- Nouveau endpoint `GET /MaintenanceDeluxe/admin.js` (public, même modèle de sécurité que `banner.js` : le code n'est qu'une UI, toutes les actions admin restent gardées server-side par les attributs `[Authorize(Policy="RequiresElevation")]` sur leurs endpoints respectifs).
+- **Pourquoi c'est important** : l'historique du plugin a deux fix critiques (v0.1.11 et v0.1.12) où l'admin UI était totalement morte à cause d'un bug de parsing JS inline silencieux. Avec un fichier .js séparé, le `node --check` du CI valide le JS isolément et la classe de bug ne peut plus survenir.
+
+### CI
+- Le workflow CI remplace l'extraction Python du inline JS (`scripts/check_inline_script.py`) par un `node --check` direct sur `Configuration/admin.js`.
+- Nouveau garde-fou : la CI **refuse** désormais tout commit qui réintroduit du JS inline dans `configPage.html`.
+
 ## [0.3.6.0] — 2026-04-29
 
 Aperçu admin agrandi : la carte remplit la zone visible.
@@ -172,6 +202,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.7.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.7
 [0.3.6.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.6
 [0.3.5.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.5
 [0.3.4.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.4
