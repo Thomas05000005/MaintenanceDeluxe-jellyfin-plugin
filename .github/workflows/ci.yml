@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Node 20 is deprecated on GHA runners (forced removal Sep 2026). Opt into Node 24
+# now to surface any incompatibilities while we still have the fallback option.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check:
     name: build + lint

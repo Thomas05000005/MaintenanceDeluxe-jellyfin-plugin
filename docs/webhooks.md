@@ -1,6 +1,6 @@
 # Notifications par webhook
 
-Depuis la version **0.3.1**, MaintenanceDeluxe peut envoyer une notification HTTP à chaque transition de maintenance (activation, désactivation). Le format du payload est auto-détecté à partir de l'URL : Discord, Slack ou JSON générique.
+Depuis la version **0.3.1**, MaintenanceDeluxe peut envoyer une notification HTTP à chaque transition de maintenance (activation, désactivation). Depuis **0.3.3**, un événement supplémentaire est émis juste avant un redémarrage serveur planifié. Le format du payload est auto-détecté à partir de l'URL : Discord, Slack ou JSON générique.
 
 ## Configuration
 
@@ -12,9 +12,12 @@ Dans **Tableau de bord → Plugins → MaintenanceDeluxe → tab Maintenance**, 
 | Activer les notifications | Coupe-circuit global. Si décoché, aucune requête HTTP n'est envoyée. |
 | Notifier à l'activation | Envoie le payload quand la maintenance démarre (activation manuelle ou programmée). |
 | Notifier à la désactivation | Envoie le payload quand la maintenance se termine. |
-| Tester la notification | Envoie immédiatement un payload de test. Limité à 1 appel toutes les 5 secondes par IP. |
+| Notifier avant un redémarrage *(v0.3.3+)* | Envoie le payload juste avant un `scheduledRestart` planifié — la requête est `await`ée (timeout 5 s) avant que Jellyfin ne shutdown, pour laisser le temps au message de partir. |
+| Tester la notification | Envoie immédiatement un payload de test. Rate-limit global de 1 appel toutes les 5 secondes (tous admins confondus, depuis v0.3.3). |
 
 Une URL invalide (autre que `https://...`) bloque l'enregistrement avec un message d'erreur. Les secrets webhook ne doivent jamais transiter en clair, donc `http://` est explicitement refusé.
+
+> **Note v0.3.3** : si l'URL pointe vers un host qui n'est ni `discord.com`, ni `discordapp.com`, ni `hooks.slack.com`, le serveur log un `Warning` (sans bloquer la sauvegarde). Les webhooks génériques restent acceptés ; ce log permet juste de repérer un typo ou une URL pasted-by-accident.
 
 ## Auto-détection du format
 
@@ -45,6 +48,8 @@ Une URL invalide (autre que `https://...`) bloque l'enregistrement avec un messa
 ```
 
 À la désactivation, le titre devient `✅ Maintenance terminée` et la couleur passe au vert.
+
+À l'événement `Restarting` (v0.3.3+), le titre est `🔁 Redémarrage en cours`, la description `Le serveur Jellyfin redémarre, retour imminent.` et la couleur rouge clair (`0xE57373`).
 
 ## Format Slack
 
@@ -88,6 +93,7 @@ Pour les intégrations custom (Home Assistant, n8n, ntfy, IFTTT…) :
 Champ `event` :
 - `maintenance_activated` : transition vers actif
 - `maintenance_deactivated` : transition vers inactif
+- `server_restarting` *(v0.3.3+)* : juste avant un redémarrage serveur planifié
 - `maintenance_test` : payload de test envoyé via le bouton
 
 ## Robustesse

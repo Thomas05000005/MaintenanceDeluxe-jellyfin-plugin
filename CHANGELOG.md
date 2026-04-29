@@ -4,6 +4,26 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4.0] — 2026-04-29
+
+Polish post-audit, suite directe à v0.3.3.
+
+### Ajouté
+- **Checkbox `Notifier avant un redémarrage serveur`** dans le tab Maintenance, section *Notifications*. Pilote le champ `WebhookSettings.NotifyOnRestart` ajouté en v0.3.3 mais qui n'avait pas encore de surface UI. Default `true` ; les anciens configs sans le champ sont rétro-compatibles.
+- **Headers HTTP de durcissement** sur les endpoints publics :
+  - `GET /MaintenanceDeluxe/banner.js` → `X-Content-Type-Options: nosniff` + `Cache-Control: public, max-age=300` (le script ne change qu'à un upgrade plugin → DLL nouveau, donc 5 min de cache économise des fetchs sans masquer une release).
+  - `GET /MaintenanceDeluxe/preview.html` → `X-Content-Type-Options: nosniff` + `X-Frame-Options: SAMEORIGIN` (anti-clickjacking ; l'iframe legitimate est servie par Jellyfin lui-même donc same-origin suffit).
+- **Documentation des endpoints API** dans le `README.md` (table récapitulative) + flag `?md-debug=1` documenté.
+- Section `Restarting` + warning host inconnu ajoutés à `docs/webhooks.md`.
+
+### Modifié
+- **`EnsureUsersDisabledAsync`** : log `Information` liste désormais les usernames des comptes ré-disabled, plus seulement leurs UUIDs. Debug d'une dérive (un user re-enable manuellement pendant la maintenance) bien plus rapide.
+- **Workflows GitHub Actions** : opt-in Node.js 24 via `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` au niveau env. Les runners GHA forceront Node 24 par défaut en juin 2026 et retireront Node 20 en septembre 2026 ; mieux vaut surfacer toute incompatibilité maintenant tant que le fallback existe.
+
+### Documentation
+- `docs/webhooks.md` à jour avec l'événement `Restarting`, le champ `NotifyOnRestart`, le warning sur les hosts inconnus, et la note sur le rate-limit global v0.3.3.
+- `README.md` : table récapitulative des 9 endpoints REST exposés par le plugin avec leurs niveaux d'auth, plus une section *Debug flag*.
+
 ## [0.3.3.0] — 2026-04-29
 
 Audit complet du plugin (12 fixes).
@@ -118,6 +138,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.4.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.4
 [0.3.3.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.3
 [0.3.2.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.2
 [0.3.1.1]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.1.1

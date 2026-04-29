@@ -167,6 +167,7 @@ internal static class MaintenanceHelper
             if (!maint.IsActive) return;
 
             int restored = 0;
+            var restoredNames = new List<string>();
             foreach (var idStr in maint.MaintenanceDisabledUserIds)
             {
                 if (!Guid.TryParse(idStr, out var guid)) continue;
@@ -183,16 +184,17 @@ internal static class MaintenanceHelper
                         policy.IsDisabled = true;
                         await userManager.UpdatePolicyAsync(guid, policy).ConfigureAwait(false);
                         restored++;
+                        restoredNames.Add(user.Username ?? guid.ToString());
                     }
                     catch (Exception ex)
                     {
-                        logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserId} during startup consistency check.", guid);
+                        logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
                     }
                 }
             }
 
             if (restored > 0)
-                logger?.LogInformation("[MaintenanceDeluxe] Startup consistency check re-disabled {Count} user(s) that were re-enabled during restart.", restored);
+                logger?.LogInformation("[MaintenanceDeluxe] Drift check re-disabled {Count} user(s) that were re-enabled mid-maintenance: {Users}.", restored, string.Join(", ", restoredNames));
         }
         finally
         {

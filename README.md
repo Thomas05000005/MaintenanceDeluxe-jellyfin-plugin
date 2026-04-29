@@ -89,6 +89,24 @@ Output DLL: `Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugi
 
 A standalone `preview.html` sits at the root of the repo. Open it in any browser and you get the overlay rendered with slider controls to tweak remaining time, total duration, performance tier, and number of release notes. Useful for CSS tweaks before touching the plugin.
 
+## Endpoints (v0.3.3+)
+
+| Method + path | Auth | Purpose |
+|---|---|---|
+| `GET /MaintenanceDeluxe/maintenance` | public | Stripped public snapshot (`PublicMaintenanceSnapshot`) — used by the login-page overlay. UUID lists and webhook URL are removed. |
+| `GET /MaintenanceDeluxe/banner.js` | public | Banner client script, served identically by JS Injector. |
+| `GET /MaintenanceDeluxe/preview.html` | public | HTML shell for the admin live-preview iframe. |
+| `GET /MaintenanceDeluxe/config` | any auth | Banner-client view (`BannerClientConfig`) — full plugin settings **without** `maintenanceMode`. |
+| `GET /MaintenanceDeluxe/config-admin` | admin | Full `PluginConfiguration` including `maintenanceMode` (webhook URL, user UUID lists). |
+| `POST /MaintenanceDeluxe/config` | admin | Save general settings. |
+| `POST /MaintenanceDeluxe/maintenance` | admin | Toggle maintenance / save maintenance fields. |
+| `POST /MaintenanceDeluxe/maintenance/test-webhook` | admin | Send a test payload. Rate-limited to 1 call / 5 s globally. |
+| `GET /MaintenanceDeluxe/users-summary` | admin | Lightweight user list for the whitelist multi-select. |
+
+## Debug flag
+
+Append `?md-debug=1` to any Jellyfin URL to enable verbose `console.debug` output from the banner script (script-load notice, init traces). Without the flag the banner is silent in DevTools so end-users don't see plugin chatter.
+
 ## License
 
 GPL-3.0. See `LICENSE`.

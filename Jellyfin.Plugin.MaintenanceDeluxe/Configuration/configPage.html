@@ -1170,9 +1170,13 @@
                   <input id="webhookNotifyOnActivate" type="checkbox" is="emby-checkbox" checked />
                   <span>Notifier à l'activation de la maintenance</span>
                 </label>
-                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.8em">
+                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.4em">
                   <input id="webhookNotifyOnDeactivate" type="checkbox" is="emby-checkbox" checked />
                   <span>Notifier à la désactivation de la maintenance</span>
+                </label>
+                <label class="emby-checkbox-label" style="display:block;margin-bottom:0.8em">
+                  <input id="webhookNotifyOnRestart" type="checkbox" is="emby-checkbox" checked />
+                  <span>Notifier juste avant un redémarrage serveur planifié</span>
                 </label>
                 <button type="button" id="webhookTestBtn" class="jf-reset-btn">
                   <span class="material-icons">send</span>
@@ -3919,10 +3923,13 @@
             var enabledEl = document.getElementById('webhookEnabled');
             var notifActEl = document.getElementById('webhookNotifyOnActivate');
             var notifDeactEl = document.getElementById('webhookNotifyOnDeactivate');
+            var notifRestartEl = document.getElementById('webhookNotifyOnRestart');
             if (urlEl) urlEl.value = w.url || '';
             if (enabledEl) enabledEl.checked = !!w.enabled;
             if (notifActEl) notifActEl.checked = w.notifyOnActivate !== false;
             if (notifDeactEl) notifDeactEl.checked = w.notifyOnDeactivate !== false;
+            // notifyOnRestart added in v0.3.3 — default true if missing from older configs.
+            if (notifRestartEl) notifRestartEl.checked = w.notifyOnRestart !== false;
           }
 
           function getWebhookFromUi() {
@@ -3930,7 +3937,8 @@
               url: (document.getElementById('webhookUrl').value || '').trim() || null,
               enabled: !!document.getElementById('webhookEnabled').checked,
               notifyOnActivate: !!document.getElementById('webhookNotifyOnActivate').checked,
-              notifyOnDeactivate: !!document.getElementById('webhookNotifyOnDeactivate').checked
+              notifyOnDeactivate: !!document.getElementById('webhookNotifyOnDeactivate').checked,
+              notifyOnRestart: !!document.getElementById('webhookNotifyOnRestart').checked
             };
           }
 

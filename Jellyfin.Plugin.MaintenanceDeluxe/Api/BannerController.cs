@@ -103,6 +103,13 @@ public class BannerController : ControllerBase
             .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Resources.banner.js");
         if (stream is null)
             return NotFound();
+        // nosniff: belt-and-braces against MIME-confusion attacks even though we
+        // already declare application/javascript explicitly.
+        // Cache 5 min: the script is identical for the lifetime of a plugin version,
+        // so this dramatically cuts repeat-fetch traffic without delaying real updates
+        // (a Jellyfin restart is required to load a new DLL anyway).
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Cache-Control"] = "public, max-age=300";
         return File(stream, "application/javascript");
     }
 
@@ -128,6 +135,11 @@ public class BannerController : ControllerBase
 <script src=""/MaintenanceDeluxe/banner.js""></script>
 </body>
 </html>";
+        // SAMEORIGIN: this shell is consumed by the admin live-preview iframe within
+        // Jellyfin itself. Block any third-party site from embedding it (clickjacking).
+        // nosniff: guard against MIME-confusion if a downstream proxy strips the type.
+        Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
         return new ContentResult
         {
             Content = html,
