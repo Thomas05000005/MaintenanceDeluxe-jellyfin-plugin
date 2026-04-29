@@ -14,7 +14,10 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.ScheduledTasks;
 /// <summary>
 /// Runs every minute to drive maintenance scheduling, persistence hardening, and scheduled server restart.
 /// <list type="bullet">
-///   <item>Startup consistency check: re-disables tracked users if the server restarted mid-maintenance.</item>
+///   <item>Startup consistency check: logs once per process lifetime when starting mid-maintenance.</item>
+///   <item>Periodic drift check: while maintenance is active, re-disables any tracked user that
+///         another admin re-enabled via the Jellyfin dashboard. Prevents the maintenance promise
+///         from being silently broken between two server restarts.</item>
 ///   <item>Schedule activate/deactivate: triggers based on <see cref="Configuration.MaintenanceSetting.ScheduledStart"/> / <see cref="Configuration.MaintenanceSetting.ScheduledEnd"/>.</item>
 ///   <item>Scheduled restart: restarts the server at <see cref="Configuration.MaintenanceSetting.ScheduledRestart"/>; clears the field afterward.</item>
 /// </list>
@@ -67,25 +70,37 @@ public class MaintenanceScheduleTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        // ── Startup consistency check (once per process lifetime) ──────────────────
-        if (!_startupCheckDone)
-        {
-            _startupCheckDone = true;
-            var startupPlugin = Plugin.Instance;
-            if (startupPlugin?.Configuration.MaintenanceMode.IsActive == true)
-            {
-                _logger.LogInformation("[MaintenanceDeluxe] Server started mid-maintenance — re-verifying user disabled state.");
-                await MaintenanceHelper.EnsureUsersDisabledAsync(_userManager, _logger).ConfigureAwait(false);
-            }
-        }
-
-        // ── Schedule: auto-activate ────────────────────────────────────────────────
+        // Single Plugin.Instance read for the whole tick. The plugin singleton is
+        // initialised once at process startup and lives until shutdown, so this
+        // reference cannot become null partway through. plugin.Configuration is
+        // an object reference whose fields the helpers mutate in place, so we
+        // re-read plugin.Configuration.MaintenanceMode at each branch boundary
+        // to see the post-helper state without re-fetching the singleton.
         var plugin = Plugin.Instance;
         if (plugin is null) return;
 
-        var maint = plugin.Configuration.MaintenanceMode;
         var now = DateTime.UtcNow;
 
+        // ── Startup log (once per process lifetime) ────────────────────────────────
+        // The actual re-disable now happens unconditionally in the periodic drift
+        // check below — this branch only exists to surface a clear log line on first
+        // tick after a mid-maintenance restart.
+        if (!_startupCheckDone)
+        {
+            _startupCheckDone = true;
+            if (plugin.Configuration.MaintenanceMode.IsActive)
+                _logger.LogInformation("[MaintenanceDeluxe] Server started mid-maintenance — periodic drift check will re-disable any user re-enabled during the restart.");
+        }
+
+        // ── Periodic drift check ───────────────────────────────────────────────────
+        // Runs every tick (1 min). If another admin re-enables a user via the
+        // Jellyfin dashboard while maintenance is active, the next tick puts them
+        // back in the disabled state.
+        if (plugin.Configuration.MaintenanceMode.IsActive)
+            await MaintenanceHelper.EnsureUsersDisabledAsync(_userManager, _logger).ConfigureAwait(false);
+
+        // ── Schedule: auto-activate ────────────────────────────────────────────────
+        var maint = plugin.Configuration.MaintenanceMode;
         if (maint.ScheduleEnabled
             && maint.ScheduledStart.HasValue
             && now >= maint.ScheduledStart.Value
@@ -93,17 +108,12 @@ public class MaintenanceScheduleTask : IScheduledTask
         {
             _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance activation triggered at {Time}.", now);
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
-            var freshMaint = Plugin.Instance?.Configuration.MaintenanceMode;
-            if (freshMaint is not null)
-                await WebhookNotifier.NotifyAsync(freshMaint.Webhook, WebhookEvent.Activated, freshMaint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
+            var freshMaint = plugin.Configuration.MaintenanceMode;
+            await WebhookNotifier.NotifyAsync(freshMaint.Webhook, WebhookEvent.Activated, freshMaint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
         }
 
-        // Reload after possible activation.
-        plugin = Plugin.Instance;
-        if (plugin is null) return;
-        maint = plugin.Configuration.MaintenanceMode;
-
         // ── Schedule: auto-deactivate ──────────────────────────────────────────────
+        maint = plugin.Configuration.MaintenanceMode;
         if (maint.ScheduleEnabled
             && maint.ScheduledEnd.HasValue
             && now >= maint.ScheduledEnd.Value
@@ -130,32 +140,30 @@ public class MaintenanceScheduleTask : IScheduledTask
             // Also clear ScheduledRestart if it was inside the window (admin's intent was likely
             // "restart as part of this maintenance"); preserve it if it was set after ScheduledEnd
             // (admin's intent was likely "schedule a restart later, independent of this window").
-            plugin = Plugin.Instance;
-            if (plugin is not null)
-            {
-                var config = plugin.Configuration;
-                var endValue = config.MaintenanceMode.ScheduledEnd;
-                var restartValue = config.MaintenanceMode.ScheduledRestart;
-                config.MaintenanceMode.ScheduleEnabled = false;
-                config.MaintenanceMode.ScheduledStart = null;
-                config.MaintenanceMode.ScheduledEnd = null;
-                if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
-                {
-                    config.MaintenanceMode.ScheduledRestart = null;
-                }
-                plugin.UpdateConfiguration(config);
-                plugin.SaveConfiguration();
-            }
+            var config = plugin.Configuration;
+            var endValue = config.MaintenanceMode.ScheduledEnd;
+            var restartValue = config.MaintenanceMode.ScheduledRestart;
+            config.MaintenanceMode.ScheduleEnabled = false;
+            config.MaintenanceMode.ScheduledStart = null;
+            config.MaintenanceMode.ScheduledEnd = null;
+            if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
+                config.MaintenanceMode.ScheduledRestart = null;
+            plugin.UpdateConfiguration(config);
+            plugin.SaveConfiguration();
         }
 
         // ── Scheduled restart ──────────────────────────────────────────────────────
-        plugin = Plugin.Instance;
-        if (plugin is null) return;
         maint = plugin.Configuration.MaintenanceMode;
-
         if (maint.ScheduledRestart.HasValue && now >= maint.ScheduledRestart.Value)
         {
             _logger.LogInformation("[MaintenanceDeluxe] Scheduled server restart triggered at {Time}.", now);
+
+            // Notify webhook BEFORE restart so subscribers know what's happening.
+            // We await it (with WebhookNotifier's own 5s timeout cap) so the HTTP request
+            // gets a chance to complete before Jellyfin tears down the host. The notifier
+            // never throws, so a webhook failure cannot prevent the restart.
+            await WebhookNotifier.NotifyAsync(maint.Webhook, WebhookEvent.Restarting, maint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
+
             var config = plugin.Configuration;
             config.MaintenanceMode.ScheduledRestart = null;
             plugin.UpdateConfiguration(config);

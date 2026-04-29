@@ -1423,9 +1423,12 @@
     }
 
     // Diagnostic log (helps users/devs troubleshoot when overlay doesn't appear).
-    try { console.debug("[MaintenanceDeluxe] script loaded", {
-        href: window.location.href, readyState: document.readyState
-    }); } catch (e) {}
+    // Guarded behind ?md-debug=1 so end-users opening DevTools don't see plugin chatter.
+    if (/[?&]md-debug=1\b/.test(window.location.href)) {
+        try { console.debug("[MaintenanceDeluxe] script loaded", {
+            href: window.location.href, readyState: document.readyState
+        }); } catch (e) {}
+    }
 
     // Re-fetches /MaintenanceDeluxe/maintenance and applies state. Safe to call often.
     function refetchAndApplyMaintenance() {

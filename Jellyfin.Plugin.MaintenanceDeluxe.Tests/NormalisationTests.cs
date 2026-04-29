@@ -123,4 +123,20 @@ public class NormalisationTests
     {
         Assert.Equal(expected, BannerController.NormaliseOptionalString(input, max));
     }
+
+    [Theory]
+    [InlineData("discord.com", true)]
+    [InlineData("DISCORD.COM", true)]
+    [InlineData("discordapp.com", true)]
+    [InlineData("hooks.slack.com", true)]
+    [InlineData("HOOKS.SLACK.COM", true)]
+    [InlineData("example.com", false)]
+    [InlineData("notslack.com", false)]
+    [InlineData("evil.discord.com.attacker.tld", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsKnownWebhookHost_RecognisesProviders(string? host, bool expected)
+    {
+        Assert.Equal(expected, BannerController.IsKnownWebhookHost(host));
+    }
 }

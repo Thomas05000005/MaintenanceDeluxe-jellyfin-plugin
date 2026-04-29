@@ -12,6 +12,14 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      Pulled in WITHOUT ExcludeAssets=runtime (unlike the plugin csproj) so that
+      tests instantiating PluginConfiguration — which inherits from
+      BasePluginConfiguration in MediaBrowser.Model — can load the runtime
+      assembly. The plugin itself relies on Jellyfin server providing this DLL
+      at runtime; the test process has to ship its own copy.
+    -->
+    <PackageReference Include="Jellyfin.Model" Version="10.11.6" />
   </ItemGroup>
 
   <ItemGroup>

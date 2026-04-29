@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,7 +23,8 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 ///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (UUID-stripped snapshot for the login-page overlay)</item>
 ///   <item><c>GET /MaintenanceDeluxe/banner.js</c> — public (script injected on every page; same bytes as the JavaScriptInjector copy)</item>
 ///   <item><c>GET /MaintenanceDeluxe/preview.html</c> — public (HTML shell consumed by the admin live-preview iframe; iframe navigation does not carry Authorization headers)</item>
-///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (full plugin config, only authenticated clients)</item>
+///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (banner-client view; <see cref="BannerClientConfig"/>, no admin-only data)</item>
+///   <item><c>GET /MaintenanceDeluxe/config-admin</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (full <see cref="PluginConfiguration"/> incl. webhook URL and user UUID lists)</item>
 ///   <item><c>POST /MaintenanceDeluxe/config</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only write)</item>
 ///   <item><c>POST /MaintenanceDeluxe/maintenance</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only toggle)</item>
 ///   <item><c>POST /MaintenanceDeluxe/maintenance/test-webhook</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only webhook check)</item>
@@ -39,8 +39,12 @@ public class BannerController : ControllerBase
     private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<BannerController> _logger;
 
-    // Per-IP rate-limit for /test-webhook (1 call / 5s).
-    private static readonly ConcurrentDictionary<string, DateTime> _testWebhookLastCall = new();
+    // Global rate-limit for /test-webhook (1 call / 5s, all admins combined).
+    // Previously a per-IP ConcurrentDictionary, but (a) Jellyfin is typically behind a
+    // reverse proxy so RemoteIpAddress is the proxy IP — all admins shared the same
+    // bucket anyway — and (b) the dict grew unboundedly. /test-webhook is admin-only
+    // and rarely exercised, so a single global cooldown is the simplest correct design.
+    private static long _testWebhookLastCallTicks; // DateTime.UtcNow.Ticks
     private static readonly TimeSpan _testWebhookCooldown = TimeSpan.FromSeconds(5);
 
     /// <summary>Initializes a new instance of <see cref="BannerController"/>.</summary>
@@ -51,14 +55,34 @@ public class BannerController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Returns the current plugin configuration. Returns 503 if the plugin instance is not yet initialised
-    /// (avoids serving phantom defaults during a partial bootstrap).</summary>
+    /// <summary>Returns the banner-client view of the plugin configuration. This is the
+    /// non-elevated endpoint — any authenticated user can call it, so the response is
+    /// scrubbed of admin-only data (webhook URL, user UUID lists) via <see cref="BannerClientConfig"/>.
+    /// banner.js never reads <c>maintenanceMode</c> from <c>/config</c> (it polls the
+    /// <c>/maintenance</c> snapshot instead), so this view is sufficient.
+    /// Returns 503 if the plugin instance is not yet initialised (avoids serving phantom defaults).</summary>
     [HttpGet("config")]
     [Authorize]
     [Produces("application/json")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
-    public ActionResult<PluginConfiguration> GetConfig()
+    public ActionResult<BannerClientConfig> GetConfig()
+    {
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+        return Ok(BannerClientConfig.From(Plugin.Instance.Configuration));
+    }
+
+    /// <summary>Returns the FULL plugin configuration including <c>maintenanceMode</c>
+    /// (webhook URL, whitelistedUserIds, maintenanceDisabledUserIds, preDisabledUserIds).
+    /// Admin-only — the admin config page reads from here so it can render the whitelist
+    /// widget and the webhook tab. Returns 503 if the plugin instance is not yet initialised.</summary>
+    [HttpGet("config-admin")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PluginConfiguration> GetConfigAdmin()
     {
         if (Plugin.Instance is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
@@ -214,6 +238,10 @@ public class BannerController : ControllerBase
         if (Plugin.Instance is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
         var maint = Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting();
+        // Anonymous endpoint — banner.js polls it on every SPA navigation. Allow a short
+        // public cache so a tab that navigates 10 times in 10s only hits the server once.
+        // 10s is short enough that admin toggles propagate to clients within one cycle.
+        Response.Headers["Cache-Control"] = "public, max-age=10";
         return Ok(PublicMaintenanceSnapshot.From(maint));
     }
 
@@ -238,12 +266,26 @@ public class BannerController : ControllerBase
             && maintenance.ScheduledEnd.Value <= maintenance.ScheduledStart.Value)
             return BadRequest("scheduledEnd must be after scheduledStart.");
 
+        // Refuse a scheduledRestart absurdly far in the future. The scheduler polls
+        // every minute, so a 50-year-out value just sits and pollutes config; cap it
+        // to a reasonable horizon so typos can't stay invisible forever.
+        if (maintenance.ScheduledRestart.HasValue
+            && maintenance.ScheduledRestart.Value > DateTime.UtcNow.AddDays(MaxScheduledRestartHorizonDays))
+            return BadRequest($"scheduledRestart must be within {MaxScheduledRestartHorizonDays} days from now.");
+
         // Webhook URL must be https:// (no http:// — secrets in webhook tokens must not transit cleartext).
         if (maintenance.Webhook is not null && !string.IsNullOrWhiteSpace(maintenance.Webhook.Url))
         {
             if (!Uri.TryCreate(maintenance.Webhook.Url, UriKind.Absolute, out var hookUri)
                 || hookUri.Scheme != Uri.UriSchemeHttps)
                 return BadRequest("Webhook URL must be a valid https:// URL.");
+
+            // Soft warning when the host is not a recognised webhook provider. Doesn't
+            // block the save — Generic webhooks to admin's own infra are legitimate —
+            // but flags accidental SSRF-as-a-feature (e.g. typo'd internal hostname,
+            // pasted attacker-controlled URL) in the server log so it isn't silent.
+            if (!IsKnownWebhookHost(hookUri.Host))
+                _logger.LogWarning("[MaintenanceDeluxe] Webhook URL host '{Host}' is not a recognised provider (Discord/Slack). Generic webhook accepted; verify it points to your own infrastructure.", hookUri.Host);
         }
 
         var config = Plugin.Instance.Configuration;
@@ -286,9 +328,12 @@ public class BannerController : ControllerBase
 
         if (!wasActive && maintenance.IsActive)
         {
-            // Persist updated fields before activation so the helper reads the latest message/url.
+            // In-memory pointer update only — the helper does a single SaveConfiguration
+            // at the end of its critical section, after also writing IsActive/ActivatedAt
+            // and the disabled-user lists. Doing two saves here was a benign race window
+            // where a concurrent GET /config-admin could see post-controller-fields but
+            // pre-helper-state.
             Plugin.Instance.UpdateConfiguration(config);
-            Plugin.Instance.SaveConfiguration();
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(
                 Plugin.Instance.Configuration.MaintenanceMode.Webhook,
@@ -302,7 +347,6 @@ public class BannerController : ControllerBase
             // Snapshot counts BEFORE deactivation clears the lists.
             var snapshotForNotif = ClonePublicFields(Plugin.Instance.Configuration.MaintenanceMode);
             Plugin.Instance.UpdateConfiguration(config);
-            Plugin.Instance.SaveConfiguration();
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(
                 Plugin.Instance.Configuration.MaintenanceMode.Webhook,
@@ -313,6 +357,7 @@ public class BannerController : ControllerBase
         }
         else
         {
+            // No state transition → no helper involved → save here.
             Plugin.Instance.UpdateConfiguration(config);
             Plugin.Instance.SaveConfiguration();
         }
@@ -335,11 +380,14 @@ public class BannerController : ControllerBase
         if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             return BadRequest(new { error = "Webhook URL must be a valid https:// URL." });
 
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        var now = DateTime.UtcNow;
-        if (_testWebhookLastCall.TryGetValue(ip, out var last) && now - last < _testWebhookCooldown)
+        // Atomic compare-and-swap on the global timestamp: only the first caller in a
+        // 5-second window passes; subsequent callers (from any admin / any IP) get 429.
+        var nowTicks = DateTime.UtcNow.Ticks;
+        var lastTicks = Interlocked.Read(ref _testWebhookLastCallTicks);
+        if (nowTicks - lastTicks < _testWebhookCooldown.Ticks)
             return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Patiente quelques secondes avant un nouveau test." });
-        _testWebhookLastCall[ip] = now;
+        if (Interlocked.CompareExchange(ref _testWebhookLastCallTicks, nowTicks, lastTicks) != lastTicks)
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Patiente quelques secondes avant un nouveau test." });
 
         var (status, response) = await WebhookNotifier.TestAsync(body.Url, _httpFactory, _logger, ct).ConfigureAwait(false);
         return Ok(new { statusCode = status, body = response });
@@ -431,6 +479,16 @@ public class BannerController : ControllerBase
         return null;
     }
 
+    /// <summary>True if the host is a recognised webhook provider. Used only for logging,
+    /// not enforcement — generic webhooks remain accepted.</summary>
+    internal static bool IsKnownWebhookHost(string? host)
+    {
+        if (string.IsNullOrEmpty(host)) return false;
+        return host.Equals("discord.com", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("hooks.slack.com", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Returns true for null/empty URLs and URLs starting with http://, https://, or /.</summary>
     internal static bool IsUrlSafe(string? url)
     {
@@ -448,6 +506,7 @@ public class BannerController : ControllerBase
     private const int MaxReleaseNoteTitleLength = 200;
     private const int MaxReleaseNoteBodyLength = 4000;
     private const int MaxIconLength = 8;
+    private const int MaxScheduledRestartHorizonDays = 30;
 
     private static readonly HashSet<string> _validThemes =
         new(StringComparer.Ordinal) { "velours" };

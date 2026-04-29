@@ -25,6 +25,7 @@ internal enum WebhookEvent
 {
     Activated,
     Deactivated,
+    Restarting,
     Test
 }
 
@@ -62,6 +63,7 @@ internal static class WebhookNotifier
         if (settings is null || !settings.Enabled || string.IsNullOrWhiteSpace(settings.Url)) return;
         if (evt == WebhookEvent.Activated && !settings.NotifyOnActivate) return;
         if (evt == WebhookEvent.Deactivated && !settings.NotifyOnDeactivate) return;
+        if (evt == WebhookEvent.Restarting && !settings.NotifyOnRestart) return;
 
         try
         {
@@ -192,6 +194,11 @@ internal static class WebhookNotifier
             "Le serveur est de nouveau accessible.",
             0x4CAF50,
             "maintenance_deactivated"),
+        WebhookEvent.Restarting => (
+            "🔁 Redémarrage en cours",
+            "Le serveur Jellyfin redémarre, retour imminent.",
+            0xE57373,
+            "server_restarting"),
         _ => ("MaintenanceDeluxe", "Notification", 0x808080, "maintenance_event")
     };
 

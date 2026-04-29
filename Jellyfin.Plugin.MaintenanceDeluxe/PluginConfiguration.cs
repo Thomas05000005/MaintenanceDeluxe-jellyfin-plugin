@@ -392,11 +392,104 @@ public class WebhookSettings
     /// <summary>Gets or sets a value indicating whether to notify when maintenance deactivates. Default true.</summary>
     [JsonPropertyName("notifyOnDeactivate")]
     public bool NotifyOnDeactivate { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether to notify just before a scheduled server restart. Default true.</summary>
+    [JsonPropertyName("notifyOnRestart")]
+    public bool NotifyOnRestart { get; set; } = true;
+}
+
+/// <summary>
+/// Snapshot of <see cref="PluginConfiguration"/> exposed to non-admin authenticated callers
+/// via <c>GET /MaintenanceDeluxe/config</c>. Mirrors every field of PluginConfiguration EXCEPT
+/// <see cref="PluginConfiguration.MaintenanceMode"/>, which carries admin-only data
+/// (<c>WhitelistedUserIds</c>, <c>MaintenanceDisabledUserIds</c>, <c>PreDisabledUserIds</c>,
+/// <c>Webhook.Url</c>) and is already covered for end-users by the public
+/// <c>GET /MaintenanceDeluxe/maintenance</c> endpoint via <see cref="PublicMaintenanceSnapshot"/>.
+/// banner.js never reads <c>config.maintenanceMode</c>, so dropping it does not affect the client.
+/// </summary>
+public class BannerClientConfig
+{
+#pragma warning disable CS1591 // Public-facing fields mirror PluginConfiguration; doc lives there.
+    [JsonPropertyName("displayDuration")]
+    public int DisplayDuration { get; set; }
+    [JsonPropertyName("pauseDuration")]
+    public int PauseDuration { get; set; }
+    [JsonPropertyName("showDismissButton")]
+    public bool ShowDismissButton { get; set; }
+    [JsonPropertyName("dismissButtonSize")]
+    public int DismissButtonSize { get; set; }
+    [JsonPropertyName("showDismissAll")]
+    public bool ShowDismissAll { get; set; }
+    [JsonPropertyName("dismissAllSize")]
+    public int DismissAllSize { get; set; }
+    [JsonPropertyName("dismissAllText")]
+    public string DismissAllText { get; set; } = string.Empty;
+    [JsonPropertyName("permanentOverride")]
+    public PermanentOverride PermanentOverride { get; set; } = new();
+    [JsonPropertyName("showInDashboard")]
+    public bool ShowInDashboard { get; set; }
+    [JsonPropertyName("rotationEnabled")]
+    public bool RotationEnabled { get; set; }
+    [JsonPropertyName("rotationMessages")]
+    public List<BannerMessage> RotationMessages { get; set; } = new();
+    [JsonPropertyName("colorPresets")]
+    public List<ColorPreset> ColorPresets { get; set; } = new();
+    [JsonPropertyName("textAlign")]
+    public string TextAlign { get; set; } = "center";
+    [JsonPropertyName("rotationShuffle")]
+    public bool RotationShuffle { get; set; }
+    [JsonPropertyName("persistDismiss")]
+    public bool PersistDismiss { get; set; }
+    [JsonPropertyName("permanentDismissible")]
+    public bool PermanentDismissible { get; set; }
+    [JsonPropertyName("transitionSpeed")]
+    public string TransitionSpeed { get; set; } = "normal";
+    [JsonPropertyName("fontSize")]
+    public int FontSize { get; set; }
+    [JsonPropertyName("bannerHeight")]
+    public int BannerHeight { get; set; }
+    [JsonPropertyName("fontBold")]
+    public bool FontBold { get; set; }
+    [JsonPropertyName("showRefreshPrompt")]
+    public bool ShowRefreshPrompt { get; set; }
+    [JsonPropertyName("urlPopupHint")]
+    public string UrlPopupHint { get; set; } = string.Empty;
+    [JsonPropertyName("lastModified")]
+    public long LastModified { get; set; }
+
+    public static BannerClientConfig From(PluginConfiguration c) => new()
+    {
+        DisplayDuration = c.DisplayDuration,
+        PauseDuration = c.PauseDuration,
+        ShowDismissButton = c.ShowDismissButton,
+        DismissButtonSize = c.DismissButtonSize,
+        ShowDismissAll = c.ShowDismissAll,
+        DismissAllSize = c.DismissAllSize,
+        DismissAllText = c.DismissAllText,
+        PermanentOverride = c.PermanentOverride,
+        ShowInDashboard = c.ShowInDashboard,
+        RotationEnabled = c.RotationEnabled,
+        RotationMessages = c.RotationMessages,
+        ColorPresets = c.ColorPresets,
+        TextAlign = c.TextAlign,
+        RotationShuffle = c.RotationShuffle,
+        PersistDismiss = c.PersistDismiss,
+        PermanentDismissible = c.PermanentDismissible,
+        TransitionSpeed = c.TransitionSpeed,
+        FontSize = c.FontSize,
+        BannerHeight = c.BannerHeight,
+        FontBold = c.FontBold,
+        ShowRefreshPrompt = c.ShowRefreshPrompt,
+        UrlPopupHint = c.UrlPopupHint,
+        LastModified = c.LastModified
+    };
+#pragma warning restore CS1591
 }
 
 /// <summary>
 /// Plugin configuration for MaintenanceDeluxe.
-/// Serialized to XML by Jellyfin and exposed as JSON via <c>/MaintenanceDeluxe/config</c>.
+/// Serialized to XML by Jellyfin and exposed as JSON via <c>/MaintenanceDeluxe/config-admin</c> (admin-only).
+/// Non-admin clients read a stripped-down view via <see cref="BannerClientConfig"/> on <c>/MaintenanceDeluxe/config</c>.
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {

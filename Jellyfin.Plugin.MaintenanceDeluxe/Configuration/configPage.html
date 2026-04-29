@@ -3029,8 +3029,8 @@
           // ── maintenance mode ───────────────────────────────────────
 
           function escHtml(s) {
-            return String(s).replace(/[<>&"]/g, function (c) {
-              return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c];
+            return String(s).replace(/[<>&"']/g, function (c) {
+              return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c];
             });
           }
 
@@ -4074,9 +4074,9 @@
               }),
               contentType: 'application/json'
             }).then(function () {
-              // Re-fetch /config (admin-only) so we get the FULL maintenanceMode including
-              // UUID lists; the public /maintenance endpoint strips those for privacy.
-              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+              // Re-fetch /config-admin (admin-only) so we get the FULL maintenanceMode including
+              // UUID lists; /config (banner-client view) drops them and /maintenance (public) too.
+              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
                 .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
             });
           }
@@ -4148,7 +4148,7 @@
 
           function exportConfig() {
             var resultEl = document.getElementById('mdConfigIoResult');
-            ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+            ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
               .then(function (cfg) {
                 var payload = buildExportPayload(cfg);
                 var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -4333,9 +4333,10 @@
             .addEventListener('pageshow', function () {
               initDom();
               checkDependencies();
-              // /config is admin-only and contains the FULL maintenanceMode including UUID lists.
-              // /maintenance (public) strips them for privacy, so the admin UI must use /config.
-              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config'))
+              // /config-admin (RequiresElevation) returns the FULL maintenanceMode including UUID lists.
+              // /config is the banner-client view and drops maintenanceMode for non-admin privacy,
+              // /maintenance (public) drops it too. The admin UI MUST use /config-admin.
+              ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
                 .then(function (config) {
                   populatePage(config);
                   applyMaintenanceUi(config && config.maintenanceMode);

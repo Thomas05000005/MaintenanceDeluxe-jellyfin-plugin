@@ -4,6 +4,34 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3.0] — 2026-04-29
+
+Audit complet du plugin (12 fixes).
+
+### Sécurité
+- **`GET /config` ne fuit plus les secrets aux non-admins.** Retourne désormais un DTO `BannerClientConfig` qui mirroir `PluginConfiguration` **sauf `MaintenanceMode`**. L'URL webhook (secret Discord/Slack qui permet de poster dans le canal) et les listes UUID utilisateurs (`MaintenanceDisabledUserIds`, `PreDisabledUserIds`, `WhitelistedUserIds`) ne sont plus accessibles aux utilisateurs Jellyfin standards. Nouvel endpoint `GET /config-admin` (`[Authorize(Policy="RequiresElevation")]`) pour la page de config admin.
+- **Drift check périodique pendant la maintenance.** `EnsureUsersDisabledAsync` est désormais appelée à chaque tick (1 min) du scheduled task quand maintenance est active, plus uniquement au startup. Si un autre admin re-enable un utilisateur via la dashboard Jellyfin pendant la maintenance, il est ré-disabled dans la minute — la promesse de maintenance ne peut plus être silencieusement cassée jusqu'au prochain restart serveur.
+- **Webhook URL : warning sur host inconnu.** Log `Warning` côté serveur si l'URL webhook pointe vers un host autre que Discord/Slack. Les webhooks génériques restent acceptés (pas de blocage), mais un typo ou une URL pasted attacker-controlled est désormais visible dans les logs.
+- **`escHtml` côté admin échappe l'apostrophe** (`'` → `&#39;`). Latent — pas d'XSS aujourd'hui car tous les usages sont en text content ou attribut double-quoted, mais durci pour les futurs ajouts.
+
+### Ajouté
+- **Notification webhook `Restarting`** envoyée juste avant un redémarrage serveur planifié (`scheduledRestart`). `await`ée (avec timeout interne 5 s du `WebhookNotifier`) pour laisser la requête HTTP partir avant le shutdown Jellyfin. Toggle via nouveau champ `WebhookSettings.NotifyOnRestart` (default `true`).
+- **`Cache-Control: public, max-age=10`** sur `GET /MaintenanceDeluxe/maintenance` (endpoint anonyme). banner.js poll à chaque navigation SPA — le cache court réduit la charge sans masquer les toggles admin > 10 s.
+- **Borne supérieure de 30 jours sur `scheduledRestart`.** Refus avec `400 Bad Request` si l'admin saisit une date > 30 jours dans le futur (typos et configs polluées détectables).
+- **13 nouveaux tests xUnit** : 3 sur `BannerClientConfig.From` (incluant un *guard test* anti-drift via reflection des `JsonPropertyName`) + 10 sur `IsKnownWebhookHost` (incluant le cas `evil.discord.com.attacker.tld` → `false`). Total **74 tests**.
+
+### Modifié
+- **`MaintenanceScheduleTask.ExecuteAsync`** : un seul `Plugin.Instance` read en début de tick ; `plugin.Configuration.MaintenanceMode` re-lu aux frontières de branches activate/deactivate/restart pour voir les modifications faites par les helpers. Plus cohérent face aux modifications inter-branches.
+- **JS Injector retry** : backoff exponentiel `5/15/45/120/300/600 s` (~18 min total) au lieu de `3 × 5 s`. Donne le temps au plugin de se rattacher sur les hosts lents (low-CPU NAS, cold-cache containers).
+- **`Plugin.ScheduleRetry`** : nouveau helper qui encapsule le `Task.Run` avec try/catch propre. Plus de fire-and-forget orphelin qui pourrait remonter à `TaskScheduler.UnobservedTaskException`.
+- **`SaveMaintenance` (controller)** : plus de double `SaveConfiguration()` dans les branches activate/deactivate. Le helper save unique en fin de section critique. Fenêtre de race fermée où un `GET /config-admin` concurrent voyait un état intermédiaire.
+
+### Corrigé
+- **Rate-limit `/test-webhook`** : remplacé `ConcurrentDictionary<string, DateTime>` per-IP par un `long` global atomique (`Interlocked.CompareExchange`). (a) Plus de memory leak — la map croissait sans limite ; (b) plus de bypass derrière reverse proxy — toutes les IP réelles partageaient le bucket de l'IP du proxy.
+
+### Tests
+- 74 tests passent (61 v0.3.2 + 13 nouveaux).
+
 ## [0.3.2.0] — 2026-04-28
 
 ### Ajouté
@@ -90,6 +118,7 @@ Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/)
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.3.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.3
 [0.3.2.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.2
 [0.3.1.1]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.1.1
 [0.3.1.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.1

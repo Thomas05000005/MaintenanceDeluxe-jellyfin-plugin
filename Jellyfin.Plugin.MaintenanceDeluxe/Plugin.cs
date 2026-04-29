@@ -19,8 +19,12 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe;
 public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
     private readonly ILogger<Plugin> _logger;
-    private int _retryCount = 0;
-    private const int MaxRetries = 3;
+    private int _retryCount;
+
+    // Exponential backoff: 5s, 15s, 45s, 2min, 5min, 10min — total ~18 min, gives JS Injector
+    // ample time to start on slow hosts (low-CPU NAS, cold-cache containers) where 3×5s wasn't
+    // enough. Each value is in seconds.
+    private static readonly int[] _retryDelaysSeconds = [5, 15, 45, 120, 300, 600];
 
     /// <summary>
     /// Gets the singleton plugin instance.
@@ -114,24 +118,40 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
         {
             // JS Injector's singleton is not ready yet — retry after all plugins have initialised.
-            if (_retryCount >= MaxRetries)
+            if (_retryCount >= _retryDelaysSeconds.Length)
             {
-                _logger.LogWarning("[MaintenanceDeluxe] JS Injector not ready after {MaxRetries} retries — banner script will not be injected.", MaxRetries);
+                _logger.LogWarning("[MaintenanceDeluxe] JS Injector not ready after {MaxRetries} retries — banner script will not be injected. Restart Jellyfin if JS Injector becomes available later.", _retryDelaysSeconds.Length);
                 return;
             }
 
+            var delaySeconds = _retryDelaysSeconds[_retryCount];
             _retryCount++;
-            _logger.LogInformation("[MaintenanceDeluxe] JS Injector not ready yet, retrying in 5 s (attempt {Attempt}/{MaxRetries})...", _retryCount, MaxRetries);
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5));
-                RegisterWithJsInjector();
-            });
+            _logger.LogInformation("[MaintenanceDeluxe] JS Injector not ready yet, retrying in {Delay}s (attempt {Attempt}/{MaxRetries}).", delaySeconds, _retryCount, _retryDelaysSeconds.Length);
+            ScheduleRetry(delaySeconds);
         }
         catch (Exception ex)
         {
             // Intentionally broad: this plugin must not crash the server.
             _logger.LogError(ex, "[MaintenanceDeluxe] Failed to register with JS Injector.");
         }
+    }
+
+    /// <summary>Schedules <see cref="RegisterWithJsInjector"/> after a delay, with full
+    /// exception capture inside the background task so an in-retry failure cannot escape
+    /// to <c>TaskScheduler.UnobservedTaskException</c>.</summary>
+    private void ScheduleRetry(int delaySeconds)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds)).ConfigureAwait(false);
+                RegisterWithJsInjector();
+            }
+            catch (Exception retryEx)
+            {
+                _logger.LogError(retryEx, "[MaintenanceDeluxe] JS Injector retry task failed unexpectedly.");
+            }
+        });
     }
 }
