@@ -74,7 +74,7 @@ internal static class WebhookNotifier
         catch (Exception ex)
         {
             // Intentionally broad: a webhook failure must never block maintenance.
-            logger?.LogWarning(ex, "[MaintenanceDeluxe] Webhook notification failed for event {Event}.", evt);
+            logger?.LogWarning(ex, "Webhook notification failed for event {Event}.", evt);
         }
     }
 
@@ -94,7 +94,7 @@ internal static class WebhookNotifier
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "[MaintenanceDeluxe] Test webhook failed.");
+            logger?.LogWarning(ex, "Test webhook failed.");
             return (0, ex.Message);
         }
     }
@@ -123,19 +123,19 @@ internal static class WebhookNotifier
 
                 if (status >= 500 && attempt == 1)
                 {
-                    logger?.LogDebug("[MaintenanceDeluxe] Webhook returned {Status}, retrying once.", status);
+                    logger?.LogDebug("Webhook returned {Status}, retrying once.", status);
                     continue;
                 }
                 return (status, body);
             }
             catch (TaskCanceledException) when (attempt == 1)
             {
-                logger?.LogDebug("[MaintenanceDeluxe] Webhook timed out, retrying once.");
+                logger?.LogDebug("Webhook timed out, retrying once.");
                 continue;
             }
             catch (HttpRequestException ex) when (attempt == 1)
             {
-                logger?.LogDebug(ex, "[MaintenanceDeluxe] Webhook transport error, retrying once.");
+                logger?.LogDebug(ex, "Webhook transport error, retrying once.");
                 continue;
             }
         }

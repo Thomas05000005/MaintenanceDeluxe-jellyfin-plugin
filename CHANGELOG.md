@@ -4,6 +4,29 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.8.0] — 2026-04-29
+
+Audit fonctionnel complet — nettoyage de mort code, nouvelle feature pre-flight check, documentation enrichie.
+
+### Ajouté
+- **Pre-flight check sessions actives** avant l'activation manuelle de la maintenance. Nouveau endpoint `GET /MaintenanceDeluxe/active-sessions` (admin-only) qui retourne les utilisateurs en train de streamer (`NowPlayingItem != null`). Avant le POST `/maintenance` avec `isActive=true`, la page admin affiche un modal de confirmation listant les noms + titres en cours + appareils. Évite de couper sa famille en plein film.
+- **`Configuration/admin.css`** : nouveau fichier embedded, contient 359 lignes de styles extraits de `configPage.html`. Servi via nouveau endpoint `GET /MaintenanceDeluxe/admin.css` (public, même modèle que `admin.js`).
+- **`docs/banners.md`** : documentation complète du système de bannières (rotation + permanent override + schedules 5 types + routes wildcards + color presets + comportements client). Le système était puissant mais sous-promu — il a maintenant sa doc dédiée. Lien depuis le README.
+- **CI : nouveau garde-fou anti-inline-style** dans `configPage.html`. Symétrique au guard anti-inline-script ajouté en v0.3.7. Toute régression bloquée à la PR.
+
+### Supprimé
+- **`scripts/check_inline_script.py`** : mort code depuis v0.3.7 où le bloc inline JS a été extrait dans `admin.js`. Plus utilisé par aucun workflow.
+
+### Modifié
+- **`configPage.html`** : passe de 1329 à 971 lignes (-27 %). Cumul depuis v0.3.5 : **-78 %**, de 4376 à 971 lignes.
+- **`BannerController`** : les 3 endpoints servant des assets embedded (`banner.js`, `admin.js`, `admin.css`) factorisés via un helper privé `ServeEmbeddedAsset(resourceName, contentType)`. Headers `X-Content-Type-Options: nosniff` + `Cache-Control: public, max-age=300` posés à un seul endroit. Suggestion follow-up du review v0.3.7 appliquée.
+- **Logging C#** : retrait du préfixe redondant `[MaintenanceDeluxe]` sur tous les `LogXxx`. Depuis v0.3.7 (`BeginScope`) et grâce au `LogCategory` automatique de `Microsoft.Extensions.Logging` (qui contient déjà le namespace de la classe), ce préfixe était du bruit. Banner.js conserve son préfixe `[MaintenanceDeluxe]` dans les `console.debug`/`console.warn` — utile côté DevTools pour identifier la source dans la console browser.
+- **README** : table des endpoints à jour (11 routes au lieu de 9) + section *Banner system* qui pointe vers `docs/banners.md`.
+
+### Notes techniques
+- L'audit JS Injector confirme que la reflection est l'**API publique officielle** du plugin tiers (commentaire explicite dans leur `PluginInterface.cs` : *"This method is designed to be called by other plugins via reflection"*). Le pattern actuel est volontaire, pas un workaround.
+- Les counts de tests xUnit dans le CHANGELOG sont déjà cohérents : 61 (v0.3.2) → 74 (v0.3.3) → 83 (v0.3.5) → 89 (v0.3.7). L'incohérence ressentie venait des versions yanked (v0.3.6/v0.3.7 initial) qui annonçaient des counts différents avant rollback. État actuel : **89 tests, tous verts**.
+
 ## [0.3.7.0] — 2026-04-29
 
 Refactor qualité (suite audit interne). Aucun changement de comportement observable côté utilisateur final.
@@ -202,6 +225,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.8.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.8
 [0.3.7.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.7
 [0.3.6.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.6
 [0.3.5.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.5

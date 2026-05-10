@@ -70,14 +70,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
             if (jsInjectorAssembly is null)
             {
-                _logger.LogInformation("[MaintenanceDeluxe] JS Injector plugin not found — banner script will not be injected.");
+                _logger.LogInformation("JS Injector plugin not found — banner script will not be injected.");
                 return;
             }
 
             var pluginInterfaceType = jsInjectorAssembly.GetType("Jellyfin.Plugin.JavaScriptInjector.PluginInterface");
             if (pluginInterfaceType is null)
             {
-                _logger.LogWarning("[MaintenanceDeluxe] JS Injector PluginInterface type not found.");
+                _logger.LogWarning("JS Injector PluginInterface type not found.");
                 return;
             }
 
@@ -87,7 +87,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             {
                 if (stream is null)
                 {
-                    _logger.LogWarning("[MaintenanceDeluxe] Embedded resource '{Resource}' not found.", resourceName);
+                    _logger.LogWarning("Embedded resource '{Resource}' not found.", resourceName);
                     return;
                 }
 
@@ -113,26 +113,26 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             };
 
             pluginInterfaceType.GetMethod("RegisterScript")?.Invoke(null, new object?[] { payload });
-            _logger.LogInformation("[MaintenanceDeluxe] Banner script registered with JS Injector.");
+            _logger.LogInformation("Banner script registered with JS Injector.");
         }
         catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
         {
             // JS Injector's singleton is not ready yet — retry after all plugins have initialised.
             if (_retryCount >= _retryDelaysSeconds.Length)
             {
-                _logger.LogWarning("[MaintenanceDeluxe] JS Injector not ready after {MaxRetries} retries — banner script will not be injected. Restart Jellyfin if JS Injector becomes available later.", _retryDelaysSeconds.Length);
+                _logger.LogWarning("JS Injector not ready after {MaxRetries} retries — banner script will not be injected. Restart Jellyfin if JS Injector becomes available later.", _retryDelaysSeconds.Length);
                 return;
             }
 
             var delaySeconds = _retryDelaysSeconds[_retryCount];
             _retryCount++;
-            _logger.LogInformation("[MaintenanceDeluxe] JS Injector not ready yet, retrying in {Delay}s (attempt {Attempt}/{MaxRetries}).", delaySeconds, _retryCount, _retryDelaysSeconds.Length);
+            _logger.LogInformation("JS Injector not ready yet, retrying in {Delay}s (attempt {Attempt}/{MaxRetries}).", delaySeconds, _retryCount, _retryDelaysSeconds.Length);
             ScheduleRetry(delaySeconds);
         }
         catch (Exception ex)
         {
             // Intentionally broad: this plugin must not crash the server.
-            _logger.LogError(ex, "[MaintenanceDeluxe] Failed to register with JS Injector.");
+            _logger.LogError(ex, "Failed to register with JS Injector.");
         }
     }
 
@@ -150,7 +150,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             }
             catch (Exception retryEx)
             {
-                _logger.LogError(retryEx, "[MaintenanceDeluxe] JS Injector retry task failed unexpectedly.");
+                _logger.LogError(retryEx, "JS Injector retry task failed unexpectedly.");
             }
         });
     }

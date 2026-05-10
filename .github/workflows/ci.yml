@@ -54,5 +54,12 @@ jobs:
             exit 1
           fi
 
+      - name: Verify configPage.html no longer has inline style (extracted to admin.css since v0.3.8)
+        run: |
+          if grep -qE '<style[^>]*>[^<]' Jellyfin.Plugin.MaintenanceDeluxe/Configuration/configPage.html; then
+            echo "error: configPage.html contains inline style content. Move it to admin.css." >&2
+            exit 1
+          fi
+
       - name: Version coherence (csproj / manifest.json)
         run: python scripts/check_version_coherence.py

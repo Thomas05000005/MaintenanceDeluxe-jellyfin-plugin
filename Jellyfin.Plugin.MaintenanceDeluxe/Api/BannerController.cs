@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Session;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,7 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 ///   <item><c>GET /MaintenanceDeluxe/maintenance</c> — public (UUID-stripped snapshot for the login-page overlay)</item>
 ///   <item><c>GET /MaintenanceDeluxe/banner.js</c> — public (script injected on every page; same bytes as the JavaScriptInjector copy)</item>
 ///   <item><c>GET /MaintenanceDeluxe/admin.js</c> — public (admin config-page script; same security model as banner.js — UI only, all admin actions gated by RequiresElevation on their endpoints)</item>
+///   <item><c>GET /MaintenanceDeluxe/admin.css</c> — public (admin config-page stylesheet; same security model as admin.js)</item>
 ///   <item><c>GET /MaintenanceDeluxe/preview.html</c> — public (HTML shell consumed by the admin live-preview iframe; iframe navigation does not carry Authorization headers)</item>
 ///   <item><c>GET /MaintenanceDeluxe/config</c> — <c>[Authorize]</c> (banner-client view; <see cref="BannerClientConfig"/>, no admin-only data)</item>
 ///   <item><c>GET /MaintenanceDeluxe/config-admin</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (full <see cref="PluginConfiguration"/> incl. webhook URL and user UUID lists)</item>
@@ -30,6 +32,7 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 ///   <item><c>POST /MaintenanceDeluxe/maintenance</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only toggle)</item>
 ///   <item><c>POST /MaintenanceDeluxe/maintenance/test-webhook</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only webhook check)</item>
 ///   <item><c>GET /MaintenanceDeluxe/users-summary</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only users list for the whitelist widget)</item>
+///   <item><c>GET /MaintenanceDeluxe/active-sessions</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only pre-flight check before activation: who is currently streaming)</item>
 /// </list>
 /// </summary>
 [ApiController]
@@ -37,6 +40,7 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 public class BannerController : ControllerBase
 {
     private readonly IUserManager _userManager;
+    private readonly ISessionManager _sessionManager;
     private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<BannerController> _logger;
 
@@ -49,9 +53,14 @@ public class BannerController : ControllerBase
     private static readonly TimeSpan _testWebhookCooldown = TimeSpan.FromSeconds(5);
 
     /// <summary>Initializes a new instance of <see cref="BannerController"/>.</summary>
-    public BannerController(IUserManager userManager, IHttpClientFactory httpFactory, ILogger<BannerController> logger)
+    public BannerController(
+        IUserManager userManager,
+        ISessionManager sessionManager,
+        IHttpClientFactory httpFactory,
+        ILogger<BannerController> logger)
     {
         _userManager = userManager;
+        _sessionManager = sessionManager;
         _httpFactory = httpFactory;
         _logger = logger;
     }
@@ -98,21 +107,8 @@ public class BannerController : ControllerBase
     [HttpGet("banner.js")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult GetBannerScript()
-    {
-        var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Resources.banner.js");
-        if (stream is null)
-            return NotFound();
-        // nosniff: belt-and-braces against MIME-confusion attacks even though we
-        // already declare application/javascript explicitly.
-        // Cache 5 min: the script is identical for the lifetime of a plugin version,
-        // so this dramatically cuts repeat-fetch traffic without delaying real updates
-        // (a Jellyfin restart is required to load a new DLL anyway).
-        Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Cache-Control"] = "public, max-age=300";
-        return File(stream, "application/javascript");
-    }
+    public IActionResult GetBannerScript() =>
+        ServeEmbeddedAsset("Jellyfin.Plugin.MaintenanceDeluxe.Resources.banner.js", "application/javascript");
 
     /// <summary>Serves the admin config-page client script. Public (no [Authorize]) for the
     /// same reason as banner.js: a &lt;script src&gt; tag in configPage.html cannot send the
@@ -123,15 +119,31 @@ public class BannerController : ControllerBase
     [HttpGet("admin.js")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult GetAdminScript()
+    public IActionResult GetAdminScript() =>
+        ServeEmbeddedAsset("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.js", "application/javascript");
+
+    /// <summary>Serves the admin config-page stylesheet. Same public/security model as
+    /// admin.js — the stylesheet contains no secrets and is loaded via <c>&lt;link&gt;</c>
+    /// from configPage.html.</summary>
+    [HttpGet("admin.css")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult GetAdminStylesheet() =>
+        ServeEmbeddedAsset("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.css", "text/css");
+
+    /// <summary>Shared helper for the three public asset endpoints (banner.js, admin.js,
+    /// admin.css). nosniff guards against MIME-confusion even though the Content-Type is
+    /// explicit; the 5-minute cache cuts repeat fetches without delaying real updates
+    /// (a new DLL release requires a Jellyfin restart anyway). 404 if the embedded
+    /// resource is missing — typically a build issue.</summary>
+    private IActionResult ServeEmbeddedAsset(string resourceName, string contentType)
     {
-        var stream = Assembly.GetExecutingAssembly()
-            .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.js");
+        var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
         if (stream is null)
             return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["Cache-Control"] = "public, max-age=300";
-        return File(stream, "application/javascript");
+        return File(stream, contentType);
     }
 
     /// <summary>Serves a minimal admin preview shell used by the config page's live-preview iframe.
@@ -318,7 +330,7 @@ public class BannerController : ControllerBase
             // but flags accidental SSRF-as-a-feature (e.g. typo'd internal hostname,
             // pasted attacker-controlled URL) in the server log so it isn't silent.
             if (!IsKnownWebhookHost(hookUri.Host))
-                _logger.LogWarning("[MaintenanceDeluxe] Webhook URL host '{Host}' is not a recognised provider (Discord/Slack). Generic webhook accepted; verify it points to your own infrastructure.", hookUri.Host);
+                _logger.LogWarning("Webhook URL host '{Host}' is not a recognised provider (Discord/Slack). Generic webhook accepted; verify it points to your own infrastructure.", hookUri.Host);
         }
 
         var config = Plugin.Instance.Configuration;
@@ -444,6 +456,34 @@ public class BannerController : ControllerBase
             .OrderBy(u => u.name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return Ok(users);
+    }
+
+    /// <summary>Returns the list of users with an active streaming session right now —
+    /// consumed by the admin UI as a pre-flight check before activating maintenance,
+    /// so admins don't accidentally kick someone mid-film. A session counts as "active"
+    /// when <c>NowPlayingItem</c> is non-null (i.e. actually playing media); idle web
+    /// sessions are excluded so we don't false-positive on every browser tab.</summary>
+    [HttpGet("active-sessions")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult GetActiveSessions()
+    {
+        var sessions = _sessionManager.Sessions
+            .Where(s => s.NowPlayingItem is not null)
+            .Select(s => new
+            {
+                userId = s.UserId.ToString(),
+                userName = s.UserName ?? "?",
+                deviceName = s.DeviceName ?? "?",
+                clientName = s.Client ?? "?",
+                nowPlayingTitle = s.NowPlayingItem?.Name ?? "?",
+                nowPlayingType = s.NowPlayingItem?.Type.ToString() ?? "?",
+                lastActivityDate = s.LastActivityDate
+            })
+            .OrderBy(s => s.userName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Ok(sessions);
     }
 
     /// <summary>Body shape for the test-webhook endpoint.</summary>

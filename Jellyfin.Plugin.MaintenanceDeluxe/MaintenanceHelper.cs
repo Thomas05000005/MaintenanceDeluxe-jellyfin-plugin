@@ -153,7 +153,7 @@ internal static class MaintenanceHelper
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to disable user {UserId} during maintenance activation — skipping.", user.Id);
+                    logger?.LogWarning(ex, "Failed to disable user {UserId} during maintenance activation — skipping.", user.Id);
                 }
             }
 
@@ -164,7 +164,7 @@ internal static class MaintenanceHelper
             plugin.UpdateConfiguration(config);
             plugin.SaveConfiguration();
 
-            logger?.LogInformation("[MaintenanceDeluxe] Maintenance activated. Disabled {Count} user(s); {Skipped} skipped.",
+            logger?.LogInformation("Maintenance activated. Disabled {Count} user(s); {Skipped} skipped.",
                 successfullyDisabled.Count, toDisable.Count - successfullyDisabled.Count);
         }
         finally
@@ -193,9 +193,9 @@ internal static class MaintenanceHelper
 
             var plan = PartitionDeactivationTargets(maint.MaintenanceDisabledUserIds, userManager.GetUserById);
             foreach (var bad in plan.MalformedIds)
-                logger?.LogWarning("[MaintenanceDeluxe] Skipping malformed user ID '{Id}' during deactivation.", bad);
+                logger?.LogWarning("Skipping malformed user ID '{Id}' during deactivation.", bad);
             foreach (var gone in plan.MissingUserIds)
-                logger?.LogDebug("[MaintenanceDeluxe] User {UserId} not found during deactivation (may have been deleted) — skipping.", gone);
+                logger?.LogDebug("User {UserId} not found during deactivation (may have been deleted) — skipping.", gone);
 
             int reenabled = 0;
             foreach (var (guid, user) in plan.ToReEnable)
@@ -210,7 +210,7 @@ internal static class MaintenanceHelper
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-enable user {UserId} during deactivation — skipping.", guid);
+                    logger?.LogWarning(ex, "Failed to re-enable user {UserId} during deactivation — skipping.", guid);
                 }
             }
 
@@ -221,7 +221,7 @@ internal static class MaintenanceHelper
             plugin.UpdateConfiguration(config);
             plugin.SaveConfiguration();
 
-            logger?.LogInformation("[MaintenanceDeluxe] Maintenance deactivated. Re-enabled {Count} user(s).", reenabled);
+            logger?.LogInformation("Maintenance deactivated. Re-enabled {Count} user(s).", reenabled);
         }
         finally
         {
@@ -262,14 +262,14 @@ internal static class MaintenanceHelper
                 }
                 catch (Exception ex)
                 {
-                    logger?.LogWarning(ex, "[MaintenanceDeluxe] Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
+                    logger?.LogWarning(ex, "Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
                 }
             }
 
             if (restored > 0)
-                logger?.LogInformation("[MaintenanceDeluxe] Drift check re-disabled {Count} user(s) that were re-enabled mid-maintenance: {Users}.", restored, string.Join(", ", restoredNames));
+                logger?.LogInformation("Drift check re-disabled {Count} user(s) that were re-enabled mid-maintenance: {Users}.", restored, string.Join(", ", restoredNames));
             else
-                logger?.LogTrace("[MaintenanceDeluxe] Drift check ran, no drift detected ({Tracked} tracked users still consistent).", maint.MaintenanceDisabledUserIds.Count);
+                logger?.LogTrace("Drift check ran, no drift detected ({Tracked} tracked users still consistent).", maint.MaintenanceDisabledUserIds.Count);
         }
         finally
         {

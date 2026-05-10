@@ -89,7 +89,7 @@ public class MaintenanceScheduleTask : IScheduledTask
         {
             _startupCheckDone = true;
             if (plugin.Configuration.MaintenanceMode.IsActive)
-                _logger.LogInformation("[MaintenanceDeluxe] Server started mid-maintenance — periodic drift check will re-disable any user re-enabled during the restart.");
+                _logger.LogInformation("Server started mid-maintenance — periodic drift check will re-disable any user re-enabled during the restart.");
         }
 
         // ── Periodic drift check ───────────────────────────────────────────────────
@@ -106,7 +106,7 @@ public class MaintenanceScheduleTask : IScheduledTask
             && now >= maint.ScheduledStart.Value
             && !maint.IsActive)
         {
-            _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance activation triggered at {Time}.", now);
+            _logger.LogInformation("Scheduled maintenance activation triggered at {Time}.", now);
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
             var freshMaint = plugin.Configuration.MaintenanceMode;
             await WebhookNotifier.NotifyAsync(freshMaint.Webhook, WebhookEvent.Activated, freshMaint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
@@ -119,7 +119,7 @@ public class MaintenanceScheduleTask : IScheduledTask
             && now >= maint.ScheduledEnd.Value
             && maint.IsActive)
         {
-            _logger.LogInformation("[MaintenanceDeluxe] Scheduled maintenance deactivation triggered at {Time}.", now);
+            _logger.LogInformation("Scheduled maintenance deactivation triggered at {Time}.", now);
             // Snapshot counts before DeactivateAsync clears the lists.
             var snapshot = new MaintenanceSetting
             {
@@ -156,7 +156,7 @@ public class MaintenanceScheduleTask : IScheduledTask
         maint = plugin.Configuration.MaintenanceMode;
         if (maint.ScheduledRestart.HasValue && now >= maint.ScheduledRestart.Value)
         {
-            _logger.LogInformation("[MaintenanceDeluxe] Scheduled server restart triggered at {Time}.", now);
+            _logger.LogInformation("Scheduled server restart triggered at {Time}.", now);
 
             // Notify webhook BEFORE restart so subscribers know what's happening.
             // We await it (with WebhookNotifier's own 5s timeout cap) so the HTTP request

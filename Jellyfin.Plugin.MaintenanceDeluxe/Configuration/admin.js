@@ -2733,6 +2733,30 @@
 
           // Returns a Promise — caller handles button state and success/error alerts.
           // User enable/disable is handled server-side; this function just POSTs the desired state.
+          // Pre-flight check before activating maintenance: list users currently
+          // streaming so the admin can confirm before kicking them. Resolves true
+          // if the save should proceed, false if the admin cancelled.
+          // Always resolves true when not activating, or when no one is streaming,
+          // or when the endpoint errors (don't block the admin on a transient API
+          // failure — they can retry).
+          function preflightCheckActiveSessions(activating) {
+            if (!activating) return Promise.resolve(true);
+            return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/active-sessions'))
+              .then(function (sessions) {
+                if (!sessions || sessions.length === 0) return true;
+                var lines = sessions.map(function (s) {
+                  return '  • ' + s.userName + ' — ' + s.nowPlayingTitle
+                    + ' (sur ' + s.deviceName + ')';
+                }).join('\n');
+                var msg = sessions.length === 1
+                  ? '1 utilisateur est en train de streamer :\n\n' + lines
+                  : sessions.length + ' utilisateurs sont en train de streamer :\n\n' + lines;
+                msg += '\n\nActiver la maintenance va leur couper le flux.\nConfirmer ?';
+                return window.confirm(msg);
+              })
+              .catch(function () { return true; });
+          }
+
           function saveMaintenanceSettings() {
             var message = (document.getElementById('maintenanceMessage').value.trim())
               || 'Server under maintenance. Please check back later.';
@@ -2748,37 +2772,45 @@
             var releaseNotes = collectReleaseNotes();
             var appearance = collectAppearance();
 
-            return ApiClient.ajax({
-              type: 'POST',
-              url: ApiClient.getUrl('MaintenanceDeluxe/maintenance'),
-              data: JSON.stringify({
-                isActive: isActive,
-                message: message,
-                statusUrl: statusUrl,
-                scheduleEnabled: scheduleEnabled,
-                scheduledStart: scheduledStart,
-                scheduledEnd: scheduledEnd,
-                scheduledRestart: scheduledRestart,
-                customTitle: customTitle,
-                customSubtitle: customSubtitle,
-                releaseNotes: releaseNotes,
-                accentColor: appearance.accentColor,
-                bgTint: appearance.bgTint,
-                cardOpacity: appearance.cardOpacity,
-                animationSpeed: appearance.animationSpeed,
-                particleDensity: appearance.particleDensity,
-                borderStyle: appearance.borderStyle,
-                animationScale: appearance.animationScale,
-                particleCount: appearance.particleCount,
-                whitelistedUserIds: getCheckedWhitelist(),
-                webhook: getWebhookFromUi()
-              }),
-              contentType: 'application/json'
-            }).then(function () {
-              // Re-fetch /config-admin (admin-only) so we get the FULL maintenanceMode including
-              // UUID lists; /config (banner-client view) drops them and /maintenance (public) too.
-              return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
-                .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
+            return preflightCheckActiveSessions(isActive).then(function (proceed) {
+              if (!proceed) {
+                // Admin cancelled at the streaming-sessions confirm. Re-sync the checkbox
+                // with the backend so the UI doesn't lie about a state we never POSTed.
+                return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
+                  .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
+              }
+              return ApiClient.ajax({
+                type: 'POST',
+                url: ApiClient.getUrl('MaintenanceDeluxe/maintenance'),
+                data: JSON.stringify({
+                  isActive: isActive,
+                  message: message,
+                  statusUrl: statusUrl,
+                  scheduleEnabled: scheduleEnabled,
+                  scheduledStart: scheduledStart,
+                  scheduledEnd: scheduledEnd,
+                  scheduledRestart: scheduledRestart,
+                  customTitle: customTitle,
+                  customSubtitle: customSubtitle,
+                  releaseNotes: releaseNotes,
+                  accentColor: appearance.accentColor,
+                  bgTint: appearance.bgTint,
+                  cardOpacity: appearance.cardOpacity,
+                  animationSpeed: appearance.animationSpeed,
+                  particleDensity: appearance.particleDensity,
+                  borderStyle: appearance.borderStyle,
+                  animationScale: appearance.animationScale,
+                  particleCount: appearance.particleCount,
+                  whitelistedUserIds: getCheckedWhitelist(),
+                  webhook: getWebhookFromUi()
+                }),
+                contentType: 'application/json'
+              }).then(function () {
+                // Re-fetch /config-admin (admin-only) so we get the FULL maintenanceMode including
+                // UUID lists; /config (banner-client view) drops them and /maintenance (public) too.
+                return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
+                  .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
+              });
             });
           }
 
