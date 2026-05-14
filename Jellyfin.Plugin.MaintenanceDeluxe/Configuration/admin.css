@@ -584,3 +584,19 @@
           color: #000; border-color: transparent; font-weight: 600;
         }
         .jf-ann-empty { padding: 30px; text-align: center; opacity: 0.45; font-style: italic; }
+
+        /* Templates picker (v0.3.13) */
+        .jf-ann-templates {
+          display: flex; flex-wrap: wrap; gap: 8px;
+        }
+        .jf-ann-template-btn {
+          padding: 8px 14px; border-radius: 6px;
+          border: 1px solid rgba(201, 169, 110, 0.25);
+          background: rgba(201, 169, 110, 0.08);
+          color: inherit; font-family: inherit; font-size: 13px;
+          cursor: pointer; transition: all .15s;
+        }
+        .jf-ann-template-btn:hover {
+          background: rgba(201, 169, 110, 0.18);
+          border-color: rgba(201, 169, 110, 0.5);
+        }

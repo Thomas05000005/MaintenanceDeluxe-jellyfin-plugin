@@ -1574,9 +1574,15 @@
         var s = document.createElement("style");
         s.id = "jf-ann-styles";
         s.textContent = [
-            "#jf-ann-overlay{position:fixed;inset:0;z-index:" + ANN_OVERLAY_Z + ";",
-            "background:rgba(0,0,0,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);",
-            "display:flex;align-items:center;justify-content:center;padding:24px;",
+            // !important + explicit 100vw/100vh + appended to documentElement (html, not body)
+            // works around Jellyfin parents that have transform/filter/will-change, which
+            // would otherwise re-anchor position:fixed to that ancestor and break centering.
+            "#jf-ann-overlay{position:fixed!important;top:0!important;left:0!important;",
+            "right:0!important;bottom:0!important;width:100vw!important;height:100vh!important;",
+            "margin:0!important;z-index:" + ANN_OVERLAY_Z + ";",
+            "background:rgba(0,0,0,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);",
+            "display:flex!important;align-items:center!important;justify-content:center!important;",
+            "padding:24px;box-sizing:border-box;",
             "opacity:0;transition:opacity .25s ease;font-family:inherit;}",
             "#jf-ann-overlay.visible{opacity:1;}",
             ".jf-ann-modal{position:relative;width:100%;max-width:min(700px,92vw);",
@@ -1650,6 +1656,20 @@
         overlay.setAttribute("role", "dialog");
         overlay.setAttribute("aria-modal", "true");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
+        // Belt-and-suspenders inline styles. The class-based CSS in injectAnnouncementStyles
+        // already uses !important, but Jellyfin Media Player (Electron) aggressively caches
+        // the previous banner.js across server restarts, so an old version without !important
+        // could still be served. Inline styles via cssText beat all class CSS and guarantee
+        // the modal is centered + dimmed even from a stale cached script context.
+        overlay.style.cssText =
+            "position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;" +
+            "width:100vw!important;height:100vh!important;margin:0!important;" +
+            "z-index:" + ANN_OVERLAY_Z + "!important;" +
+            "background:rgba(0,0,0,.68)!important;" +
+            "backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);" +
+            "display:flex!important;align-items:center!important;justify-content:center!important;" +
+            "padding:24px;box-sizing:border-box;" +
+            "opacity:0;transition:opacity .25s ease;font-family:inherit;";
         overlay.style.setProperty("--jf-ann-accent", accent);
 
         var html = "<div class=\"jf-ann-modal\">";
@@ -1709,11 +1729,22 @@
 
     function showAnnouncementModal(a, token, onDismissed) {
         var overlay = buildAnnouncementModal(a);
-        document.body.appendChild(overlay);
-        requestAnimationFrame(function () { overlay.classList.add("visible"); });
+        // Attach to documentElement (html), not body. Jellyfin sometimes sets a transform
+        // or will-change on the body or its main wrapper, which would re-anchor our
+        // position:fixed to that ancestor and break centering (modal would land in a
+        // corner instead of the viewport center). html has no such constraint.
+        (document.documentElement || document.body).appendChild(overlay);
+        // Inline opacity flip because cssText set opacity:0 inline, which beats the
+        // class-based .visible{opacity:1} from injected styles. Manipulating
+        // overlay.style.opacity directly stays in the same specificity tier.
+        requestAnimationFrame(function () {
+            overlay.classList.add("visible");
+            overlay.style.opacity = "1";
+        });
 
         function close() {
             overlay.classList.remove("visible");
+            overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
             dismissAnnouncementOnServer(a.id, token).then(function () {

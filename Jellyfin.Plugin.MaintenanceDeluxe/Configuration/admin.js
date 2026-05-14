@@ -3069,6 +3069,86 @@
           // ── Announcements admin UI (v0.3.9) ─────────────────────────────
           var ANN_IMPORTANCE_OPTIONS = ['info', 'update', 'warning', 'critical'];
           var ANN_MULTIMODE_OPTIONS = ['one-at-a-time', 'carousel', 'stack'];
+
+          // Quick-add templates for common announcement scenarios. Click one in the
+          // dropdown above the announcements list and a pre-filled row is added —
+          // admin just tweaks the body and hits Save. Saves 30s on every new annonce.
+          var ANN_TEMPLATES = [
+            {
+              key: 'update-plugin',
+              label: '⚡ Mise à jour serveur',
+              announcement: {
+                icon: '⚡', title: 'Mise à jour disponible', version: '',
+                body: '**Nouveautés** de cette mise à jour :\n\n- \n- \n- \n\nMerci de votre patience.',
+                importance: 'update', isActive: true,
+                comparisons: [], targetRoles: [], targetUserIds: []
+              }
+            },
+            {
+              key: 'new-content',
+              label: '🎬 Nouveaux films',
+              announcement: {
+                icon: '🎬', title: 'Nouveaux contenus ajoutés', version: '',
+                body: '**Cette semaine sur le serveur** :\n\n- \n- \n- \n\nBon visionnage !',
+                importance: 'info', isActive: true,
+                comparisons: [], targetRoles: ['user'], targetUserIds: []
+              }
+            },
+            {
+              key: 'maintenance-planned',
+              label: '🔧 Maintenance prévue',
+              announcement: {
+                icon: '🔧', title: 'Maintenance programmée', version: '',
+                body: 'Une maintenance est prévue le **[date]** de **[heure début]** à **[heure fin]**.\n\nLe serveur sera indisponible pendant cette période.',
+                importance: 'warning', isActive: true,
+                comparisons: [], targetRoles: [], targetUserIds: []
+              }
+            },
+            {
+              key: 'perf-improvement',
+              label: '🚀 Amélioration des perfs',
+              announcement: {
+                icon: '🚀', title: 'Performances améliorées', version: '',
+                body: 'Le serveur a été optimisé. Voici les **gains** mesurés :',
+                importance: 'update', isActive: true,
+                comparisons: [
+                  { label: 'Latence streaming', before: '200 ms', after: '140 ms', highlight: '-30%' },
+                  { label: 'Démarrage', before: '4 s', after: '2 s', highlight: '2x' }
+                ],
+                targetRoles: [], targetUserIds: []
+              }
+            },
+            {
+              key: 'community',
+              label: '📢 Annonce communautaire',
+              announcement: {
+                icon: '📢', title: 'Annonce', version: '',
+                body: '',
+                importance: 'info', isActive: true,
+                comparisons: [], targetRoles: [], targetUserIds: []
+              }
+            },
+            {
+              key: 'event',
+              label: '🎉 Évènement / soirée',
+              announcement: {
+                icon: '🎉', title: 'Évènement à venir', version: '',
+                body: '**[Nom de l\'évènement]** le **[date]** à **[heure]**.\n\nAu programme :\n\n- \n- ',
+                importance: 'info', isActive: true,
+                comparisons: [], targetRoles: ['user'], targetUserIds: []
+              }
+            },
+            {
+              key: 'critical-warning',
+              label: '⚠️ Alerte critique',
+              announcement: {
+                icon: '⚠️', title: 'Action requise', version: '',
+                body: '**Important :** \n\n',
+                importance: 'critical', isActive: true,
+                comparisons: [], targetRoles: [], targetUserIds: []
+              }
+            }
+          ];
           var _annUsersCache = null;
           var _annData = { items: [], multiMode: 'one-at-a-time' };
 
@@ -3460,29 +3540,53 @@
           // Exported on window so the global save handler can include it via Promise.allSettled.
           window.__md_saveAllAnnouncements = saveAllAnnouncements;
 
+          function addAnnouncementFromTemplate(template) {
+            var base = (template && template.announcement) ? template.announcement : {};
+            _annData.items.push({
+              announcement: {
+                id: '',
+                title: base.title || 'Nouvelle annonce',
+                version: base.version || '',
+                body: base.body || '',
+                icon: base.icon || '📣',
+                isActive: base.isActive !== false,
+                targetRoles: (base.targetRoles || []).slice(),
+                targetUserIds: (base.targetUserIds || []).slice(),
+                importance: base.importance || 'info',
+                comparisons: (base.comparisons || []).map(function (c) {
+                  return { label: c.label || '', before: c.before || '', after: c.after || '', highlight: c.highlight || '' };
+                }),
+                ctaLabel: base.ctaLabel || null,
+                ctaUrl: base.ctaUrl || null
+              },
+              seenCount: 0,
+              totalUsers: 0
+            });
+            renderAnnouncementsList();
+            var rows = document.querySelectorAll('#annList .jf-ann-row');
+            if (rows.length) rows[rows.length - 1].classList.add('expanded');
+          }
+
           function initAnnouncementsUi() {
             var addBtn = document.getElementById('addAnnouncement');
             if (addBtn) addBtn.addEventListener('click', function () {
-              _annData.items.push({
-                announcement: {
-                  id: '',
-                  title: 'Nouvelle annonce',
-                  version: '',
-                  body: '',
-                  icon: '📣',
-                  isActive: true,
-                  targetRoles: [],
-                  targetUserIds: [],
-                  importance: 'info',
-                  comparisons: []
-                },
-                seenCount: 0,
-                totalUsers: 0
-              });
-              renderAnnouncementsList();
-              var rows = document.querySelectorAll('#annList .jf-ann-row');
-              if (rows.length) rows[rows.length - 1].classList.add('expanded');
+              addAnnouncementFromTemplate(null); // blank announcement
             });
+
+            // Render templates picker. Container is in configPage.html with id="annTemplates".
+            var picker = document.getElementById('annTemplates');
+            if (picker) {
+              picker.innerHTML = '';
+              ANN_TEMPLATES.forEach(function (tpl) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'jf-reset-btn jf-ann-template-btn';
+                btn.textContent = tpl.label;
+                btn.title = 'Insérer ce modèle comme nouvelle annonce';
+                btn.addEventListener('click', function () { addAnnouncementFromTemplate(tpl); });
+                picker.appendChild(btn);
+              });
+            }
 
             // multi-mode change triggers a save (lightweight, just a radio).
             document.querySelectorAll('input[name="annMultiMode"]').forEach(function (el) {

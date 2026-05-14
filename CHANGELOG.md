@@ -4,6 +4,26 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13.0] — 2026-05-14
+
+Modal d'annonce enfin centrée, fond premium, et 7 templates rapides pour gagner 30 secondes par annonce.
+
+### Corrigé
+- **🐛 Modal en haut à gauche au lieu de centrée** : un ancestor Jellyfin (body ou skinBody) avec `transform` / `filter` / `will-change` créait un containing block pour `position:fixed`, qui se réancrait à cet ancestor au lieu du viewport. Résultat : la modal s'affichait comme un mini-toast en coin, sans le fond dimmed, sans le blur, sans rien. Le `!important` de la v0.3.12 ne suffisait pas non plus quand Jellyfin Media Player servait depuis son cache Electron l'ancienne banner.js sans `!important`.
+- **🛡️ Triple défense pour garantir le centrage** : (1) CSS injecté en `!important` avec `100vw`/`100vh` explicites et `position:fixed` sur tous les bords, (2) overlay attaché à `document.documentElement` (la balise `<html>`) au lieu de `document.body` — `html` n'a jamais de transform parent, (3) `overlay.style.cssText` inline avec `!important` directement sur l'élément. Les styles inline battent toutes les classes CSS, donc même si un ancien `banner.js` est servi depuis le cache navigateur, la modal s'affiche correctement.
+- **🎨 Style premium renforcé** : fond passe à `rgba(0,0,0,.68)` (plus contrasté), backdrop blur passe de 6 à 8 px, transition d'opacity gérée via `overlay.style.opacity` directement (pas via classe CSS, pour rester dans le même tier de spécificité que cssText).
+
+### Ajouté
+- **⚡ 7 templates rapides d'annonce** dans l'éditeur admin (`ANN_TEMPLATES`) : Mise à jour serveur, Nouveaux films, Maintenance prévue, Amélioration des perfs (avec comparisons before/after pré-remplies), Annonce communautaire, Évènement / soirée, Alerte critique. Chaque template a un emoji, un titre, un body pré-écrit, une importance par défaut et un targeting par défaut (ex. user-only pour les nouveaux contenus).
+- **🪟 UI templates picker** : nouveau bloc *Modèles rapides* au-dessus de la liste des annonces avec un bouton par template. Click sur un bouton → annonce pré-remplie ajoutée à la liste et automatiquement dépliée pour édition immédiate.
+- **🎨 CSS dédiée** (`.jf-ann-templates`, `.jf-ann-template-btn`) — design or sur fond légèrement teinté, hover state.
+- Le bouton historique **`+ Nouvelle annonce`** est renommé **`+ Annonce vide`** pour clarifier l'alternative aux templates.
+
+### Notes techniques
+- Pas de changement de format `Announcement` côté serveur — les templates sont du sucre 100% client.
+- 121 tests xUnit inchangés.
+- ETag-based cache busting de v0.3.11 garantit que `banner.js` + `admin.js` sont rafraîchis dès l'upgrade, donc les templates apparaissent immédiatement après install.
+
 ## [0.3.12.0] — 2026-05-14
 
 Fix critique : la modal d'annonce ne s'affichait pas après login (Phase 1 v0.3.9 → v0.3.10).
