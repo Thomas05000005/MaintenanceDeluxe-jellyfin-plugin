@@ -136,18 +136,42 @@ public class BannerController : ControllerBase
     public IActionResult GetAdminStylesheet() =>
         ServeEmbeddedAsset("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.css", "text/css");
 
-    /// <summary>Shared helper for the three public asset endpoints (banner.js, admin.js,
-    /// admin.css). nosniff guards against MIME-confusion even though the Content-Type is
-    /// explicit; the 5-minute cache cuts repeat fetches without delaying real updates
-    /// (a new DLL release requires a Jellyfin restart anyway). 404 if the embedded
-    /// resource is missing — typically a build issue.</summary>
+    // ETag tied to the assembly version — changes on every plugin upgrade so the browser
+    // refetches fresh assets instead of serving stale ones from a previous version. Cached
+    // once at process start; the version doesn't change at runtime.
+    private static readonly string _assetEtagVersion = "\"v"
+        + (typeof(BannerController).Assembly.GetName().Version?.ToString() ?? "unknown") + "\"";
+
+    /// <summary>Shared helper for the public asset endpoints (banner.js, admin.js, admin.css).
+    /// Uses ETag-based revalidation tied to the plugin assembly version: the browser caches
+    /// the asset but must revalidate on every request (cheap conditional GET). If the version
+    /// hasn't changed, we return 304 Not Modified with no body. When the plugin is upgraded,
+    /// the version bumps, the ETag changes, and the browser fetches the fresh asset. This
+    /// fixes the "stale admin UI after plugin upgrade" class of bug that v0.3.4-v0.3.10
+    /// suffered with the plain max-age=300 strategy. nosniff guards MIME-confusion regardless.
+    /// 404 if the embedded resource is missing (typically a build issue).</summary>
     private IActionResult ServeEmbeddedAsset(string resourceName, string contentType)
     {
+        // 304 Not Modified shortcut: if the client already has the current version, skip the
+        // body entirely. Big win on every admin page load after the first one for this version.
+        if (Request.Headers.TryGetValue("If-None-Match", out var inm)
+            && inm.ToString() == _assetEtagVersion)
+        {
+            Response.Headers["ETag"] = _assetEtagVersion;
+            Response.Headers["Cache-Control"] = "public, no-cache, must-revalidate";
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
         var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
         if (stream is null)
             return NotFound();
+
         Response.Headers["X-Content-Type-Options"] = "nosniff";
-        Response.Headers["Cache-Control"] = "public, max-age=300";
+        Response.Headers["ETag"] = _assetEtagVersion;
+        // no-cache here means "browser MUST revalidate with ETag before reusing" (not "don't
+        // cache" — that would be no-store). The 304 path above kicks in when the version
+        // matches; otherwise the full body is served.
+        Response.Headers["Cache-Control"] = "public, no-cache, must-revalidate";
         return File(stream, contentType);
     }
 

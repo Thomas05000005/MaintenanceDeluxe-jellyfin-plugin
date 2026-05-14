@@ -4,6 +4,20 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11.0] — 2026-05-14
+
+Fix critique : cache busting des assets admin après upgrade plugin.
+
+### Corrigé
+- **🐛 Stale admin UI après upgrade** : la classe de bug qui faisait que `admin.js` / `admin.css` / `banner.js` restaient cachés 5 min après une upgrade plugin (Cache-Control `max-age=300` aveugle introduit en v0.3.4). Frappait v0.3.10 frontalement : le user voyait toujours l'UI v0.3.9 après l'install v0.3.10 jusqu'à un `Ctrl+Shift+R` manuel.
+- **🔧 Stratégie ETag-based revalidation** : `ServeEmbeddedAsset` calcule désormais un ETag basé sur `Assembly.GetName().Version`, posé sur les responses + header `Cache-Control: public, no-cache, must-revalidate`. Le browser revalide via `If-None-Match` à chaque navigation — 304 si version inchangée (zero body, très rapide), 200 si upgrade détecté.
+
+### Détails techniques
+- ETag calculé une seule fois au startup (`static readonly`) → zero overhead par request.
+- 304 Not Modified shortcut sans body, conforme RFC 7232.
+- Plus jamais besoin de hard-refresh après upgrade : à partir de v0.3.11, chaque release force un fetch frais automatiquement.
+- 121 tests xUnit inchangés.
+
 ## [0.3.10.0] — 2026-05-14
 
 Refonte complète de l'éditeur Annonces — réponse aux trois problèmes critiques remontés sur la Phase 1 (v0.3.9) : save global qui ignorait les annonces, layout désordonné, pas de prévisualisation.
@@ -280,6 +294,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.11.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.11
 [0.3.10.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.10
 [0.3.9.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.9
 [0.3.8.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.8
