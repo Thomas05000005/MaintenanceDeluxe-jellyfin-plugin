@@ -4,6 +4,37 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9.0] — 2026-04-29
+
+Système d'annonces post-login ("What's New" modal) — nouvelle feature majeure.
+
+### Ajouté
+- **Système d'annonces** : modal post-login dismissible affichée aux utilisateurs, tracking serveur "vu par X / Y users". Chaque utilisateur voit chaque annonce **une seule fois** sauf reset explicite par l'admin. Différent des bannières (bandeau haut) et de l'overlay maintenance (full-screen bloquant).
+- **Ciblage fin** : par rôle (`user` / `admin`) ET par UUID utilisateur spécifique. Les deux filtres sont AND-combinés (« admin ET (Alice ou Bob) »).
+- **Niveaux d'importance** : `info` (bleu) / `update` (vert) / `warning` (orange) / `critical` (rouge) — change la couleur d'accent de la modal.
+- **Comparaisons structurées avant / après** : liste de lignes (Label / Before / After / Highlight optionnel) rendues comme une mini-table dans la modal. Format adapté pour stats perf, ex. « Latence streaming · 200 ms → 140 ms · -30 % ».
+- **Bouton CTA optionnel** : label + URL (safe-scheme http(s)/relatif uniquement). Ouvre dans un nouvel onglet.
+- **Markdown enrichi** : ajout du support `[texte](url)` dans le corps des annonces ET dans les release notes maintenance existantes. URL validée avec la même whitelist que `statusUrl`, échappement HTML appliqué avant le rendu.
+- **Modal responsive** : mobile portrait/paysage (comparisons en stack vertical), tablet, desktop (max 700 px), TV ≥ 1920 px (max 900 px + font +25 % + padding +50 % pour 10-foot UI).
+- **Admin UI** : nouvel onglet *Annonces* avec liste collapsible, éditeur complet (icon, titre, version, corps markdown avec aperçu live, importance, active toggle, ciblage rôle + utilisateurs, comparisons, CTA), boutons *Réinitialiser 'vue par'* et *Supprimer* par annonce.
+- **5 nouveaux endpoints REST** :
+  - `GET /MaintenanceDeluxe/announcements/active` — any auth, retourne les non-vues filtrées par user
+  - `POST /MaintenanceDeluxe/announcements/{id}/seen` — any auth, mark seen
+  - `GET /MaintenanceDeluxe/announcements/admin` — admin, list + counts
+  - `POST /MaintenanceDeluxe/announcements/admin` — admin, save
+  - `POST /MaintenanceDeluxe/announcements/admin/{id}/reset-seen` — admin, reset tracking
+- **`AnnouncementHelper`** : nouvelle classe avec 9 fonctions pures (`IsTargetedAtUser`, `HasUserSeen`, `SelectDeliverableForUser`, `MarkSeen`, `ResetSeen`, `PruneOrphanedSeenEntries`, `NormaliseImportance`, `NormaliseMultiMode`, `NormaliseTargetRoles`, `NormaliseTargetUserIds`). Toute la logique de filtrage / ciblage / tracking est isolée du Plugin singleton.
+- **`docs/announcements.md`** : documentation complète (sécurité, responsive, endpoints, limites Phase 1).
+- **32 nouveaux tests xUnit** dans `AnnouncementHelperTests` couvrant tous les cas de filtrage / ciblage / tracking / normalisation. **Total 121 tests.**
+
+### Modifié
+- **Test anti-drift `DtoMirrorsAllNonMaintenanceJsonPropertiesOfPluginConfiguration`** : nouvelle whitelist explicite `IntentionallyAdminOnly` (maintenanceMode + announcements + announcementsSeen) — au lieu de hardcoder seulement `maintenanceMode`. Ajouter un nouveau champ admin-only au plugin nécessite désormais de le whitelister consciemment (revue de sécurité forcée).
+
+### Phase 1 — limites connues
+- **Mode multi-annonces** : seul `one-at-a-time` est implémenté côté client. Les modes `carousel` (flèches) et `stack` (empilé) sont stockés server-side mais retombent sur `one-at-a-time` à l'affichage. Phase 2.
+- **Pas de viewport simulator** dans l'admin UI (preview avec presets mobile/tablet/TV). Phase 2.
+- **Pas d'image / schedule fixed-annual-weekly-daily / brouillon-publié / auto-expire**. Phase 2.
+
 ## [0.3.8.0] — 2026-04-29
 
 Audit fonctionnel complet — nettoyage de mort code, nouvelle feature pre-flight check, documentation enrichie.
@@ -225,6 +256,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.9.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.9
 [0.3.8.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.8
 [0.3.7.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.7
 [0.3.6.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.6

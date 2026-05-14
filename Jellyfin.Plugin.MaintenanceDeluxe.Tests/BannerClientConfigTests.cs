@@ -116,17 +116,28 @@ public class BannerClientConfigTests
     /// this test still passes (it only checks one direction); but if a banner-facing
     /// field is added and forgotten on the DTO, this test fails fast.
     /// </summary>
+    /// <summary>JSON properties on <see cref="PluginConfiguration"/> that we INTENTIONALLY do not
+    /// expose to non-admin clients via <see cref="BannerClientConfig"/>. Adding a new field here
+    /// means accepting that it should never leak to any authenticated user — review carefully.</summary>
+    private static readonly HashSet<string> IntentionallyAdminOnly = new()
+    {
+        "maintenanceMode",      // UUID lists + webhook URL — covered by /maintenance public DTO
+        "announcements",        // ciblage par UUID — un user lambda ne doit pas pouvoir inférer la liste des cibles
+        "announcementsSeen"     // tracking serveur des dismissals — admin-only
+    };
+
     [Fact]
     public void DtoMirrorsAllNonMaintenanceJsonPropertiesOfPluginConfiguration()
     {
         var srcProps = JsonPropertyNames(typeof(PluginConfiguration));
         var dtoProps = JsonPropertyNames(typeof(BannerClientConfig));
         var missing = srcProps
-            .Where(p => p != "maintenanceMode")
+            .Where(p => !IntentionallyAdminOnly.Contains(p))
             .Where(p => !dtoProps.Contains(p))
             .ToList();
         Assert.True(missing.Count == 0, "BannerClientConfig is missing JSON property: " + string.Join(", ", missing));
-        Assert.DoesNotContain("maintenanceMode", dtoProps);
+        foreach (var p in IntentionallyAdminOnly)
+            Assert.DoesNotContain(p, dtoProps);
     }
 
     private static HashSet<string> JsonPropertyNames(System.Type t)

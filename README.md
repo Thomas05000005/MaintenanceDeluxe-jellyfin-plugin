@@ -95,6 +95,12 @@ Beyond maintenance overlay, the plugin also ships a small CMS-style banner syste
 
 See [docs/banners.md](docs/banners.md) for a full description with screenshots in `assets/screenshots/`.
 
+## Announcement modals (v0.3.9+)
+
+Post-login "What's New" modals — one-shot per user, tracked server-side. Use them to push release notes, perf comparisons before/after, event notices. Markdown body supports bold, italic, lists, and now links `[text](url)`. Importance levels (info / update / warning / critical) drive the accent colour. Targeting by role and / or specific user UUIDs. Responsive: mobile portrait, mobile landscape, tablet, desktop, TV (10-foot UI).
+
+See [docs/announcements.md](docs/announcements.md).
+
 ## Endpoints
 
 | Method + path | Auth | Purpose |
@@ -111,6 +117,11 @@ See [docs/banners.md](docs/banners.md) for a full description with screenshots i
 | `POST /MaintenanceDeluxe/maintenance/test-webhook` | admin | Send a test payload. Rate-limited to 1 call / 5 s globally. |
 | `GET /MaintenanceDeluxe/users-summary` | admin | Lightweight user list for the whitelist multi-select. |
 | `GET /MaintenanceDeluxe/active-sessions` | admin | Users currently streaming. Used as a pre-flight check before activating maintenance (v0.3.8+). |
+| `GET /MaintenanceDeluxe/announcements/active` | any auth | Announcements not yet seen by the current user (v0.3.9+). |
+| `POST /MaintenanceDeluxe/announcements/{id}/seen` | any auth | Mark announcement as seen by current user (v0.3.9+). |
+| `GET /MaintenanceDeluxe/announcements/admin` | admin | Full announcements list + seen-counts (v0.3.9+). |
+| `POST /MaintenanceDeluxe/announcements/admin` | admin | Save announcements + multi-mode (v0.3.9+). |
+| `POST /MaintenanceDeluxe/announcements/admin/{id}/reset-seen` | admin | Reset seen-by tracking for one announcement (v0.3.9+). |
 
 ## Debug flag
 

@@ -33,6 +33,11 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe.Api;
 ///   <item><c>POST /MaintenanceDeluxe/maintenance/test-webhook</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only webhook check)</item>
 ///   <item><c>GET /MaintenanceDeluxe/users-summary</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only users list for the whitelist widget)</item>
 ///   <item><c>GET /MaintenanceDeluxe/active-sessions</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (admin-only pre-flight check before activation: who is currently streaming)</item>
+///   <item><c>GET /MaintenanceDeluxe/announcements/active</c> — <c>[Authorize]</c> (announcements not yet seen by the current user)</item>
+///   <item><c>POST /MaintenanceDeluxe/announcements/{id}/seen</c> — <c>[Authorize]</c> (mark announcement seen by current user)</item>
+///   <item><c>GET /MaintenanceDeluxe/announcements/admin</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (full list + seen-counts for admin UI)</item>
+///   <item><c>POST /MaintenanceDeluxe/announcements/admin</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (save announcements list + multi-mode)</item>
+///   <item><c>POST /MaintenanceDeluxe/announcements/admin/{id}/reset-seen</c> — <c>[Authorize(Policy="RequiresElevation")]</c> (reset who-has-seen tracking)</item>
 /// </list>
 /// </summary>
 [ApiController]
@@ -484,6 +489,240 @@ public class BannerController : ControllerBase
             .OrderBy(s => s.userName, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return Ok(sessions);
+    }
+
+    // ── Announcements (v0.3.9) ──────────────────────────────────────────────
+
+    /// <summary>Returns the announcements that the CURRENT user has not yet seen and
+    /// that target them (by role + UUID filters). Ordered most-recent-first.
+    /// banner.js calls this after login to decide whether to pop the modal.</summary>
+    [HttpGet("announcements/active")]
+    [Authorize]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult GetActiveAnnouncementsForCurrentUser()
+    {
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+
+        var (userId, isAdmin) = ResolveCurrentUser();
+        if (userId is null)
+            return Ok(Array.Empty<object>()); // can't identify user → safe empty response
+
+        var config = Plugin.Instance.Configuration;
+        var deliverable = AnnouncementHelper.SelectDeliverableForUser(
+            config.Announcements,
+            config.AnnouncementsSeen,
+            userId,
+            isAdmin);
+
+        // Project to a stripped DTO — TargetRoles / TargetUserIds are admin-side metadata
+        // that the end user doesn't need to see (and shouldn't, to avoid leaking the
+        // existence of other targeted users in the same announcement).
+        var result = deliverable.Select(a => new
+        {
+            id = a.Id,
+            version = a.Version,
+            title = a.Title,
+            body = a.Body,
+            icon = a.Icon,
+            importance = a.Importance,
+            publishedAt = a.PublishedAt,
+            comparisons = a.Comparisons,
+            ctaLabel = a.CtaLabel,
+            ctaUrl = a.CtaUrl
+        });
+        return Ok(result);
+    }
+
+    /// <summary>Marks an announcement as seen by the current user. Idempotent.</summary>
+    [HttpPost("announcements/{id}/seen")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult MarkAnnouncementSeen(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return BadRequest("Missing announcement id.");
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+
+        var (userId, _) = ResolveCurrentUser();
+        if (userId is null)
+            return Unauthorized();
+
+        var config = Plugin.Instance.Configuration;
+        // Guard against marking-seen on a non-existent or untargeted announcement —
+        // prevents users from spamming arbitrary IDs into the tracking list.
+        var match = config.Announcements.FirstOrDefault(a => a.Id == id);
+        if (match is null) return NoContent(); // unknown id: silent no-op (announcement may have been deleted)
+
+        var changed = AnnouncementHelper.MarkSeen(config.AnnouncementsSeen, id, userId);
+        if (changed)
+        {
+            Plugin.Instance.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+        }
+        return NoContent();
+    }
+
+    /// <summary>Admin-only: returns the full announcements list plus per-announcement
+    /// "seen by" counts so the admin UI can show "12 / 35 users have seen this".</summary>
+    [HttpGet("announcements/admin")]
+    [Authorize(Policy = "RequiresElevation")]
+    [Produces("application/json")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult GetAdminAnnouncements()
+    {
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+
+        var config = Plugin.Instance.Configuration;
+        var seenLookup = config.AnnouncementsSeen.ToDictionary(e => e.AnnouncementId, e => e.UserIds.Count);
+
+        var totalUsers = _userManager.Users.Count();
+        var result = config.Announcements.Select(a => new
+        {
+            announcement = a,
+            seenCount = seenLookup.TryGetValue(a.Id, out var c) ? c : 0,
+            totalUsers
+        });
+        return Ok(new
+        {
+            multiMode = config.AnnouncementMultiMode,
+            items = result
+        });
+    }
+
+    /// <summary>Admin-only: replaces the entire announcements list. Validates URLs,
+    /// normalises enums / roles / UUIDs, assigns server-generated IDs to new entries,
+    /// and prunes orphaned seen-tracking entries.</summary>
+    [HttpPost("announcements/admin")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult SaveAdminAnnouncements([FromBody] SaveAnnouncementsRequest body)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+
+        var incoming = body.Announcements ?? new List<Announcement>();
+
+        // Per-entry validation + normalisation pass.
+        foreach (var a in incoming)
+        {
+            if (!IsUrlSafe(a.CtaUrl))
+                return BadRequest($"Invalid ctaUrl on announcement '{a.Title}': only http(s) or relative URLs allowed.");
+
+            a.Title = NormaliseOptionalString(a.Title, 200) ?? string.Empty;
+            a.Version = NormaliseOptionalString(a.Version, 64) ?? string.Empty;
+            a.Body = NormaliseOptionalString(a.Body, 8000) ?? string.Empty;
+            a.Icon = NormaliseIcon(a.Icon);
+            a.CtaLabel = NormaliseOptionalString(a.CtaLabel, 80);
+            a.Importance = AnnouncementHelper.NormaliseImportance(a.Importance);
+            a.TargetRoles = AnnouncementHelper.NormaliseTargetRoles(a.TargetRoles);
+            a.TargetUserIds = AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds);
+
+            // Cap and normalise comparison rows (admin can't ship an unbounded list).
+            a.Comparisons = (a.Comparisons ?? new()).Take(20).Select(c => new AnnouncementComparison
+            {
+                Label = NormaliseOptionalString(c.Label, 120) ?? string.Empty,
+                Before = NormaliseOptionalString(c.Before, 120) ?? string.Empty,
+                After = NormaliseOptionalString(c.After, 120) ?? string.Empty,
+                Highlight = NormaliseOptionalString(c.Highlight, 40) ?? string.Empty
+            }).ToList();
+
+            // Assign GUID to new entries so tracking can attach to them.
+            if (string.IsNullOrWhiteSpace(a.Id)) a.Id = Guid.NewGuid().ToString();
+        }
+
+        var config = Plugin.Instance.Configuration;
+        config.Announcements = incoming;
+        config.AnnouncementMultiMode = AnnouncementHelper.NormaliseMultiMode(body.MultiMode);
+        // Drop tracking for announcements that no longer exist.
+        AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
+
+        Plugin.Instance.UpdateConfiguration(config);
+        Plugin.Instance.SaveConfiguration();
+        return NoContent();
+    }
+
+    /// <summary>Admin-only: clears the "seen by" tracking for one announcement so all
+    /// targeted users see it again on their next login.</summary>
+    [HttpPost("announcements/admin/{id}/reset-seen")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public IActionResult ResetAnnouncementSeen(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return BadRequest("Missing announcement id.");
+        if (Plugin.Instance is null)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
+
+        var config = Plugin.Instance.Configuration;
+        var changed = AnnouncementHelper.ResetSeen(config.AnnouncementsSeen, id);
+        if (changed)
+        {
+            Plugin.Instance.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+        }
+        return NoContent();
+    }
+
+    /// <summary>Body shape for <see cref="SaveAdminAnnouncements"/>.</summary>
+    public class SaveAnnouncementsRequest
+    {
+        /// <summary>Gets or sets the full announcements list (replaces server-side list).</summary>
+        public List<Announcement>? Announcements { get; set; }
+
+        /// <summary>Gets or sets the multi-announcement display mode (whitelisted server-side).</summary>
+        public string? MultiMode { get; set; }
+    }
+
+    /// <summary>Resolves the current user from the Jellyfin auth context. Returns (null, false)
+    /// if the current request isn't tied to an authenticated user (e.g. anonymous endpoint
+    /// invoked anonymously). Tries the Jellyfin-specific UserId claim first, then falls back to
+    /// the identity name + IUserManager lookup. Admin status comes from the user's permissions.</summary>
+    private (string? UserId, bool IsAdmin) ResolveCurrentUser()
+    {
+        // The Jellyfin auth layer attaches the user's GUID as a claim. Try that first
+        // (cheapest, no DB lookup). The claim name varies by Jellyfin version so we try
+        // a couple of common ones, falling back to the identity name.
+        var claimUid = User.FindFirst("Jellyfin-UserId")?.Value
+                       ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(claimUid) && Guid.TryParse(claimUid, out var fromClaim))
+        {
+            var user = _userManager.GetUserById(fromClaim);
+            if (user is not null)
+            {
+                var admin = user.Permissions.Any(p =>
+                    p.Kind == Jellyfin.Database.Implementations.Enums.PermissionKind.IsAdministrator && p.Value);
+                return (user.Id.ToString(), admin);
+            }
+        }
+
+        // Fallback: resolve by username.
+        var name = User.Identity?.Name;
+        if (!string.IsNullOrEmpty(name))
+        {
+            var user = _userManager.GetUserByName(name);
+            if (user is not null)
+            {
+                var admin = user.Permissions.Any(p =>
+                    p.Kind == Jellyfin.Database.Implementations.Enums.PermissionKind.IsAdministrator && p.Value);
+                return (user.Id.ToString(), admin);
+            }
+        }
+
+        return (null, false);
     }
 
     /// <summary>Body shape for the test-webhook endpoint.</summary>

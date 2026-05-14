@@ -399,6 +399,110 @@ public class WebhookSettings
 }
 
 /// <summary>
+/// Single "before / after" comparison row attached to an announcement.
+/// Pure presentation — no semantics, just three strings + a highlight badge.
+/// </summary>
+public class AnnouncementComparison
+{
+    /// <summary>Gets or sets the row label (e.g. "Latence streaming").</summary>
+    [JsonPropertyName("label")]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the "before" value (e.g. "200 ms").</summary>
+    [JsonPropertyName("before")]
+    public string Before { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the "after" value (e.g. "140 ms").</summary>
+    [JsonPropertyName("after")]
+    public string After { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets a short highlight badge (e.g. "-30%"). Optional.</summary>
+    [JsonPropertyName("highlight")]
+    public string Highlight { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Admin-authored announcement shown to end users as a modal after they log in.
+/// Each user sees an announcement at most once (tracked server-side via
+/// <see cref="PluginConfiguration.AnnouncementsSeen"/>) unless the admin
+/// explicitly resets the "seen by" list.
+/// </summary>
+public class Announcement
+{
+    /// <summary>Gets or sets the stable unique ID (server-generated GUID on first save).</summary>
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the version tag (e.g. "v0.3.9"). Free-form, displayed in admin UI.</summary>
+    [JsonPropertyName("version")]
+    public string Version { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the title shown at the top of the modal.</summary>
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the body — supports the safe-subset Markdown
+    /// (bold, italic, lists, links since v0.3.9).</summary>
+    [JsonPropertyName("body")]
+    public string Body { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the leading icon — emoji or short identifier.</summary>
+    [JsonPropertyName("icon")]
+    public string Icon { get; set; } = "📣"; // 📣
+
+    /// <summary>Gets or sets whether this announcement is currently considered for delivery.</summary>
+    [JsonPropertyName("isActive")]
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>Gets or sets the publication timestamp (UTC). Used for sort order
+    /// when several announcements are queued for the same user.</summary>
+    [JsonPropertyName("publishedAt")]
+    public DateTimeOffset? PublishedAt { get; set; }
+
+    /// <summary>Gets or sets the roles the announcement targets. Empty = no role filter.
+    /// Recognised values: "user" (non-admin), "admin". An empty list means "any role".</summary>
+    [JsonPropertyName("targetRoles")]
+    public List<string> TargetRoles { get; set; } = new();
+
+    /// <summary>Gets or sets the specific user UUIDs to target. Empty = no per-user filter,
+    /// only the role filter applies. Non-empty = ONLY these users (in addition to the role filter).</summary>
+    [JsonPropertyName("targetUserIds")]
+    public List<string> TargetUserIds { get; set; } = new();
+
+    /// <summary>Gets or sets the importance level: "info" (default) | "update" | "warning" | "critical".
+    /// Drives the accent colour and default icon on the client. Whitelisted server-side.</summary>
+    [JsonPropertyName("importance")]
+    public string Importance { get; set; } = "info";
+
+    /// <summary>Gets or sets the structured before/after comparison rows. Empty = no comparison block.</summary>
+    [JsonPropertyName("comparisons")]
+    public List<AnnouncementComparison> Comparisons { get; set; } = new();
+
+    /// <summary>Gets or sets the optional CTA button label (e.g. "Voir le changelog complet").</summary>
+    [JsonPropertyName("ctaLabel")]
+    public string? CtaLabel { get; set; }
+
+    /// <summary>Gets or sets the optional CTA URL. Must be http(s) or relative (same validation as statusUrl).</summary>
+    [JsonPropertyName("ctaUrl")]
+    public string? CtaUrl { get; set; }
+}
+
+/// <summary>
+/// Tracks which users have seen which announcement. One entry per announcement.
+/// XML-serialiser-friendly (avoids Dictionary which doesn't round-trip cleanly).
+/// </summary>
+public class AnnouncementsSeenEntry
+{
+    /// <summary>Gets or sets the announcement ID being tracked.</summary>
+    [JsonPropertyName("announcementId")]
+    public string AnnouncementId { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the list of user UUIDs that have dismissed this announcement.</summary>
+    [JsonPropertyName("userIds")]
+    public List<string> UserIds { get; set; } = new();
+}
+
+/// <summary>
 /// Snapshot of <see cref="PluginConfiguration"/> exposed to non-admin authenticated callers
 /// via <c>GET /MaintenanceDeluxe/config</c>. Mirrors every field of PluginConfiguration EXCEPT
 /// <see cref="PluginConfiguration.MaintenanceMode"/>, which carries admin-only data
@@ -457,6 +561,13 @@ public class BannerClientConfig
     [JsonPropertyName("lastModified")]
     public long LastModified { get; set; }
 
+    // announcements: full Announcements[] and AnnouncementsSeen[] are NOT exposed here.
+    // They contain admin-authored content + tracking that targets specific user UUIDs
+    // and is fetched separately via the dedicated GET /announcements/active endpoint
+    // (which filters server-side per the current user).
+    [JsonPropertyName("announcementMultiMode")]
+    public string AnnouncementMultiMode { get; set; } = "one-at-a-time";
+
     public static BannerClientConfig From(PluginConfiguration c) => new()
     {
         DisplayDuration = c.DisplayDuration,
@@ -481,7 +592,8 @@ public class BannerClientConfig
         FontBold = c.FontBold,
         ShowRefreshPrompt = c.ShowRefreshPrompt,
         UrlPopupHint = c.UrlPopupHint,
-        LastModified = c.LastModified
+        LastModified = c.LastModified,
+        AnnouncementMultiMode = c.AnnouncementMultiMode
     };
 #pragma warning restore CS1591
 }
@@ -521,6 +633,9 @@ public class PluginConfiguration : BasePluginConfiguration
         ShowRefreshPrompt = true;
         UrlPopupHint = string.Empty;
         MaintenanceMode = new MaintenanceSetting();
+        Announcements = new List<Announcement>();
+        AnnouncementsSeen = new List<AnnouncementsSeenEntry>();
+        AnnouncementMultiMode = "one-at-a-time";
     }
 
     /// <summary>Gets or sets how long (seconds) each message is displayed before cycling.</summary>
@@ -618,4 +733,22 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>Gets or sets the maintenance mode configuration.</summary>
     [JsonPropertyName("maintenanceMode")]
     public MaintenanceSetting MaintenanceMode { get; set; }
+
+    /// <summary>Gets or sets the list of admin-authored announcements (see <see cref="Announcement"/>).</summary>
+    [JsonPropertyName("announcements")]
+    public List<Announcement> Announcements { get; set; }
+
+    /// <summary>Gets or sets the per-announcement "seen by" tracking. Each entry maps one
+    /// announcement ID to the list of user UUIDs that have dismissed it. Cleared when the
+    /// admin resets an announcement via <c>POST /announcements/admin/{id}/reset-seen</c>.</summary>
+    [JsonPropertyName("announcementsSeen")]
+    public List<AnnouncementsSeenEntry> AnnouncementsSeen { get; set; }
+
+    /// <summary>Gets or sets the multi-announcement display mode chosen by the admin:
+    /// "one-at-a-time" (default — most recent only, next at next login),
+    /// "carousel" (one modal with arrows to navigate), or
+    /// "stack" (all announcements rendered in the same modal, scrollable).
+    /// Whitelisted server-side.</summary>
+    [JsonPropertyName("announcementMultiMode")]
+    public string AnnouncementMultiMode { get; set; } = "one-at-a-time";
 }

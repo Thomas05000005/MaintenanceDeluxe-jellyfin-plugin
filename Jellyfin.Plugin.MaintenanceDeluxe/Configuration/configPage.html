@@ -47,6 +47,9 @@
               <button type="button" class="jf-tab" data-tab="maintenance">
                 Maintenance
               </button>
+              <button type="button" class="jf-tab" data-tab="announcements">
+                Annonces
+              </button>
             </div>
 
             <!-- ══ Tab: Permanent ══════════════════════════════════════ -->
@@ -900,6 +903,34 @@
 
             </div>
             <!-- /panel: maintenance -->
+
+            <!-- ══ Tab: Annonces ═══════════════════════════════════════ -->
+            <div class="jf-panel" data-panel="announcements">
+              <div class="fieldDescription" style="margin-bottom: 1em">
+                Modal post-connexion affichée une fois à chaque utilisateur. Sert à annoncer une mise à jour, un évènement, ou un changement important.
+                Chaque utilisateur la voit une seule fois (tracking serveur) sauf reset explicite.
+              </div>
+
+              <!-- Multi-mode display preset -->
+              <div style="margin-bottom: 1.2em">
+                <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Affichage si plusieurs annonces non-vues</div>
+                <div class="jf-segmented">
+                  <label><input type="radio" name="annMultiMode" value="one-at-a-time" checked /> Une à la fois</label>
+                  <label><input type="radio" name="annMultiMode" value="carousel" /> Carousel (Phase 2)</label>
+                  <label><input type="radio" name="annMultiMode" value="stack" /> Stack (Phase 2)</label>
+                </div>
+                <div class="fieldDescription" style="margin-top:0.3em">
+                  <strong>Une à la fois</strong> : l'annonce la plus récente s'affiche. Au prochain login, la suivante. Mode unique implémenté en v0.3.9. Les modes carousel / stack seront ajoutés en Phase 2.
+                </div>
+              </div>
+
+              <div id="annList"></div>
+
+              <button is="emby-button" type="button" id="addAnnouncement" class="raised">
+                <span>+ Nouvelle annonce</span>
+              </button>
+            </div>
+            <!-- /panel: announcements -->
 
             <!-- ── Modal: Uptime Kuma URL builder ─────────────────────────── -->
             <div id="mdKumaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">

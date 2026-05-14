@@ -788,9 +788,21 @@
         var esc = function (s) { return s.replace(/[&<>"']/g, function (c) {
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
         }); };
+        // safe-subset Markdown: bold, italic, lists, plus [text](url) links.
+        // For links we validate the URL with the same scheme allowlist as banner
+        // URLs (http/https/relative) BEFORE injection. encodeURI further escapes
+        // any quote/angle that would break out of the href attribute. The match
+        // happens AFTER the text has been HTML-escaped, so [<script>](url)
+        // becomes [&lt;script&gt;](url) and never executes.
+        var linkSafeUrl = /^(https?:\/\/|\/)/i;
         function renderInline(s) {
-            return s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-                    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+            return s
+                .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
+                    if (!linkSafeUrl.test(url)) return text; // strip the URL part but keep the visible text
+                    return '<a href="' + encodeURI(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+                })
+                .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+                .replace(/\*([^*]+)\*/g, "<em>$1</em>");
         }
         var lines = src.split(/\r?\n/);
         var html = "";
@@ -1508,6 +1520,203 @@
         }
     }
 
+    // --- Announcement modal (v0.3.9) ------------------------------------
+    // A "what's new" modal that pops once per (user, announcement) after login.
+    // Fetched from /MaintenanceDeluxe/announcements/active which already filters
+    // server-side per current user and skips ones the user has dismissed.
+    // The dismiss is recorded server-side via POST /announcements/{id}/seen so
+    // it persists across devices, not just in localStorage.
+
+    var ANN_CSS_INJECTED = false;
+    var ANN_OVERLAY_Z = 1000001; // above maintenance overlay (1000000)
+    var ANN_IMPORTANCE_ACCENT = {
+        info:     "#5B9DD9",
+        update:   "#5EB35D",
+        warning:  "#E8A33D",
+        critical: "#D9534F"
+    };
+
+    function injectAnnouncementStyles() {
+        if (ANN_CSS_INJECTED) return;
+        ANN_CSS_INJECTED = true;
+        var s = document.createElement("style");
+        s.id = "jf-ann-styles";
+        s.textContent = [
+            "#jf-ann-overlay{position:fixed;inset:0;z-index:" + ANN_OVERLAY_Z + ";",
+            "background:rgba(0,0,0,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);",
+            "display:flex;align-items:center;justify-content:center;padding:24px;",
+            "opacity:0;transition:opacity .25s ease;font-family:inherit;}",
+            "#jf-ann-overlay.visible{opacity:1;}",
+            ".jf-ann-modal{position:relative;width:100%;max-width:min(700px,92vw);",
+            "max-height:88vh;overflow-y:auto;border-radius:14px;padding:32px 30px 26px;",
+            "background:rgba(28,24,22,.96);color:#E6DBC9;",
+            "box-shadow:0 24px 70px -20px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05) inset;",
+            "transform:scale(.96);transition:transform .25s ease;}",
+            "#jf-ann-overlay.visible .jf-ann-modal{transform:scale(1);}",
+            ".jf-ann-modal::before{content:\"\";position:absolute;top:0;left:0;right:0;height:3px;",
+            "background:var(--jf-ann-accent,#5B9DD9);border-radius:14px 14px 0 0;}",
+            ".jf-ann-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;}",
+            ".jf-ann-icon{font-size:30px;line-height:1;}",
+            ".jf-ann-title{margin:0;font-size:20px;font-weight:600;flex:1;color:#F5EFE3;}",
+            ".jf-ann-meta{font-size:11px;letter-spacing:.1em;text-transform:uppercase;",
+            "opacity:.6;margin-bottom:14px;}",
+            ".jf-ann-body{font-size:14px;line-height:1.55;}",
+            ".jf-ann-body p{margin:0 0 10px;}",
+            ".jf-ann-body ul{margin:6px 0;padding-left:20px;}",
+            ".jf-ann-body li{margin:3px 0;}",
+            ".jf-ann-body a{color:var(--jf-ann-accent,#5B9DD9);text-decoration:underline;}",
+            ".jf-ann-body strong{color:#F5EFE3;}",
+            ".jf-ann-compare{margin-top:18px;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;}",
+            ".jf-ann-compare-title{font-size:11px;letter-spacing:.12em;text-transform:uppercase;",
+            "opacity:.6;margin-bottom:10px;}",
+            ".jf-ann-compare-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;",
+            "gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;}",
+            ".jf-ann-compare-row:last-child{border-bottom:0;}",
+            ".jf-ann-compare-label{opacity:.85;}",
+            ".jf-ann-compare-before{opacity:.55;text-align:right;}",
+            ".jf-ann-compare-arrow{opacity:.4;}",
+            ".jf-ann-compare-after{font-weight:600;text-align:right;color:#F5EFE3;}",
+            ".jf-ann-compare-hl{margin-left:8px;font-size:11px;padding:2px 7px;border-radius:10px;",
+            "background:var(--jf-ann-accent,#5B9DD9);color:#000;font-weight:600;}",
+            ".jf-ann-footer{margin-top:22px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;}",
+            ".jf-ann-btn{padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.15);",
+            "background:rgba(255,255,255,.05);color:#F5EFE3;cursor:pointer;font-size:13px;",
+            "font-family:inherit;transition:background .15s;}",
+            ".jf-ann-btn:hover{background:rgba(255,255,255,.1);}",
+            ".jf-ann-btn-primary{background:var(--jf-ann-accent,#5B9DD9);color:#000;border-color:transparent;}",
+            ".jf-ann-btn-primary:hover{filter:brightness(1.1);background:var(--jf-ann-accent,#5B9DD9);}",
+            "/* Mobile portrait: stack comparisons */",
+            "@media(max-width:600px){",
+            ".jf-ann-modal{padding:24px 20px;border-radius:10px;max-height:92vh;}",
+            ".jf-ann-title{font-size:18px;}",
+            ".jf-ann-compare-row{grid-template-columns:1fr;gap:2px;padding:10px 0;}",
+            ".jf-ann-compare-before,.jf-ann-compare-after{text-align:left;}",
+            ".jf-ann-compare-arrow{display:none;}",
+            "}",
+            "/* TV: bigger everything for 10-foot UI */",
+            "@media(min-width:1920px){",
+            ".jf-ann-modal{max-width:900px;padding:42px 38px;}",
+            ".jf-ann-title{font-size:26px;}",
+            ".jf-ann-body{font-size:17px;}",
+            ".jf-ann-btn{padding:13px 24px;font-size:15px;}",
+            "}"
+        ].join("\n");
+        document.head.appendChild(s);
+    }
+
+    function escAnn(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+    }
+
+    function buildAnnouncementModal(a) {
+        injectAnnouncementStyles();
+        var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
+        var overlay = document.createElement("div");
+        overlay.id = "jf-ann-overlay";
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-labelledby", "jf-ann-title");
+        overlay.style.setProperty("--jf-ann-accent", accent);
+
+        var html = "<div class=\"jf-ann-modal\">";
+        html += "<div class=\"jf-ann-head\">";
+        html += "<div class=\"jf-ann-icon\">" + escAnn(a.icon || "\ud83d\udce3") + "</div>";
+        html += "<h1 id=\"jf-ann-title\" class=\"jf-ann-title\">" + escAnn(a.title) + "</h1>";
+        html += "</div>";
+        if (a.version || a.publishedAt) {
+            var meta = [];
+            if (a.version) meta.push(escAnn(a.version));
+            if (a.publishedAt) {
+                try {
+                    var d = new Date(a.publishedAt);
+                    if (!isNaN(d.getTime())) meta.push(d.toLocaleDateString());
+                } catch (e) {}
+            }
+            html += "<div class=\"jf-ann-meta\">" + meta.join(" \u2022 ") + "</div>";
+        }
+        if (a.body) html += "<div class=\"jf-ann-body\">" + mdToHtml(a.body) + "</div>";
+        if (a.comparisons && a.comparisons.length) {
+            html += "<div class=\"jf-ann-compare\"><div class=\"jf-ann-compare-title\">Avant / Apr\u00e8s</div>";
+            for (var i = 0; i < a.comparisons.length; i++) {
+                var c = a.comparisons[i];
+                html += "<div class=\"jf-ann-compare-row\">";
+                html += "<div class=\"jf-ann-compare-label\">" + escAnn(c.label) + "</div>";
+                html += "<div class=\"jf-ann-compare-before\">" + escAnn(c.before) + "</div>";
+                html += "<div class=\"jf-ann-compare-arrow\">\u2192</div>";
+                html += "<div class=\"jf-ann-compare-after\">" + escAnn(c.after);
+                if (c.highlight) html += "<span class=\"jf-ann-compare-hl\">" + escAnn(c.highlight) + "</span>";
+                html += "</div></div>";
+            }
+            html += "</div>";
+        }
+        html += "<div class=\"jf-ann-footer\">";
+        if (a.ctaLabel && a.ctaUrl) {
+            // Same safe-scheme allowlist as banner URLs.
+            if (/^(https?:\/\/|\/)/i.test(a.ctaUrl)) {
+                html += "<a class=\"jf-ann-btn\" href=\"" + encodeURI(a.ctaUrl) + "\" "
+                     + "target=\"_blank\" rel=\"noopener noreferrer\">" + escAnn(a.ctaLabel) + "</a>";
+            }
+        }
+        html += "<button type=\"button\" class=\"jf-ann-btn jf-ann-btn-primary\" data-jf-ann-ok>Compris</button>";
+        html += "</div>";
+        html += "</div>";
+
+        overlay.innerHTML = html;
+        return overlay;
+    }
+
+    function dismissAnnouncementOnServer(id, token) {
+        if (!id) return Promise.resolve();
+        return fetch("/MaintenanceDeluxe/announcements/" + encodeURIComponent(id) + "/seen", {
+            method: "POST",
+            headers: token ? { "Authorization": "MediaBrowser Token=\"" + token + "\"" } : {}
+        }).catch(function () { /* fire-and-forget, the next fetch will retry showing if not marked */ });
+    }
+
+    function showAnnouncementModal(a, token, onDismissed) {
+        var overlay = buildAnnouncementModal(a);
+        document.body.appendChild(overlay);
+        requestAnimationFrame(function () { overlay.classList.add("visible"); });
+
+        function close() {
+            overlay.classList.remove("visible");
+            setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
+            document.removeEventListener("keydown", onKey);
+            dismissAnnouncementOnServer(a.id, token).then(function () {
+                if (typeof onDismissed === "function") onDismissed();
+            });
+        }
+        function onKey(ev) { if (ev.key === "Escape") close(); }
+        document.addEventListener("keydown", onKey);
+
+        overlay.addEventListener("click", function (ev) {
+            if (ev.target === overlay) close(); // backdrop click
+        });
+        var ok = overlay.querySelector("[data-jf-ann-ok]");
+        if (ok) ok.addEventListener("click", close);
+    }
+
+    function fetchAndShowAnnouncements(token, multiMode) {
+        if (!token) return;
+        fetch("/MaintenanceDeluxe/announcements/active", {
+            headers: { "Authorization": "MediaBrowser Token=\"" + token + "\"" }
+        })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (list) {
+                if (!Array.isArray(list) || list.length === 0) return;
+                // Phase 1: only "one-at-a-time" mode is fully wired. The other modes
+                // (carousel, stack) are stored server-side but fall back to one-at-a-time
+                // here until their UI is implemented in a follow-up release.
+                showAnnouncementModal(list[0], token, function () {
+                    // Re-fetch on dismiss to pop the next one (if any) for one-at-a-time mode.
+                    if (multiMode !== "stack") fetchAndShowAnnouncements(token, multiMode);
+                });
+            })
+            .catch(function () { /* silent \u2014 announcements are non-critical */ });
+    }
+
     // Fetch maintenance state without auth \u2014 works even on the login page.
     fetch("/MaintenanceDeluxe/maintenance")
         .then(function (r) { return r.ok ? r.json() : null; })
@@ -1670,6 +1879,17 @@
 
             applyMaintenanceState();
             tick();
+
+            // Pop announcement modal (if any) shortly after init, to avoid competing
+            // with maintenance overlay and to let the Jellyfin SPA finish mounting.
+            // Skipped when the maintenance overlay is currently displayed - we don't
+            // want two modals stacked. If maintenance is active, announcements wait
+            // until the user is back online.
+            if (!(MAINTENANCE && MAINTENANCE.isActive) && getToken()) {
+                setTimeout(function () {
+                    fetchAndShowAnnouncements(getToken(), CONFIG && CONFIG.announcementMultiMode);
+                }, 1200);
+            }
         })
         .catch(function (err) {
             console.warn("[MaintenanceDeluxe] init failed:", err);

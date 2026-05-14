@@ -3061,6 +3061,313 @@
               .catch(function () {});
           }
 
+          // ── Announcements admin UI (v0.3.9) ─────────────────────────────
+          var ANN_IMPORTANCE_OPTIONS = ['info', 'update', 'warning', 'critical'];
+          var ANN_MULTIMODE_OPTIONS = ['one-at-a-time', 'carousel', 'stack'];
+          var _annUsersCache = null;
+          var _annData = { items: [], multiMode: 'one-at-a-time' };
+
+          function loadAnnouncements() {
+            ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/announcements/admin'))
+              .then(function (resp) {
+                _annData.items = (resp && resp.items) ? resp.items.map(function (it) {
+                  return { announcement: it.announcement, seenCount: it.seenCount, totalUsers: it.totalUsers };
+                }) : [];
+                _annData.multiMode = (resp && resp.multiMode) || 'one-at-a-time';
+                setRadio('annMultiMode', _annData.multiMode);
+                renderAnnouncementsList();
+              })
+              .catch(function () { _annData.items = []; renderAnnouncementsList(); });
+          }
+
+          function loadAnnouncementUsers() {
+            if (_annUsersCache) return Promise.resolve(_annUsersCache);
+            return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/users-summary'))
+              .then(function (u) { _annUsersCache = u || []; return _annUsersCache; })
+              .catch(function () { return []; });
+          }
+
+          function renderAnnouncementsList() {
+            var list = document.getElementById('annList');
+            if (!list) return;
+            list.innerHTML = '';
+            _annData.items.forEach(function (it, idx) { list.appendChild(buildAnnouncementRow(it, idx)); });
+          }
+
+          function buildAnnouncementRow(item, idx) {
+            var a = item.announcement;
+            var row = document.createElement('div');
+            row.className = 'jf-msg-row';
+            row.dataset.annIdx = String(idx);
+            var seenPct = item.totalUsers > 0 ? Math.round(100 * item.seenCount / item.totalUsers) : 0;
+
+            var summary = document.createElement('div');
+            summary.className = 'jf-msg-summary';
+            summary.innerHTML =
+              '<span style="font-size:20px">' + escHtml(a.icon || '📣') + '</span>'
+              + '<span class="jf-msg-preview"><strong>' + escHtml(a.title || '(sans titre)') + '</strong>'
+              + (a.version ? '<span style="opacity:.5;margin-left:0.5em">' + escHtml(a.version) + '</span>' : '')
+              + '</span>'
+              + '<span style="font-size:11px;opacity:.6;margin-right:0.5em">' + item.seenCount + '/' + item.totalUsers + ' vu (' + seenPct + '%)</span>'
+              + '<span style="display:inline-flex;align-items:center;gap:0.3em">'
+              + (a.isActive ? '<span style="color:#5EB35D;font-size:11px">● Active</span>' : '<span style="opacity:.5;font-size:11px">○ Inactive</span>')
+              + '</span>';
+            summary.addEventListener('click', function (ev) {
+              if (ev.target.closest('button,input,select,textarea,a')) return;
+              row.classList.toggle('expanded');
+            });
+
+            var detail = document.createElement('div');
+            detail.className = 'jf-msg-detail';
+            detail.style.padding = '0 16px 16px';
+            detail.style.display = 'grid';
+            detail.style.gridTemplateColumns = '1fr';
+            detail.style.gap = '10px';
+
+            // Title + version + icon
+            detail.innerHTML =
+              '<div style="display:grid;grid-template-columns:6em 1fr 10em;gap:10px;align-items:end">'
+              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Icon</label>'
+              + '<input is="emby-input" type="text" data-ann-field="icon" value="' + escAttr(a.icon || '📣') + '" maxlength="8" /></label>'
+              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Titre</label>'
+              + '<input is="emby-input" type="text" data-ann-field="title" value="' + escAttr(a.title || '') + '" maxlength="200" /></label>'
+              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Version</label>'
+              + '<input is="emby-input" type="text" data-ann-field="version" value="' + escAttr(a.version || '') + '" maxlength="64" placeholder="v0.3.9" /></label>'
+              + '</div>'
+
+              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+              + '<div><label class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Corps (markdown)</label>'
+              + '<textarea data-ann-field="body" rows="8" style="width:100%;font-family:inherit;font-size:14px;padding:8px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:inherit;resize:vertical">' + escHtml(a.body || '') + '</textarea>'
+              + '<div class="fieldDescription" style="margin-top:0.3em">**gras**, *italique*, - liste, [texte](url)</div></div>'
+              + '<div><label class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Aperçu</label>'
+              + '<div data-ann-preview style="min-height:200px;padding:12px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);font-size:13px;line-height:1.55">' + mdPreviewRender(a.body || '') + '</div></div>'
+              + '</div>'
+
+              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'
+              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Importance</div>'
+              + '<div class="jf-segmented">'
+              + ANN_IMPORTANCE_OPTIONS.map(function (v) {
+                  return '<label><input type="radio" name="annImp_' + idx + '" value="' + v + '"' + (a.importance === v ? ' checked' : '') + ' /> ' + v + '</label>';
+                }).join('')
+              + '</div></div>'
+              + '<div><label class="emby-checkbox-label" style="display:block;margin-top:1.4em">'
+              + '<input data-ann-field="isActive" type="checkbox" is="emby-checkbox"' + (a.isActive ? ' checked' : '') + ' />'
+              + '<span>Active (afficher aux users ciblés)</span></label></div>'
+              + '</div>'
+
+              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'
+              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Cible : rôles</div>'
+              + '<label class="emby-checkbox-label" style="display:block"><input type="checkbox" is="emby-checkbox" data-ann-role="user"' + (a.targetRoles && a.targetRoles.indexOf('user') >= 0 ? ' checked' : '') + ' /><span>Utilisateurs (non-admin)</span></label>'
+              + '<label class="emby-checkbox-label" style="display:block"><input type="checkbox" is="emby-checkbox" data-ann-role="admin"' + (a.targetRoles && a.targetRoles.indexOf('admin') >= 0 ? ' checked' : '') + ' /><span>Admins</span></label>'
+              + '<div class="fieldDescription" style="margin-top:0.3em">Aucune coche = tout le monde.</div></div>'
+              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Cible : utilisateurs spécifiques</div>'
+              + '<div data-ann-userpicker style="max-height:160px;overflow-y:auto;padding:6px;border:1px solid rgba(255,255,255,0.12);border-radius:5px;background:rgba(0,0,0,0.2);font-size:13px">Chargement...</div>'
+              + '<div class="fieldDescription" style="margin-top:0.3em">Aucune coche = pas de filtre par utilisateur.</div></div>'
+              + '</div>'
+
+              + '<div data-ann-comparisons></div>'
+              + '<button type="button" class="jf-reset-btn" data-ann-add-cmp><span class="material-icons">add</span> Ajouter une comparaison avant/après</button>'
+
+              + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:14px">'
+              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Bouton CTA (label)</label>'
+              + '<input is="emby-input" type="text" data-ann-field="ctaLabel" value="' + escAttr(a.ctaLabel || '') + '" maxlength="80" placeholder="Voir le changelog complet" /></label>'
+              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Bouton CTA (URL https://… ou /…)</label>'
+              + '<input is="emby-input" type="url" data-ann-field="ctaUrl" value="' + escAttr(a.ctaUrl || '') + '" placeholder="https://github.com/.../releases/v0.3.9" /></label>'
+              + '</div>'
+
+              + '<div style="display:flex;gap:0.6em;flex-wrap:wrap;margin-top:0.6em">'
+              + '<button type="button" class="jf-reset-btn" data-ann-reset-seen>Réinitialiser \'vue par\' (re-afficher à tous)</button>'
+              + '<button type="button" class="jf-reset-btn" data-ann-delete style="color:#d9534f">Supprimer cette annonce</button>'
+              + '</div>';
+
+            row.appendChild(summary);
+            row.appendChild(detail);
+
+            // Body live preview
+            var bodyInput = detail.querySelector('[data-ann-field="body"]');
+            var preview = detail.querySelector('[data-ann-preview]');
+            bodyInput.addEventListener('input', function () { preview.innerHTML = mdPreviewRender(bodyInput.value); });
+
+            // Comparisons
+            var cmpContainer = detail.querySelector('[data-ann-comparisons]');
+            renderComparisons(cmpContainer, a.comparisons || []);
+            detail.querySelector('[data-ann-add-cmp]').addEventListener('click', function () {
+              var current = collectComparisons(cmpContainer);
+              current.push({ label: '', before: '', after: '', highlight: '' });
+              renderComparisons(cmpContainer, current);
+            });
+
+            // User picker
+            var picker = detail.querySelector('[data-ann-userpicker]');
+            loadAnnouncementUsers().then(function (users) {
+              picker.innerHTML = '';
+              users.forEach(function (u) {
+                var lbl = document.createElement('label');
+                lbl.style.display = 'flex';
+                lbl.style.alignItems = 'center';
+                lbl.style.gap = '0.4em';
+                lbl.style.padding = '2px 4px';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.annUserId = u.id;
+                cb.style.margin = '0';
+                cb.style.width = '1em';
+                cb.style.height = '1em';
+                if (a.targetUserIds && a.targetUserIds.indexOf(u.id) >= 0) cb.checked = true;
+                lbl.appendChild(cb);
+                var span = document.createElement('span');
+                span.textContent = u.name + (u.isAdministrator ? ' (admin)' : '');
+                lbl.appendChild(span);
+                picker.appendChild(lbl);
+              });
+            });
+
+            // Reset seen
+            detail.querySelector('[data-ann-reset-seen]').addEventListener('click', function () {
+              if (!a.id) { alert('Sauve d\'abord l\'annonce.'); return; }
+              if (!confirm('Réinitialiser le suivi : tous les utilisateurs ciblés re-verront cette annonce ?')) return;
+              ApiClient.ajax({
+                type: 'POST',
+                url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin/' + encodeURIComponent(a.id) + '/reset-seen')
+              }).then(loadAnnouncements);
+            });
+
+            // Delete
+            detail.querySelector('[data-ann-delete]').addEventListener('click', function () {
+              if (!confirm('Supprimer définitivement cette annonce ?')) return;
+              _annData.items.splice(idx, 1);
+              renderAnnouncementsList();
+              saveAnnouncementsToServer();
+            });
+
+            return row;
+          }
+
+          function renderComparisons(container, list) {
+            container.innerHTML = '';
+            if (!list.length) return;
+            var header = document.createElement('div');
+            header.className = 'inputLabel inputLabelUnfocused';
+            header.style.marginBottom = '0.4em';
+            header.textContent = 'Comparaisons avant / après';
+            container.appendChild(header);
+
+            list.forEach(function (c, i) {
+              var row = document.createElement('div');
+              row.style.display = 'grid';
+              row.style.gridTemplateColumns = '1.5fr 1fr 1fr 0.7fr auto';
+              row.style.gap = '8px';
+              row.style.marginBottom = '6px';
+              row.innerHTML =
+                '<input is="emby-input" type="text" data-cmp-field="label" value="' + escAttr(c.label || '') + '" placeholder="Latence streaming" />'
+                + '<input is="emby-input" type="text" data-cmp-field="before" value="' + escAttr(c.before || '') + '" placeholder="200ms" />'
+                + '<input is="emby-input" type="text" data-cmp-field="after" value="' + escAttr(c.after || '') + '" placeholder="140ms" />'
+                + '<input is="emby-input" type="text" data-cmp-field="highlight" value="' + escAttr(c.highlight || '') + '" placeholder="-30%" />'
+                + '<button type="button" class="jf-reset-btn" data-cmp-delete style="color:#d9534f">×</button>';
+              row.querySelector('[data-cmp-delete]').addEventListener('click', function () {
+                var cur = collectComparisons(container);
+                cur.splice(i, 1);
+                renderComparisons(container, cur);
+              });
+              container.appendChild(row);
+            });
+          }
+
+          function collectComparisons(container) {
+            var result = [];
+            container.querySelectorAll('[data-cmp-field="label"]').forEach(function (labelEl) {
+              var row = labelEl.parentElement;
+              result.push({
+                label: labelEl.value.trim(),
+                before: row.querySelector('[data-cmp-field="before"]').value.trim(),
+                after: row.querySelector('[data-cmp-field="after"]').value.trim(),
+                highlight: row.querySelector('[data-cmp-field="highlight"]').value.trim()
+              });
+            });
+            return result;
+          }
+
+          function collectAnnouncementsFromUi() {
+            var items = [];
+            document.querySelectorAll('#annList .jf-msg-row').forEach(function (row, idx) {
+              var existing = _annData.items[idx] ? _annData.items[idx].announcement : {};
+              var roles = [];
+              row.querySelectorAll('[data-ann-role]').forEach(function (cb) { if (cb.checked) roles.push(cb.dataset.annRole); });
+              var userIds = [];
+              row.querySelectorAll('[data-ann-user-id]').forEach(function (cb) { if (cb.checked) userIds.push(cb.dataset.annUserId); });
+              var importance = pickRadio('annImp_' + idx, ANN_IMPORTANCE_OPTIONS, 'info');
+              var cmpContainer = row.querySelector('[data-ann-comparisons]');
+              items.push({
+                id: existing.id || '',
+                title: row.querySelector('[data-ann-field="title"]').value,
+                version: row.querySelector('[data-ann-field="version"]').value,
+                body: row.querySelector('[data-ann-field="body"]').value,
+                icon: row.querySelector('[data-ann-field="icon"]').value,
+                isActive: !!row.querySelector('[data-ann-field="isActive"]').checked,
+                publishedAt: existing.publishedAt || new Date().toISOString(),
+                targetRoles: roles,
+                targetUserIds: userIds,
+                importance: importance,
+                comparisons: collectComparisons(cmpContainer),
+                ctaLabel: row.querySelector('[data-ann-field="ctaLabel"]').value || null,
+                ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null
+              });
+            });
+            return items;
+          }
+
+          function saveAnnouncementsToServer() {
+            var items = collectAnnouncementsFromUi();
+            var multiMode = pickRadio('annMultiMode', ANN_MULTIMODE_OPTIONS, 'one-at-a-time');
+            return ApiClient.ajax({
+              type: 'POST',
+              url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin'),
+              data: JSON.stringify({ announcements: items, multiMode: multiMode }),
+              contentType: 'application/json'
+            }).then(loadAnnouncements);
+          }
+
+          function initAnnouncementsUi() {
+            var addBtn = document.getElementById('addAnnouncement');
+            if (addBtn) addBtn.addEventListener('click', function () {
+              _annData.items.push({
+                announcement: {
+                  id: '',
+                  title: 'Nouvelle annonce',
+                  version: '',
+                  body: '',
+                  icon: '📣',
+                  isActive: true,
+                  targetRoles: [],
+                  targetUserIds: [],
+                  importance: 'info',
+                  comparisons: []
+                },
+                seenCount: 0,
+                totalUsers: 0
+              });
+              renderAnnouncementsList();
+              // Auto-expand the new row
+              var rows = document.querySelectorAll('#annList .jf-msg-row');
+              if (rows.length) rows[rows.length - 1].classList.add('expanded');
+            });
+
+            // Auto-save on multi-mode change.
+            document.querySelectorAll('input[name="annMultiMode"]').forEach(function (el) {
+              el.addEventListener('change', saveAnnouncementsToServer);
+            });
+
+            // Save on blur of any announcement field — keeps the model in sync without
+            // requiring the admin to click Save. The big global Save button still triggers
+            // a final POST too.
+            var annList = document.getElementById('annList');
+            if (annList) {
+              annList.addEventListener('change', function (ev) {
+                if (ev.target.closest('#annList')) saveAnnouncementsToServer();
+              });
+            }
+          }
+
           document
             .getElementById('MaintenanceDeluxeConfigPage')
             .addEventListener('pageshow', function () {
@@ -3076,5 +3383,7 @@
                   setTimeout(updateContrastWarning, 50);
                 })
                 .catch(function () {});
+              initAnnouncementsUi();
+              loadAnnouncements();
             });
         })();
