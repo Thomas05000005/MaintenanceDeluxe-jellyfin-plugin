@@ -136,10 +136,17 @@ jobs:
           echo "MD5: $CHECKSUM"
 
       # ─── create GitHub release ──────────────────────────────────────────────
-      - name: Extract changelog from manifest.json
+      - name: Resolve release notes (prefer narrative docs/release-notes/<tag>.md)
         id: changelog
         run: |
-          python -c "import json; print(json.load(open('manifest.json'))[0]['versions'][0]['changelog'])" > /tmp/changelog.txt
+          NARRATIVE="docs/release-notes/${{ steps.version.outputs.tag }}.md"
+          if [ -f "$NARRATIVE" ]; then
+            echo "Using narrative release notes from $NARRATIVE"
+            cp "$NARRATIVE" /tmp/changelog.txt
+          else
+            echo "No narrative file at $NARRATIVE, falling back to manifest.json changelog"
+            python -c "import json; print(json.load(open('manifest.json'))[0]['versions'][0]['changelog'])" > /tmp/changelog.txt
+          fi
           echo "path=/tmp/changelog.txt" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release

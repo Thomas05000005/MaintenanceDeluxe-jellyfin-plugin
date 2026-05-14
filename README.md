@@ -95,6 +95,10 @@ Beyond maintenance overlay, the plugin also ships a small CMS-style banner syste
 
 See [docs/banners.md](docs/banners.md) for a full description with screenshots in `assets/screenshots/`.
 
+## Release notes
+
+Toutes les release notes (v0.1.0 → courante) sont versionnées dans [`docs/release-notes/`](docs/release-notes/) au format narratif. Le workflow GitHub Actions publie automatiquement le fichier `docs/release-notes/<tag>.md` comme description de la release si présent, sinon fallback sur le changelog court du manifest.
+
 ## Announcement modals (v0.3.9+)
 
 Post-login "What's New" modals — one-shot per user, tracked server-side. Use them to push release notes, perf comparisons before/after, event notices. Markdown body supports bold, italic, lists, and now links `[text](url)`. Importance levels (info / update / warning / critical) drive the accent colour. Targeting by role and / or specific user UUIDs. Responsive: mobile portrait, mobile landscape, tablet, desktop, TV (10-foot UI).
