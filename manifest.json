@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.11.0",
-        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "checksum": "74B25977DEA129A8313FC765E2118D1E",
         "changelog": "v0.3.11 - Fix critical : cache busting des assets admin apres upgrade plugin. Le user a constate apres l'install de v0.3.10 que l'UI admin restait identique a v0.3.9 (layout casse, pas de live preview) parce que le browser servait l'ancien admin.js/admin.css depuis son cache (Cache-Control: max-age=300 introduit en v0.3.4). Reecriture du helper ServeEmbeddedAsset : utilise maintenant ETag base sur la version d'assembly + Cache-Control 'public, no-cache, must-revalidate'. Au lieu de cacher 5 minutes en aveugle, le browser revalide a chaque navigation via If-None-Match - 304 Not Modified si la version n'a pas change (zero body, tres rapide), 200 avec nouveau code si upgrade plugin detecte. Cette classe de bug 'stale admin UI apres upgrade' qui frappait v0.3.4-v0.3.10 est definitivement fermee : a partir de v0.3.11, chaque release force un fetch frais des assets sans intervention de l'admin.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.11/MaintenanceDeluxe-v0.3.11.zip",
-        "timestamp": "2026-05-14T00:00:00"
+        "timestamp": "2026-05-14T19:47:29"
       },
       {
         "version": "0.3.10.0",
