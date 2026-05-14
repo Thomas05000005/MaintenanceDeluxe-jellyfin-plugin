@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.9.0",
-        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "checksum": "4AB094D673767A599FD3DE667879C53E",
         "changelog": "v0.3.9 - Annonces post-login (What's New modal) + markdown lien. Nouvelle fonctionnalite majeure : un systeme d'annonces dismissibles affichees aux utilisateurs apres login, idee pour pousser une mise a jour, un evenement, ou une release note enrichie. Chaque annonce a : titre + version + corps en markdown enrichi + icone + niveau d'importance (info/update/warning/critical avec accent colore distinct) + ciblage par role ET par UUID utilisateur specifique + comparaisons structurees avant/apres (Label/Before/After/Highlight) + bouton CTA optionnel. Tracking serveur : chaque utilisateur voit une annonce une seule fois (persistance serveur, pas localStorage). Bouton admin 'Reset vue par' pour re-afficher a tous. Markdown enrichi : ajout du support [texte](url) dans le corps des annonces ET des release notes maintenance existantes. URL safe-scheme (http/https/relatif), validation server-side. Modal client responsive : mobile portrait/paysage (stack comparisons), tablet, desktop (700px), TV (900px + font plus grand). Nouveaux endpoints : GET /announcements/active (any auth, retourne les non-vues filtrees par user), POST /{id}/seen (mark vu), GET /announcements/admin (full list + counts vu/total), POST /announcements/admin (save), POST /admin/{id}/reset-seen. 121 tests xUnit au total (89 + 32 nouveaux AnnouncementHelper). Documentation complete : docs/announcements.md. Phase 1 : seul le mode 'one-at-a-time' est implemente cote client, les modes carousel/stack arrivent en Phase 2.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.9/MaintenanceDeluxe-v0.3.9.zip",
-        "timestamp": "2026-04-29T00:00:00"
+        "timestamp": "2026-05-14T18:33:39"
       },
       {
         "version": "0.3.8.0",
