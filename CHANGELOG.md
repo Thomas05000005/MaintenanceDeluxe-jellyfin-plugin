@@ -4,6 +4,19 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.12.0] — 2026-05-14
+
+Fix critique : la modal d'annonce ne s'affichait pas après login (Phase 1 v0.3.9 → v0.3.10).
+
+### Corrigé
+- **🐛 Modal d'annonce manquante post-login** : le hook `fetchAndShowAnnouncements` ne tournait qu'au load initial de `banner.js`. Si l'user était sur la page login (no token) au chargement du script, le code exit early avant le hook. Après login → SPA navigate → pas de re-trigger. Seuls les users déjà loggués à l'arrivée du script voyaient la modal — pas le flow normal.
+- **🔧 Nouvelle fonction `maybeShowAnnouncements()` idempotente** : track le token pour lequel on a déjà checké, reset au logout, délai 800 ms avant le pop pour laisser la home page se mounter. Appelée à chaque navigation SPA via `refetchAndApplyMaintenance` (hashchange / popstate / viewshow), ainsi qu'au load initial.
+
+### Notes techniques
+- L'ancien `setTimeout(fetchAndShowAnnouncements, 1200)` direct est remplacé par le simple appel à `maybeShowAnnouncements()` (déduplication garantie via la garde `_announcementsCheckedForToken === tok`).
+- Reset auto au logout (`getToken()` devient null) pour que la prochaine connexion re-trigger.
+- 121 tests xUnit inchangés (pas de logique business modifiée, juste le wiring du hook côté client).
+
 ## [0.3.11.0] — 2026-05-14
 
 Fix critique : cache busting des assets admin après upgrade plugin.
@@ -294,6 +307,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.12.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.12
 [0.3.11.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.11
 [0.3.10.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.10
 [0.3.9.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.9

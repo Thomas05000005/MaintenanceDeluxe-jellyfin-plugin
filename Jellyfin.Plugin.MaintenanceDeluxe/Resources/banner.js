@@ -1470,7 +1470,39 @@
                 if (!maint) return;
                 MAINTENANCE = maint;
                 applyMaintenanceState();
+                // Token state may have changed since init (login transition from
+                // logged-out -> logged-in via SPA navigation). Try announcements
+                // every time we revisit maintenance state; the idempotency guard
+                // inside maybeShowAnnouncements ensures we only POST once per token.
+                maybeShowAnnouncements();
             });
+    }
+
+    // Tracks which token we've already shown the queue for. Reset to null when
+    // the user logs out so the next login triggers a fresh check.
+    var _announcementsCheckedForToken = null;
+    var _announcementsPendingTimer = null;
+
+    function maybeShowAnnouncements() {
+        var tok = getToken();
+        if (!tok) {
+            // Logged out (or never logged in). Reset so next login fires.
+            _announcementsCheckedForToken = null;
+            if (_announcementsPendingTimer) {
+                clearTimeout(_announcementsPendingTimer);
+                _announcementsPendingTimer = null;
+            }
+            return;
+        }
+        if (_announcementsCheckedForToken === tok) return;        // already done for this session
+        if (MAINTENANCE && MAINTENANCE.isActive) return;          // wait until maintenance ends
+        _announcementsCheckedForToken = tok;
+        // Small delay so SPA home page has time to mount visually before the modal pops.
+        if (_announcementsPendingTimer) clearTimeout(_announcementsPendingTimer);
+        _announcementsPendingTimer = setTimeout(function () {
+            _announcementsPendingTimer = null;
+            fetchAndShowAnnouncements(tok, (CONFIG && CONFIG.announcementMultiMode) || "one-at-a-time");
+        }, 800);
     }
 
     // Re-check and re-attach the overlay on SPA navigations. Essential so that
@@ -1880,16 +1912,13 @@
             applyMaintenanceState();
             tick();
 
-            // Pop announcement modal (if any) shortly after init, to avoid competing
-            // with maintenance overlay and to let the Jellyfin SPA finish mounting.
-            // Skipped when the maintenance overlay is currently displayed - we don't
-            // want two modals stacked. If maintenance is active, announcements wait
-            // until the user is back online.
-            if (!(MAINTENANCE && MAINTENANCE.isActive) && getToken()) {
-                setTimeout(function () {
-                    fetchAndShowAnnouncements(getToken(), CONFIG && CONFIG.announcementMultiMode);
-                }, 1200);
-            }
+            // Pop announcement modal (if any) shortly after init.
+            // The actual gating logic (no token / no announcements / maintenance active
+            // / already shown for this session) lives inside maybeShowAnnouncements,
+            // which is also invoked on every SPA navigation via refetchAndApplyMaintenance.
+            // So a user who logs in (transitions from no-token -> token via SPA) gets
+            // the modal too, not only users already logged in at first page load.
+            maybeShowAnnouncements();
         })
         .catch(function (err) {
             console.warn("[MaintenanceDeluxe] init failed:", err);
