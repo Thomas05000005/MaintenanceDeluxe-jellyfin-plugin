@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.4.0.0",
+        "checksum": "PLACEHOLDER",
+        "changelog": "v0.4.0 - Systeme de themes visuels pour les annonces. 4 themes au choix : Velours et Or (le look actuel, defaut), OLED Total Black (fond noir pur monochrome avec JetBrains Mono, ideal ecrans OLED), Glow Neon (halo color rotatif selon importance avec Space Grotesk geometrique futuriste et pulse animation), Glassmorphism (fond tres flou translucide avec Manrope rond elegant, look macOS / Vision Pro). 4 polices web premium embarques (140 KB total : Inter, JetBrains Mono, Space Grotesk, Manrope) servies par le plugin sous /MaintenanceDeluxe/fonts/ avec cache immutable 1 an. Selecteur de theme global dans Settings (s'applique a toutes les annonces par defaut) + override par annonce dans l'editeur (laisse 'Heriter' pour suivre le default, ou pick un theme specifique). Live preview admin re-rendue avec le theme actif et badge affichant quel theme s'applique (avec indicateur si override). 15 tests xUnit ajoutes pour valider la whitelist des cles de theme (cote serveur, comportement override null = inherit). Total 136 tests verts.",
+        "targetAbi": "10.11.6.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.4.0/MaintenanceDeluxe-v0.4.0.zip",
+        "timestamp": "2026-05-14T22:55:00"
+      },
+      {
         "version": "0.3.13.0",
         "checksum": "3872760B69A0291C2CEAB37A39534748",
         "changelog": "v0.3.13 - Modal annonce centree + premium + templates rapides. (1) Fix critique de centrage : la modal apparaissait en haut a gauche en mode toast au lieu de centree plein ecran. Cause : un ancestor Jellyfin (body ou skinBody) avec transform/filter/will-change creait un containing block pour position:fixed, qui se rattachait a cet ancestor au lieu du viewport. Fix : CSS hardcode avec !important + 100vw/100vh explicites + append a document.documentElement (html) au lieu de body pour echapper a tout transform parent. (2) Style premium : backdrop blur passe a 8px, fond rgba(0,0,0,.68) plus contraste. (3) Templates rapides : 7 modeles pre-remplis dans l'admin pour ajouter une annonce en 1 clic au lieu de tout retaper (Mise a jour serveur, Nouveaux films, Maintenance prevue, Amelioration perfs avec comparisons, Annonce communautaire, Evenement, Alerte critique). Bouton dedie par modele dans la section Annonces. Bouton 'Nouvelle annonce' renomme '+ Annonce vide' pour clarifier l'alternative.",

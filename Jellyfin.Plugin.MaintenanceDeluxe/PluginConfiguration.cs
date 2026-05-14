@@ -485,6 +485,12 @@ public class Announcement
     /// <summary>Gets or sets the optional CTA URL. Must be http(s) or relative (same validation as statusUrl).</summary>
     [JsonPropertyName("ctaUrl")]
     public string? CtaUrl { get; set; }
+
+    /// <summary>Gets or sets the per-announcement theme override key. Null/empty = inherit
+    /// the global <see cref="PluginConfiguration.AnnouncementTheme"/>. Whitelisted server-side
+    /// against {"velours", "oled", "neon", "glass"}.</summary>
+    [JsonPropertyName("theme")]
+    public string? Theme { get; set; }
 }
 
 /// <summary>
@@ -567,6 +573,8 @@ public class BannerClientConfig
     // (which filters server-side per the current user).
     [JsonPropertyName("announcementMultiMode")]
     public string AnnouncementMultiMode { get; set; } = "one-at-a-time";
+    [JsonPropertyName("announcementTheme")]
+    public string AnnouncementTheme { get; set; } = "velours";
 
     public static BannerClientConfig From(PluginConfiguration c) => new()
     {
@@ -593,7 +601,8 @@ public class BannerClientConfig
         ShowRefreshPrompt = c.ShowRefreshPrompt,
         UrlPopupHint = c.UrlPopupHint,
         LastModified = c.LastModified,
-        AnnouncementMultiMode = c.AnnouncementMultiMode
+        AnnouncementMultiMode = c.AnnouncementMultiMode,
+        AnnouncementTheme = c.AnnouncementTheme
     };
 #pragma warning restore CS1591
 }
@@ -636,6 +645,7 @@ public class PluginConfiguration : BasePluginConfiguration
         Announcements = new List<Announcement>();
         AnnouncementsSeen = new List<AnnouncementsSeenEntry>();
         AnnouncementMultiMode = "one-at-a-time";
+        AnnouncementTheme = "velours";
     }
 
     /// <summary>Gets or sets how long (seconds) each message is displayed before cycling.</summary>
@@ -751,4 +761,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Whitelisted server-side.</summary>
     [JsonPropertyName("announcementMultiMode")]
     public string AnnouncementMultiMode { get; set; } = "one-at-a-time";
+
+    /// <summary>Gets or sets the global announcement-modal theme key. Default "velours".
+    /// Each <see cref="Announcement"/> can override this via its own <see cref="Announcement.Theme"/>.
+    /// Whitelisted server-side against {"velours", "oled", "neon", "glass"}.</summary>
+    [JsonPropertyName("announcementTheme")]
+    public string AnnouncementTheme { get; set; } = "velours";
 }

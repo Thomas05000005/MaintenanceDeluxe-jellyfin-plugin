@@ -34,6 +34,33 @@ public class NormalisationTests
     }
 
     [Theory]
+    [InlineData("velours", "velours")]
+    [InlineData("oled", "oled")]
+    [InlineData("neon", "neon")]
+    [InlineData("glass", "glass")]
+    [InlineData("UNKNOWN", "velours")]
+    [InlineData("", "velours")]
+    [InlineData(null, "velours")]
+    public void NormaliseAnnouncementTheme_AcceptsFourThemesElseVelours(string? input, string expected)
+    {
+        Assert.Equal(expected, BannerController.NormaliseAnnouncementTheme(input));
+    }
+
+    [Theory]
+    [InlineData("velours", "velours")]
+    [InlineData("oled", "oled")]
+    [InlineData("neon", "neon")]
+    [InlineData("glass", "glass")]
+    [InlineData("UNKNOWN", null)] // unknown override -> drop (inherit global)
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData("   ", null)]
+    public void NormaliseAnnouncementThemeOverride_AcceptsFourThemesElseNull(string? input, string? expected)
+    {
+        Assert.Equal(expected, BannerController.NormaliseAnnouncementThemeOverride(input));
+    }
+
+    [Theory]
     [InlineData("off", "off")]
     [InlineData("slow", "slow")]
     [InlineData("normal", "normal")]

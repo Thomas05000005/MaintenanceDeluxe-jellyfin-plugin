@@ -4,6 +4,35 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0.0] — 2026-05-14
+
+Première bump mineure : système de thèmes visuels pour les annonces avec 4 styles au choix, polices web premium embarquées, sélection globale + override par annonce, aperçu live thématisé.
+
+### Ajouté
+- **🎨 4 thèmes visuels pour la modal d'annonces** :
+  - **Velours & Or** *(défaut)* — palette sombre + accent or, police Inter premium SaaS
+  - **OLED Total Black** — fond `#000` pur monochrome, JetBrains Mono, idéal écrans OLED
+  - **Glow Néon (sobre)** — halo coloré pulsant 4.5s selon l'importance, Space Grotesk géométrique, text-shadow lumineux
+  - **Glassmorphism** — fond très flouté (28px blur saturate 1.5x), carte translucide avec bordure lumineuse, Manrope
+- **🔤 4 polices web embarquées** (140 KB total, latin-only variable woff2) servies via `GET /MaintenanceDeluxe/fonts/{slug}.woff2` avec `Cache-Control: public, max-age=31536000, immutable`. Chargement lazy : aucune font téléchargée tant que l'utilisateur reste sur Velours, et `font-display: swap` garde le texte visible pendant le streaming.
+- **🪟 Sélecteur global** dans l'onglet Annonces : segmented control avec les 4 thèmes, auto-save au changement, re-render immédiat de toutes les previews avant la requête réseau.
+- **🪟 Override par annonce** dans l'éditeur : nouveau select `Thème pour cette annonce` avec option `Hériter du défaut global` (par défaut) + les 4 thèmes nommés. Permet de mixer plusieurs styles dans la même liste (par ex. critical-warning en Néon rouge pulsant, annonces classiques en Velours).
+- **👁️ Aperçu live thématisé** : la preview admin applique le thème complet (palette + police + animations), avec un badge en haut affichant le thème actif (étoile `*` si overridden, sans étoile si hérité du défaut global, tooltip explicatif).
+- **🧪 Tests** : 15 nouveaux tests xUnit couvrant `NormaliseAnnouncementTheme` (whitelist + fallback `velours`) et `NormaliseAnnouncementThemeOverride` (sémantique unknown → `null` = inherit). 136 tests verts au total.
+
+### Modifié
+- **`PluginConfiguration`** : nouveau champ `AnnouncementTheme` (default `"velours"`). Reflété automatiquement dans `BannerClientConfig`.
+- **`Announcement`** : nouveau champ nullable `Theme` (override par annonce, `null` = inherit).
+- **`GET /announcements/active`** : retourne maintenant le `theme` effectif (override ?? global) résolu côté serveur, le client n'a pas à connaître le default.
+- **`GET /announcements/admin`** : retourne le `theme` global en plus du `multiMode` pour pré-remplir le sélecteur admin.
+- **`POST /announcements/admin`** : accepte un nouveau champ `theme` (whitelist + fallback `velours`).
+
+### Notes techniques
+- **Path traversal impossible** sur l'endpoint fonts : le slug est matché contre un `Dictionary<string, string>` figé, jamais concaténé.
+- **Scoping CSS strict** : toutes les règles thème sont scopées via `#jf-ann-overlay.jf-ann-theme-X .jf-ann-modal {...}`, aucun risque de leak hors de la modal.
+- Plusieurs thèmes peuvent **coexister dans le même DOM** (utile pour l'aperçu admin qui bascule entre thèmes sans page reload).
+- **Phase 2 planifiée** : éditeur de thème custom (palette / animation / police pickable) comme la fenêtre de maintenance, pour créer ses propres styles sans modifier le code.
+
 ## [0.3.13.0] — 2026-05-14
 
 Modal d'annonce enfin centrée, fond premium, et 7 templates rapides pour gagner 30 secondes par annonce.

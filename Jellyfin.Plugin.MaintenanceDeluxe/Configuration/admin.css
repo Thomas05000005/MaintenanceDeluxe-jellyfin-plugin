@@ -600,3 +600,144 @@
           background: rgba(201, 169, 110, 0.18);
           border-color: rgba(201, 169, 110, 0.5);
         }
+
+        /* ─── Announcement themes (v0.4.0) ───────────────────────────────── */
+        /* @font-face declarations for the bundled webfonts. Served by the
+           plugin under /MaintenanceDeluxe/fonts/. Latin-only variable woff2,
+           font-display:swap keeps text visible while the file streams.        */
+        @font-face {
+          font-family: 'JFAnnInter';
+          font-style: normal; font-weight: 300 900; font-display: swap;
+          src: url('/MaintenanceDeluxe/fonts/inter.woff2') format('woff2');
+        }
+        @font-face {
+          font-family: 'JFAnnJetBrains';
+          font-style: normal; font-weight: 300 800; font-display: swap;
+          src: url('/MaintenanceDeluxe/fonts/jetbrains-mono.woff2') format('woff2');
+        }
+        @font-face {
+          font-family: 'JFAnnSpaceGrotesk';
+          font-style: normal; font-weight: 300 700; font-display: swap;
+          src: url('/MaintenanceDeluxe/fonts/space-grotesk.woff2') format('woff2');
+        }
+        @font-face {
+          font-family: 'JFAnnManrope';
+          font-style: normal; font-weight: 200 800; font-display: swap;
+          src: url('/MaintenanceDeluxe/fonts/manrope.woff2') format('woff2');
+        }
+
+        /* Theme: Velours & Or (default — refines the existing preview look). */
+        .jf-ann-preview-modal.theme-velours {
+          font-family: 'JFAnnInter', system-ui, sans-serif;
+          background: linear-gradient(180deg, rgba(40, 28, 22, 0.96) 0%, rgba(22, 14, 10, 0.97) 100%);
+          color: #E6DBC9;
+          box-shadow: 0 14px 40px -12px rgba(0, 0, 0, 0.65),
+                      0 0 0 1px rgba(201, 169, 110, 0.15) inset;
+        }
+        .jf-ann-preview-modal.theme-velours .pv-title {
+          color: #F5EFE3; font-weight: 600; letter-spacing: -0.01em;
+        }
+
+        /* Theme: OLED Total Black. */
+        .jf-ann-preview-modal.theme-oled {
+          font-family: 'JFAnnJetBrains', ui-monospace, SFMono-Regular, Menlo, monospace;
+          background: #000; color: #fff;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          border-radius: 6px; box-shadow: none;
+          letter-spacing: 0.005em;
+        }
+        .jf-ann-preview-modal.theme-oled::before { display: none; }
+        .jf-ann-preview-modal.theme-oled .pv-title {
+          color: #fff; font-weight: 500; letter-spacing: -0.005em;
+        }
+        .jf-ann-preview-modal.theme-oled .pv-meta { opacity: 0.5; }
+        .jf-ann-preview-modal.theme-oled .pv-btn {
+          background: #000; border: 1px solid rgba(255, 255, 255, 0.25); color: #fff;
+          border-radius: 4px;
+        }
+        .jf-ann-preview-modal.theme-oled .pv-btn.primary {
+          background: #fff; color: #000; border-color: #fff;
+        }
+        .jf-ann-preview-modal.theme-oled .pv-compare {
+          border-top-color: rgba(255, 255, 255, 0.12);
+        }
+        .jf-ann-preview-modal.theme-oled .pv-compare-row {
+          border-bottom-color: rgba(255, 255, 255, 0.06);
+        }
+        .jf-ann-preview-modal.theme-oled .pv-compare-hl { background: #fff; color: #000; border-radius: 3px; }
+
+        /* Theme: Glow Néon — accent-driven halo + futuristic geometric font. */
+        @keyframes jfAnnPreviewGlow {
+          0%, 100% { box-shadow: 0 0 22px -6px var(--jf-ann-preview-accent, #5B9DD9),
+                                 0 12px 36px -12px rgba(0, 0, 0, 0.7),
+                                 0 0 0 1px rgba(255, 255, 255, 0.06) inset; }
+          50% { box-shadow: 0 0 44px -4px var(--jf-ann-preview-accent, #5B9DD9),
+                            0 14px 40px -10px rgba(0, 0, 0, 0.7),
+                            0 0 0 1px rgba(255, 255, 255, 0.1) inset; }
+        }
+        .jf-ann-preview-modal.theme-neon {
+          font-family: 'JFAnnSpaceGrotesk', system-ui, sans-serif;
+          background: linear-gradient(180deg, rgba(14, 14, 28, 0.96) 0%, rgba(8, 8, 18, 0.98) 100%);
+          color: #DDE3F0; border-radius: 16px;
+          animation: jfAnnPreviewGlow 4.5s ease-in-out infinite;
+        }
+        .jf-ann-preview-modal.theme-neon::before {
+          height: 2px;
+          background: linear-gradient(90deg, transparent 0%,
+                                      var(--jf-ann-preview-accent, #5B9DD9) 50%,
+                                      transparent 100%);
+        }
+        .jf-ann-preview-modal.theme-neon .pv-title {
+          color: #fff; font-weight: 600; letter-spacing: -0.01em;
+          text-shadow: 0 0 22px var(--jf-ann-preview-accent, #5B9DD9);
+        }
+        .jf-ann-preview-modal.theme-neon .pv-btn.primary {
+          color: #fff; background: var(--jf-ann-preview-accent, #5B9DD9);
+          box-shadow: 0 0 18px -2px var(--jf-ann-preview-accent, #5B9DD9);
+        }
+        .jf-ann-preview-modal.theme-neon .pv-compare-hl {
+          box-shadow: 0 0 10px -2px var(--jf-ann-preview-accent, #5B9DD9);
+        }
+
+        /* Theme: Glassmorphism — frosted-glass surface, soft border. */
+        .jf-ann-preview-modal.theme-glass {
+          font-family: 'JFAnnManrope', system-ui, sans-serif;
+          background: rgba(255, 255, 255, 0.07); color: #F0F2F8;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          backdrop-filter: blur(18px) saturate(1.4);
+          -webkit-backdrop-filter: blur(18px) saturate(1.4);
+          box-shadow: 0 22px 60px -20px rgba(0, 0, 0, 0.5),
+                      0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+        }
+        .jf-ann-preview-modal.theme-glass::before {
+          height: 1px;
+          background: linear-gradient(90deg, transparent 0%,
+                                      var(--jf-ann-preview-accent, #5B9DD9) 50%,
+                                      transparent 100%);
+        }
+        .jf-ann-preview-modal.theme-glass .pv-title {
+          color: #fff; font-weight: 600; letter-spacing: -0.015em;
+        }
+        .jf-ann-preview-modal.theme-glass .pv-meta { opacity: 0.7; }
+        .jf-ann-preview-modal.theme-glass .pv-btn {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2); color: #fff;
+        }
+        .jf-ann-preview-modal.theme-glass .pv-btn.primary {
+          background: #fff; color: #101018; border-color: #fff;
+        }
+        .jf-ann-preview-modal.theme-glass .pv-compare {
+          border-top-color: rgba(255, 255, 255, 0.12);
+        }
+        .jf-ann-preview-modal.theme-glass .pv-compare-row {
+          border-bottom-color: rgba(255, 255, 255, 0.06);
+        }
+
+        /* Theme badge: shows which theme is currently active in the preview. */
+        .jf-ann-preview-themetag {
+          display: inline-block; font-size: 10px; letter-spacing: 0.08em;
+          text-transform: uppercase; padding: 3px 8px; border-radius: 10px;
+          background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);
+          margin-left: auto; opacity: 0.7; flex-shrink: 0;
+        }

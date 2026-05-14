@@ -3150,7 +3150,14 @@
             }
           ];
           var _annUsersCache = null;
-          var _annData = { items: [], multiMode: 'one-at-a-time' };
+          var _annData = { items: [], multiMode: 'one-at-a-time', theme: 'velours' };
+          var ANN_THEME_OPTIONS = ['velours', 'oled', 'neon', 'glass'];
+          var ANN_THEME_LABELS = {
+            velours: 'Velours & Or',
+            oled: 'OLED Total Black',
+            neon: 'Glow Néon',
+            glass: 'Glassmorphism'
+          };
 
           function loadAnnouncements() {
             ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/announcements/admin'))
@@ -3159,7 +3166,9 @@
                   return { announcement: it.announcement, seenCount: it.seenCount, totalUsers: it.totalUsers };
                 }) : [];
                 _annData.multiMode = (resp && resp.multiMode) || 'one-at-a-time';
+                _annData.theme = (resp && resp.theme && ANN_THEME_OPTIONS.indexOf(resp.theme) >= 0) ? resp.theme : 'velours';
                 setRadio('annMultiMode', _annData.multiMode);
+                setRadio('annThemeGlobal', _annData.theme);
                 renderAnnouncementsList();
               })
               .catch(function () { _annData.items = []; renderAnnouncementsList(); });
@@ -3228,10 +3237,19 @@
           // Pure: builds the live-preview HTML matching what banner.js renders.
           function renderAnnouncementPreview(a) {
             var accent = ANN_ACCENT_BY_IMPORTANCE[a.importance] || ANN_ACCENT_BY_IMPORTANCE.info;
-            var h = '<div class="jf-ann-preview-modal" style="--jf-ann-preview-accent:' + accent + '">';
+            // Effective theme: per-announcement override falls back to the
+            // global default the admin picked at the top of the tab.
+            var effectiveTheme = (a.theme && ANN_THEME_OPTIONS.indexOf(a.theme) >= 0)
+              ? a.theme
+              : (_annData.theme || 'velours');
+            var themeLabel = ANN_THEME_LABELS[effectiveTheme] || effectiveTheme;
+            var inheriting = !a.theme;
+            var h = '<div class="jf-ann-preview-modal theme-' + effectiveTheme + '" style="--jf-ann-preview-accent:' + accent + '">';
             h += '<div class="pv-head">';
             h += '<div class="pv-icon">' + escAnn(a.icon || '📣') + '</div>';
             h += '<h1 class="pv-title">' + escAnn(a.title || '(sans titre)') + '</h1>';
+            h += '<span class="jf-ann-preview-themetag" title="' + (inheriting ? 'Hérité du défaut global' : 'Surchargé pour cette annonce') + '">'
+               + escAnn(themeLabel) + (inheriting ? '' : ' *') + '</span>';
             h += '</div>';
             if (a.version) h += '<div class="pv-meta">' + escAnn(a.version) + '</div>';
             if (a.body) h += '<div class="pv-body">' + annMdRender(a.body) + '</div>';
@@ -3316,6 +3334,18 @@
               + '<div class="jf-ann-field" style="justify-content:center"><label class="emby-checkbox-label">'
               + '<input data-ann-field="isActive" type="checkbox"' + (a.isActive ? ' checked' : '') + ' />'
               + '<span>Active (afficher aux users ciblés)</span></label></div>'
+              + '</div></fieldset>'
+
+              // Fieldset: visual theme override (per-announcement)
+              + '<fieldset><legend>Apparence</legend>'
+              + '<div class="jf-ann-field"><label class="lbl">Thème pour cette annonce</label>'
+              + '<select data-ann-field="theme" style="max-width:280px">'
+              + '<option value=""' + (!a.theme ? ' selected' : '') + '>Hériter du défaut global</option>'
+              + ANN_THEME_OPTIONS.map(function (k) {
+                  return '<option value="' + k + '"' + (a.theme === k ? ' selected' : '') + '>' + ANN_THEME_LABELS[k] + '</option>';
+                }).join('')
+              + '</select>'
+              + '<div class="hint">Le défaut global est défini en haut de l\'onglet. Laisse \'Hériter\' pour suivre ce choix.</div>'
               + '</div></fieldset>'
 
               // Fieldset: targeting
@@ -3501,6 +3531,8 @@
             row.querySelectorAll('[data-ann-user-id]').forEach(function (cb) { if (cb.checked) userIds.push(cb.dataset.annUserId); });
             var importance = pickRadio('annImp_' + idx, ANN_IMPORTANCE_OPTIONS, 'info');
             var cmpContainer = row.querySelector('[data-ann-comparisons]');
+            var themeSel = row.querySelector('[data-ann-field="theme"]');
+            var themeVal = themeSel ? themeSel.value : '';
             return {
               id: existing.id || '',
               title: row.querySelector('[data-ann-field="title"]').value,
@@ -3514,7 +3546,8 @@
               importance: importance,
               comparisons: collectComparisons(cmpContainer),
               ctaLabel: row.querySelector('[data-ann-field="ctaLabel"]').value || null,
-              ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null
+              ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null,
+              theme: (themeVal && ANN_THEME_OPTIONS.indexOf(themeVal) >= 0) ? themeVal : null
             };
           }
 
@@ -3530,10 +3563,11 @@
           function saveAllAnnouncements() {
             var items = collectAnnouncementsFromUi();
             var multiMode = pickRadio('annMultiMode', ANN_MULTIMODE_OPTIONS, 'one-at-a-time');
+            var theme = pickRadio('annThemeGlobal', ANN_THEME_OPTIONS, 'velours');
             return ApiClient.ajax({
               type: 'POST',
               url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin'),
-              data: JSON.stringify({ announcements: items, multiMode: multiMode }),
+              data: JSON.stringify({ announcements: items, multiMode: multiMode, theme: theme }),
               contentType: 'application/json'
             }).then(loadAnnouncements);
           }
@@ -3591,6 +3625,18 @@
             // multi-mode change triggers a save (lightweight, just a radio).
             document.querySelectorAll('input[name="annMultiMode"]').forEach(function (el) {
               el.addEventListener('change', function () { saveAllAnnouncements(); });
+            });
+            // global theme change: immediately re-render every preview so the admin sees
+            // the new default applied to non-overridden rows, then persist server-side.
+            document.querySelectorAll('input[name="annThemeGlobal"]').forEach(function (el) {
+              el.addEventListener('change', function () {
+                _annData.theme = pickRadio('annThemeGlobal', ANN_THEME_OPTIONS, 'velours');
+                document.querySelectorAll('#annList .jf-ann-row').forEach(function (row) {
+                  var ev = new Event('input', { bubbles: true });
+                  row.dispatchEvent(ev);
+                });
+                saveAllAnnouncements();
+              });
             });
           }
 

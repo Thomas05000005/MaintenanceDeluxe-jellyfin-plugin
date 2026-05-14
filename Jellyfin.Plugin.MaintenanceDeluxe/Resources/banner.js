@@ -1560,6 +1560,8 @@
     // it persists across devices, not just in localStorage.
 
     var ANN_CSS_INJECTED = false;
+    var ANN_FONTS_INJECTED = false;
+    var ANN_THEME_INJECTED = {};
     var ANN_OVERLAY_Z = 1000001; // above maintenance overlay (1000000)
     var ANN_IMPORTANCE_ACCENT = {
         info:     "#5B9DD9",
@@ -1567,6 +1569,140 @@
         warning:  "#E8A33D",
         critical: "#D9534F"
     };
+
+    // Theme definitions. Each entry contributes its own CSS scoped by
+    // `#jf-ann-overlay.jf-ann-theme-<key>` plus a font-family. The base CSS
+    // (injected once via injectAnnouncementStyles) handles all theme-agnostic
+    // layout - positioning, max-width, the !important containing-block
+    // workaround. Themes only override colours, typography, animations and
+    // surface treatments. Adding a new theme = one entry here + one option in
+    // the admin select. Server-side whitelist lives in BannerController.cs.
+    var ANN_THEMES = {
+        velours: {
+            font: "'JFAnnInter',system-ui,sans-serif",
+            css: [
+                "#jf-ann-overlay.jf-ann-theme-velours{background:rgba(0,0,0,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}",
+                "#jf-ann-overlay.jf-ann-theme-velours .jf-ann-modal{",
+                "background:linear-gradient(180deg,rgba(40,28,22,.96) 0%,rgba(22,14,10,.97) 100%);",
+                "color:#E6DBC9;border:0;",
+                "box-shadow:0 24px 70px -20px rgba(0,0,0,.65),0 0 0 1px rgba(201,169,110,.15) inset;}",
+                "#jf-ann-overlay.jf-ann-theme-velours .jf-ann-title{color:#F5EFE3;font-weight:600;letter-spacing:-.01em;}",
+                "#jf-ann-overlay.jf-ann-theme-velours .jf-ann-modal::before{",
+                "background:linear-gradient(90deg,transparent 0%,var(--jf-ann-accent,#C9A96E) 30%,var(--jf-ann-accent,#C9A96E) 70%,transparent 100%);}"
+            ].join("")
+        },
+        oled: {
+            font: "'JFAnnJetBrains',ui-monospace,SFMono-Regular,Menlo,monospace",
+            css: [
+                "#jf-ann-overlay.jf-ann-theme-oled{background:#000;backdrop-filter:none;-webkit-backdrop-filter:none;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-modal{",
+                "background:#000;color:#fff;border:1px solid rgba(255,255,255,.18);",
+                "border-radius:6px;box-shadow:none;letter-spacing:.005em;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-modal::before{display:none;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-title{color:#fff;font-weight:500;letter-spacing:-.005em;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-meta{opacity:.5;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-btn{background:#000;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:4px;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-btn:hover{background:rgba(255,255,255,.08);}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-btn-primary{background:#fff;color:#000;border-color:#fff;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-btn-primary:hover{background:#ddd;filter:none;}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-compare{border-top:1px solid rgba(255,255,255,.12);}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-compare-row{border-bottom:1px solid rgba(255,255,255,.06);}",
+                "#jf-ann-overlay.jf-ann-theme-oled .jf-ann-compare-hl{background:#fff;color:#000;border-radius:3px;}"
+            ].join("")
+        },
+        neon: {
+            font: "'JFAnnSpaceGrotesk',system-ui,sans-serif",
+            css: [
+                "@keyframes jfAnnGlowPulse{",
+                "0%,100%{box-shadow:0 0 28px -6px var(--jf-ann-accent,#5B9DD9),0 18px 56px -16px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.06) inset;}",
+                "50%{box-shadow:0 0 56px -4px var(--jf-ann-accent,#5B9DD9),0 20px 60px -14px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.1) inset;}}",
+                "#jf-ann-overlay.jf-ann-theme-neon{background:rgba(6,8,18,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-modal{",
+                "background:linear-gradient(180deg,rgba(14,14,28,.96) 0%,rgba(8,8,18,.98) 100%);",
+                "color:#DDE3F0;border-radius:16px;",
+                "animation:jfAnnGlowPulse 4.5s ease-in-out infinite;}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-modal::before{",
+                "height:2px;background:linear-gradient(90deg,transparent 0%,var(--jf-ann-accent,#5B9DD9) 50%,transparent 100%);}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-title{",
+                "color:#fff;letter-spacing:-.01em;font-weight:600;",
+                "text-shadow:0 0 28px var(--jf-ann-accent,#5B9DD9);}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-btn{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-btn-primary{",
+                "color:#fff;background:var(--jf-ann-accent,#5B9DD9);",
+                "box-shadow:0 0 22px -2px var(--jf-ann-accent,#5B9DD9);}",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-compare-hl{",
+                "box-shadow:0 0 12px -2px var(--jf-ann-accent,#5B9DD9);}"
+            ].join("")
+        },
+        glass: {
+            font: "'JFAnnManrope',system-ui,sans-serif",
+            css: [
+                "#jf-ann-overlay.jf-ann-theme-glass{",
+                "background:rgba(0,0,0,.38);",
+                "backdrop-filter:blur(28px) saturate(1.5);-webkit-backdrop-filter:blur(28px) saturate(1.5);}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-modal{",
+                "background:rgba(255,255,255,.07);color:#F0F2F8;border-radius:20px;",
+                "border:1px solid rgba(255,255,255,.16);",
+                "backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);",
+                "box-shadow:0 30px 80px -20px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08) inset;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-modal::before{",
+                "background:linear-gradient(90deg,transparent 0%,var(--jf-ann-accent,#5B9DD9) 50%,transparent 100%);height:1px;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-title{color:#fff;font-weight:600;letter-spacing:-.015em;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-meta{opacity:.7;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-btn:hover{background:rgba(255,255,255,.18);}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-btn-primary{background:#fff;color:#101018;border-color:#fff;}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-btn-primary:hover{background:#fff;filter:brightness(.96);}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-compare{border-top-color:rgba(255,255,255,.12);}",
+                "#jf-ann-overlay.jf-ann-theme-glass .jf-ann-compare-row{border-bottom-color:rgba(255,255,255,.06);}"
+            ].join("")
+        }
+    };
+
+    // @font-face for the four bundled webfonts. Injected once on the first
+    // themed modal - the browser only downloads each font when the active
+    // theme's font-family references it (font-display:swap keeps text
+    // visible while the woff2 streams). All four fonts are latin-only
+    // variable woff2 served by the plugin under /MaintenanceDeluxe/fonts/.
+    function injectAnnFontFaces() {
+        if (ANN_FONTS_INJECTED) return;
+        ANN_FONTS_INJECTED = true;
+        var s = document.createElement("style");
+        s.id = "jf-ann-fonts";
+        s.textContent = [
+            "@font-face{font-family:'JFAnnInter';font-style:normal;font-weight:300 900;font-display:swap;",
+            "src:url('/MaintenanceDeluxe/fonts/inter.woff2') format('woff2');}",
+            "@font-face{font-family:'JFAnnJetBrains';font-style:normal;font-weight:300 800;font-display:swap;",
+            "src:url('/MaintenanceDeluxe/fonts/jetbrains-mono.woff2') format('woff2');}",
+            "@font-face{font-family:'JFAnnSpaceGrotesk';font-style:normal;font-weight:300 700;font-display:swap;",
+            "src:url('/MaintenanceDeluxe/fonts/space-grotesk.woff2') format('woff2');}",
+            "@font-face{font-family:'JFAnnManrope';font-style:normal;font-weight:200 800;font-display:swap;",
+            "src:url('/MaintenanceDeluxe/fonts/manrope.woff2') format('woff2');}"
+        ].join("");
+        document.head.appendChild(s);
+    }
+
+    // Lazy: only inject the theme CSS the first time it is needed in this DOM.
+    // Each themed modal is scoped by an overlay class so multiple themes can
+    // coexist on the same page (admin preview).
+    function injectAnnTheme(themeKey) {
+        var theme = ANN_THEMES[themeKey];
+        if (!theme || ANN_THEME_INJECTED[themeKey]) return;
+        ANN_THEME_INJECTED[themeKey] = true;
+        injectAnnFontFaces();
+        var s = document.createElement("style");
+        s.id = "jf-ann-theme-" + themeKey;
+        s.textContent = theme.css
+            + "#jf-ann-overlay.jf-ann-theme-" + themeKey + ","
+            + "#jf-ann-overlay.jf-ann-theme-" + themeKey + " .jf-ann-modal,"
+            + "#jf-ann-overlay.jf-ann-theme-" + themeKey + " .jf-ann-btn{font-family:" + theme.font + ";}";
+        document.head.appendChild(s);
+    }
+
+    function resolveAnnTheme(a) {
+        var key = a && a.theme;
+        return (key && ANN_THEMES[key]) ? key : "velours";
+    }
 
     function injectAnnouncementStyles() {
         if (ANN_CSS_INJECTED) return;
@@ -1650,9 +1786,12 @@
 
     function buildAnnouncementModal(a) {
         injectAnnouncementStyles();
+        var themeKey = resolveAnnTheme(a);
+        injectAnnTheme(themeKey);
         var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
         var overlay = document.createElement("div");
         overlay.id = "jf-ann-overlay";
+        overlay.className = "jf-ann-theme-" + themeKey;
         overlay.setAttribute("role", "dialog");
         overlay.setAttribute("aria-modal", "true");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");

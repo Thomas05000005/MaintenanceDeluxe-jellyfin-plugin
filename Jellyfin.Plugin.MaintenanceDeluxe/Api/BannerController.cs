@@ -136,6 +136,39 @@ public class BannerController : ControllerBase
     public IActionResult GetAdminStylesheet() =>
         ServeEmbeddedAsset("Jellyfin.Plugin.MaintenanceDeluxe.Configuration.admin.css", "text/css");
 
+    // Whitelist of font file names allowed by the fonts endpoint. Maps the URL slug
+    // to the embedded resource basename. Keeps path traversal impossible: the user
+    // input is matched against this dictionary, never concatenated into a path.
+    private static readonly Dictionary<string, string> _fontResources = new(StringComparer.Ordinal)
+    {
+        ["inter"] = "Inter-Variable.woff2",
+        ["jetbrains-mono"] = "JetBrainsMono-Variable.woff2",
+        ["space-grotesk"] = "SpaceGrotesk-Variable.woff2",
+        ["manrope"] = "Manrope-Variable.woff2"
+    };
+
+    /// <summary>Serves the embedded webfont matching <paramref name="slug"/>.
+    /// Public (no [Authorize]) so banner.js can @font-face them on the login page before auth.
+    /// Long-cached (1 year) — fonts are versioned by URL via the assembly-version query string
+    /// banner.js appends, so a plugin upgrade naturally invalidates the cache through a new URL.
+    /// </summary>
+    [HttpGet("fonts/{slug}.woff2")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public IActionResult GetFont(string slug)
+    {
+        if (string.IsNullOrWhiteSpace(slug) || !_fontResources.TryGetValue(slug, out var file))
+            return NotFound();
+
+        var stream = Assembly.GetExecutingAssembly()
+            .GetManifestResourceStream("Jellyfin.Plugin.MaintenanceDeluxe.Resources.Fonts." + file);
+        if (stream is null) return NotFound();
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+        return File(stream, "font/woff2");
+    }
+
     // ETag tied to the assembly version — changes on every plugin upgrade so the browser
     // refetches fresh assets instead of serving stale ones from a previous version. Cached
     // once at process start; the version doesn't change at runtime.
@@ -541,6 +574,10 @@ public class BannerController : ControllerBase
             userId,
             isAdmin);
 
+        // Resolve the effective theme server-side: per-announcement override wins, otherwise
+        // the global default. Saves the client a lookup and keeps the theme key on every item.
+        var globalTheme = NormaliseAnnouncementTheme(config.AnnouncementTheme);
+
         // Project to a stripped DTO — TargetRoles / TargetUserIds are admin-side metadata
         // that the end user doesn't need to see (and shouldn't, to avoid leaking the
         // existence of other targeted users in the same announcement).
@@ -552,6 +589,7 @@ public class BannerController : ControllerBase
             body = a.Body,
             icon = a.Icon,
             importance = a.Importance,
+            theme = string.IsNullOrEmpty(a.Theme) ? globalTheme : a.Theme,
             publishedAt = a.PublishedAt,
             comparisons = a.Comparisons,
             ctaLabel = a.CtaLabel,
@@ -618,6 +656,7 @@ public class BannerController : ControllerBase
         return Ok(new
         {
             multiMode = config.AnnouncementMultiMode,
+            theme = config.AnnouncementTheme,
             items = result
         });
     }
@@ -652,6 +691,7 @@ public class BannerController : ControllerBase
             a.Importance = AnnouncementHelper.NormaliseImportance(a.Importance);
             a.TargetRoles = AnnouncementHelper.NormaliseTargetRoles(a.TargetRoles);
             a.TargetUserIds = AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds);
+            a.Theme = NormaliseAnnouncementThemeOverride(a.Theme);
 
             // Cap and normalise comparison rows (admin can't ship an unbounded list).
             a.Comparisons = (a.Comparisons ?? new()).Take(20).Select(c => new AnnouncementComparison
@@ -669,6 +709,7 @@ public class BannerController : ControllerBase
         var config = Plugin.Instance.Configuration;
         config.Announcements = incoming;
         config.AnnouncementMultiMode = AnnouncementHelper.NormaliseMultiMode(body.MultiMode);
+        config.AnnouncementTheme = NormaliseAnnouncementTheme(body.Theme);
         // Drop tracking for announcements that no longer exist.
         AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
 
@@ -709,6 +750,10 @@ public class BannerController : ControllerBase
 
         /// <summary>Gets or sets the multi-announcement display mode (whitelisted server-side).</summary>
         public string? MultiMode { get; set; }
+
+        /// <summary>Gets or sets the global announcement-modal theme key (whitelisted server-side).
+        /// Applies to every announcement unless an entry has its own <see cref="Announcement.Theme"/> override.</summary>
+        public string? Theme { get; set; }
     }
 
     /// <summary>Resolves the current user from the Jellyfin auth context. Returns (null, false)
@@ -846,6 +891,28 @@ public class BannerController : ControllerBase
 
     private static readonly HashSet<string> _validThemes =
         new(StringComparer.Ordinal) { "velours" };
+
+    // Announcement modal themes. Distinct from the maintenance overlay themes so each
+    // surface can evolve independently — maintenance is full-page and dramatic; annonces
+    // are compact and need legibility-first variants.
+    private static readonly HashSet<string> _validAnnouncementThemes =
+        new(StringComparer.Ordinal) { "velours", "oled", "neon", "glass" };
+
+    /// <summary>Whitelists an announcement theme key. Fallback "velours".</summary>
+    internal static string NormaliseAnnouncementTheme(string? value)
+    {
+        if (!string.IsNullOrEmpty(value) && _validAnnouncementThemes.Contains(value)) return value;
+        return "velours";
+    }
+
+    /// <summary>Per-announcement theme override: null/empty means "inherit global default".
+    /// Any non-empty value must be in the whitelist or it falls back to "velours".</summary>
+    internal static string? NormaliseAnnouncementThemeOverride(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        return _validAnnouncementThemes.Contains(trimmed) ? trimmed : null;
+    }
 
     private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
 
