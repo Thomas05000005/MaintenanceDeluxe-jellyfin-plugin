@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.10.0",
-        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "checksum": "E2B5E7C8F3D5B900A0682B4C7298646B",
         "changelog": "v0.3.10 - Refonte complete de l'editeur Annonces. Trois fix critiques sur la Phase 1 de v0.3.9 : (1) Le bouton Enregistrer global ne sauvait pas les annonces - il ignorait POST /announcements/admin. Maintenant les 3 saves (config, maintenance, announcements) tournent en parallele via Promise.allSettled avec rapport d'erreur unifie. (2) Layout desordonne : les champs et les comparaisons s'empilaient n'importe comment a cause d'un grid mal defini avec emby-input. Reecrit en grid CSS 2 colonnes (form gauche, preview right) avec fieldsets thematiques (Identite / Corps / Etat / Cible / Comparaisons / CTA) + sub-grids responsifs (mobile 1 col, desktop 2-3 cols). (3) Aucune previsualisation. Ajout d'un panneau live preview a droite de chaque editeur qui rend la modal d'annonce telle qu'elle apparaitra cote user, avec accent colorise selon l'importance + comparisons en mini-table + footer. Mise a jour en temps reel a chaque keystroke. Plus : bouton 'Enregistrer cette annonce' dedie par row avec badge dirty pulsant orange (au lieu de l'auto-save invisible et fragile). 174 lignes de CSS dedie ajoutees dans admin.css (jf-ann-* + pv-*).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.10/MaintenanceDeluxe-v0.3.10.zip",
-        "timestamp": "2026-05-14T00:00:00"
+        "timestamp": "2026-05-14T19:36:04"
       },
       {
         "version": "0.3.9.0",
