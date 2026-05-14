@@ -4,6 +4,30 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.10.0] — 2026-05-14
+
+Refonte complète de l'éditeur Annonces — réponse aux trois problèmes critiques remontés sur la Phase 1 (v0.3.9) : save global qui ignorait les annonces, layout désordonné, pas de prévisualisation.
+
+### Corrigé
+- **🛡️ Bouton Enregistrer global save désormais les annonces.** Le handler global lance 3 saves en parallèle via `Promise.allSettled` (config + maintenance + announcements) avec rapport d'erreur unifié.
+- **📐 Layout grid `1fr 1fr`** : form à gauche, live preview à droite (collapse en 1 colonne sous 1100 px). Champs alignés via fieldsets thématiques (Identité / Corps / État / Cible / Comparaisons / CTA).
+- **📊 Comparaisons en grid 5-colonnes** : Label / Before / After / Highlight / × — passe en 2 colonnes sous 800 px.
+
+### Ajouté
+- **🪟 Live preview à droite de chaque éditeur** : rendu local de la modal (HTML pur, pas d'iframe), background radial-gradient or/midnight, accent colorisé selon l'importance, mise à jour à chaque keystroke, sticky `top: 1em` pour suivre le scroll du form.
+- **💾 Bouton *Enregistrer cette annonce*** dédié par row (vert primary) avec badge dirty pulsant orange (`@keyframes jf-ann-pulse`) dès qu'un champ change. Feedback de succès "✓ Enregistré" pendant 1.5 s après save.
+- **174 lignes de CSS dédié** dans `admin.css` (`.jf-ann-*` + `.pv-*`).
+- **`window.__md_saveAllAnnouncements`** exposé sur `window` pour bridge entre le scope IIFE et le handler de save global.
+
+### Modifié
+- **`readAnnouncementFromRow(row, existing)`** : nouvelle fonction pure qui lit une row UI vers un objet `Announcement`. Réutilisée par le live preview ET le save — garantit que aperçu = état sauvegardé.
+- **Markdown rendering admin-side identique au client** : `annMdRender` mirroir `mdToHtml` (bold, italic, lists, `[texte](url)`).
+
+### Notes techniques
+- Format de stockage `Announcement` inchangé — les annonces v0.3.9 sont préservées à l'identique en migration.
+- 121 tests xUnit inchangés (les pure helpers de v0.3.9 couvrent toujours la logique business).
+- Viewport simulator + modes carousel/stack restent en Phase 2.
+
 ## [0.3.9.0] — 2026-04-29
 
 Système d'annonces post-login ("What's New" modal) — nouvelle feature majeure.
@@ -256,6 +280,7 @@ Audit complet du plugin (12 fixes).
 - **Personnalisation d'apparence** avec live preview : couleur d'accent, teinte de fond, opacité de carte, vitesse d'animation, densité de particules, style de bordure. Bouton d'agrandissement plein écran avec hotkey `H` pour masquer le panneau et `Esc` pour quitter.
 - Toutes les couleurs sont dérivées d'une couleur d'accent unique pour garder la palette cohérente quel que soit le hue choisi.
 
+[0.3.10.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.10
 [0.3.9.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.9
 [0.3.8.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.8
 [0.3.7.0]: https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/tag/v0.3.7

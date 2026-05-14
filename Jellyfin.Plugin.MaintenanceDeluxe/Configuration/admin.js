@@ -1665,29 +1665,34 @@
                   data: JSON.stringify(config),
                   contentType: 'application/json'
                 });
-                // Maintenance save runs INDEPENDENTLY — if the general config save
-                // fails (bad URL in a rotation message, etc.) we still want the
-                // maintenance tab fields persisted. Both errors are surfaced.
-                Promise.allSettled([configSave, saveMaintenanceSettings()])
+                // Three parallel saves (since v0.3.10): bannière/preset config,
+                // maintenance tab fields, and announcements. Each is independent —
+                // a failure in one does not abort the others. All errors surfaced.
+                var annSave = (typeof window.__md_saveAllAnnouncements === 'function')
+                  ? window.__md_saveAllAnnouncements()
+                  : Promise.resolve();
+                Promise.allSettled([configSave, saveMaintenanceSettings(), annSave])
                   .then(function (results) {
                     restoreBtn();
                     var configErr = results[0].status === 'rejected';
                     var maintErr = results[1].status === 'rejected';
-                    if (!configErr && !maintErr) {
-                      // Successful save: clear dirty state + drop the autosave draft.
+                    var annErr = results[2].status === 'rejected';
+                    if (!configErr && !maintErr && !annErr) {
+                      // Successful save: clear dirty state + drop autosave draft + clear per-row pulse.
                       try { setConfigDirty(false); } catch (e) {}
                       try { localStorage.removeItem('md_draft_v1'); } catch (e) {}
+                      document.querySelectorAll('#annList [data-ann-save].dirty').forEach(function (b) { b.classList.remove('dirty'); });
                       if (document.getElementById('showRefreshPrompt').checked) {
                         showRefreshPrompt();
                       } else {
                         Dashboard.alert('Configuration enregistrée.');
                       }
-                    } else if (configErr && !maintErr) {
-                      Dashboard.alert('Maintenance enregistrée. Échec de la config bannière/préréglage : ' + (results[0].reason && results[0].reason.responseText || results[0].reason || 'erreur inconnue'));
-                    } else if (!configErr && maintErr) {
-                      Dashboard.alert('Config bannière enregistrée. Échec de la sauvegarde maintenance : ' + (results[1].reason && results[1].reason.responseText || results[1].reason || 'erreur inconnue'));
                     } else {
-                      Dashboard.alert('Les deux sauvegardes ont échoué. Détails dans la console.');
+                      var msgs = [];
+                      if (configErr) msgs.push('config bannière/préréglage : ' + ((results[0].reason && results[0].reason.responseText) || results[0].reason || 'erreur inconnue'));
+                      if (maintErr) msgs.push('maintenance : ' + ((results[1].reason && results[1].reason.responseText) || results[1].reason || 'erreur inconnue'));
+                      if (annErr) msgs.push('annonces : ' + ((results[2].reason && results[2].reason.responseText) || results[2].reason || 'erreur inconnue'));
+                      Dashboard.alert('Échec partiel des sauvegardes :\n- ' + msgs.join('\n- '));
                     }
                   })
                   .catch(function (err) {
@@ -3094,99 +3099,222 @@
             _annData.items.forEach(function (it, idx) { list.appendChild(buildAnnouncementRow(it, idx)); });
           }
 
+
+          // ── Markdown preview (mirrors banner.js mdToHtml: bold, italic, lists, [text](url) ─
+          function annMdRender(src) {
+            if (!src) return '';
+            var esc = function (s) { return s.replace(/[&<>"']/g, function (c) {
+              return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            }); };
+            var safeUrl = /^(https?:\/\/|\/)/i;
+            function inline(s) {
+              return s
+                .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
+                  if (!safeUrl.test(url)) return text;
+                  return '<a href="' + encodeURI(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+                })
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            }
+            var lines = src.split(/\r?\n/);
+            var html = '';
+            var inList = false;
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i];
+              var trimmed = line.replace(/^\s+/, '');
+              if (/^-\s+/.test(trimmed)) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                html += '<li>' + inline(esc(trimmed.replace(/^-\s+/, ''))) + '</li>';
+              } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (trimmed.length === 0) { if (i > 0) html += '<br>'; }
+                else html += '<p>' + inline(esc(line)) + '</p>';
+              }
+            }
+            if (inList) html += '</ul>';
+            return html;
+          }
+
+          var ANN_ACCENT_BY_IMPORTANCE = {
+            info: '#5B9DD9', update: '#5EB35D', warning: '#E8A33D', critical: '#D9534F'
+          };
+
+          function escAnn(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+              return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+          }
+
+          // Pure: builds the live-preview HTML matching what banner.js renders.
+          function renderAnnouncementPreview(a) {
+            var accent = ANN_ACCENT_BY_IMPORTANCE[a.importance] || ANN_ACCENT_BY_IMPORTANCE.info;
+            var h = '<div class="jf-ann-preview-modal" style="--jf-ann-preview-accent:' + accent + '">';
+            h += '<div class="pv-head">';
+            h += '<div class="pv-icon">' + escAnn(a.icon || '📣') + '</div>';
+            h += '<h1 class="pv-title">' + escAnn(a.title || '(sans titre)') + '</h1>';
+            h += '</div>';
+            if (a.version) h += '<div class="pv-meta">' + escAnn(a.version) + '</div>';
+            if (a.body) h += '<div class="pv-body">' + annMdRender(a.body) + '</div>';
+            if (a.comparisons && a.comparisons.length) {
+              h += '<div class="pv-compare"><div class="pv-compare-title">Avant / Après</div>';
+              for (var i = 0; i < a.comparisons.length; i++) {
+                var c = a.comparisons[i];
+                h += '<div class="pv-compare-row">';
+                h += '<div>' + escAnn(c.label) + '</div>';
+                h += '<div class="pv-compare-before">' + escAnn(c.before) + '</div>';
+                h += '<div class="pv-compare-arrow">→</div>';
+                h += '<div class="pv-compare-after">' + escAnn(c.after);
+                if (c.highlight) h += '<span class="pv-compare-hl">' + escAnn(c.highlight) + '</span>';
+                h += '</div></div>';
+              }
+              h += '</div>';
+            }
+            h += '<div class="pv-footer">';
+            if (a.ctaLabel && a.ctaUrl && /^(https?:\/\/|\/)/i.test(a.ctaUrl)) {
+              h += '<span class="pv-btn">' + escAnn(a.ctaLabel) + '</span>';
+            }
+            h += '<span class="pv-btn primary">Compris</span>';
+            h += '</div></div>';
+            return h;
+          }
+
           function buildAnnouncementRow(item, idx) {
             var a = item.announcement;
             var row = document.createElement('div');
-            row.className = 'jf-msg-row';
+            row.className = 'jf-ann-row';
             row.dataset.annIdx = String(idx);
+
             var seenPct = item.totalUsers > 0 ? Math.round(100 * item.seenCount / item.totalUsers) : 0;
 
+            // Summary header (collapsed view)
             var summary = document.createElement('div');
-            summary.className = 'jf-msg-summary';
+            summary.className = 'jf-ann-summary';
             summary.innerHTML =
-              '<span style="font-size:20px">' + escHtml(a.icon || '📣') + '</span>'
-              + '<span class="jf-msg-preview"><strong>' + escHtml(a.title || '(sans titre)') + '</strong>'
-              + (a.version ? '<span style="opacity:.5;margin-left:0.5em">' + escHtml(a.version) + '</span>' : '')
-              + '</span>'
-              + '<span style="font-size:11px;opacity:.6;margin-right:0.5em">' + item.seenCount + '/' + item.totalUsers + ' vu (' + seenPct + '%)</span>'
-              + '<span style="display:inline-flex;align-items:center;gap:0.3em">'
-              + (a.isActive ? '<span style="color:#5EB35D;font-size:11px">● Active</span>' : '<span style="opacity:.5;font-size:11px">○ Inactive</span>')
-              + '</span>';
-            summary.addEventListener('click', function (ev) {
-              if (ev.target.closest('button,input,select,textarea,a')) return;
-              row.classList.toggle('expanded');
-            });
+              '<div class="jf-ann-summary-icon">' + escHtml(a.icon || '📣') + '</div>'
+              + '<div class="jf-ann-summary-title">'
+              + '<strong>' + escHtml(a.title || '(sans titre)') + '</strong>'
+              + (a.version ? '<small>' + escHtml(a.version) + '</small>' : '')
+              + '</div>'
+              + '<div class="jf-ann-summary-stats">' + item.seenCount + '/' + item.totalUsers + ' vu (' + seenPct + '%)</div>'
+              + '<div class="jf-ann-summary-status ' + (a.isActive ? 'active' : 'inactive') + '">' + (a.isActive ? 'Active' : 'Inactive') + '</div>'
+              + '<div class="jf-ann-summary-chevron">▾</div>';
+            summary.addEventListener('click', function () { row.classList.toggle('expanded'); });
 
+            // Detail editor (expanded view)
             var detail = document.createElement('div');
-            detail.className = 'jf-msg-detail';
-            detail.style.padding = '0 16px 16px';
-            detail.style.display = 'grid';
-            detail.style.gridTemplateColumns = '1fr';
-            detail.style.gap = '10px';
-
-            // Title + version + icon
+            detail.className = 'jf-ann-detail';
             detail.innerHTML =
-              '<div style="display:grid;grid-template-columns:6em 1fr 10em;gap:10px;align-items:end">'
-              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Icon</label>'
-              + '<input is="emby-input" type="text" data-ann-field="icon" value="' + escAttr(a.icon || '📣') + '" maxlength="8" /></label>'
-              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Titre</label>'
-              + '<input is="emby-input" type="text" data-ann-field="title" value="' + escAttr(a.title || '') + '" maxlength="200" /></label>'
-              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Version</label>'
-              + '<input is="emby-input" type="text" data-ann-field="version" value="' + escAttr(a.version || '') + '" maxlength="64" placeholder="v0.3.9" /></label>'
-              + '</div>'
+              '<div class="jf-ann-editor">'
+              + '<div class="jf-ann-form">'
 
-              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
-              + '<div><label class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Corps (markdown)</label>'
-              + '<textarea data-ann-field="body" rows="8" style="width:100%;font-family:inherit;font-size:14px;padding:8px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);color:inherit;resize:vertical">' + escHtml(a.body || '') + '</textarea>'
-              + '<div class="fieldDescription" style="margin-top:0.3em">**gras**, *italique*, - liste, [texte](url)</div></div>'
-              + '<div><label class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.3em">Aperçu</label>'
-              + '<div data-ann-preview style="min-height:200px;padding:12px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);font-size:13px;line-height:1.55">' + mdPreviewRender(a.body || '') + '</div></div>'
-              + '</div>'
+              // Fieldset: identity
+              + '<fieldset><legend>Identité</legend><div class="jf-ann-grid-3">'
+              + '<div class="jf-ann-field"><label class="lbl">Icon</label>'
+              + '<input type="text" data-ann-field="icon" value="' + escAttr(a.icon || '📣') + '" maxlength="8" /></div>'
+              + '<div class="jf-ann-field"><label class="lbl">Titre *</label>'
+              + '<input type="text" data-ann-field="title" value="' + escAttr(a.title || '') + '" maxlength="200" placeholder="Nouveau dans v0.3.10" /></div>'
+              + '<div class="jf-ann-field"><label class="lbl">Version</label>'
+              + '<input type="text" data-ann-field="version" value="' + escAttr(a.version || '') + '" maxlength="64" placeholder="v0.3.10" /></div>'
+              + '</div></fieldset>'
 
-              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'
-              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Importance</div>'
+              // Fieldset: body
+              + '<fieldset><legend>Corps</legend>'
+              + '<div class="jf-ann-field">'
+              + '<textarea data-ann-field="body" placeholder="**Markdown** supporté : *italique*, - listes, [liens](https://...)">' + escHtml(a.body || '') + '</textarea>'
+              + '<div class="hint">**gras**, *italique*, - liste, [texte](url)</div>'
+              + '</div></fieldset>'
+
+              // Fieldset: state + importance
+              + '<fieldset><legend>État & importance</legend><div class="jf-ann-grid-2">'
+              + '<div class="jf-ann-field">'
+              + '<label class="lbl">Niveau</label>'
               + '<div class="jf-segmented">'
               + ANN_IMPORTANCE_OPTIONS.map(function (v) {
                   return '<label><input type="radio" name="annImp_' + idx + '" value="' + v + '"' + (a.importance === v ? ' checked' : '') + ' /> ' + v + '</label>';
                 }).join('')
               + '</div></div>'
-              + '<div><label class="emby-checkbox-label" style="display:block;margin-top:1.4em">'
-              + '<input data-ann-field="isActive" type="checkbox" is="emby-checkbox"' + (a.isActive ? ' checked' : '') + ' />'
+              + '<div class="jf-ann-field" style="justify-content:center"><label class="emby-checkbox-label">'
+              + '<input data-ann-field="isActive" type="checkbox"' + (a.isActive ? ' checked' : '') + ' />'
               + '<span>Active (afficher aux users ciblés)</span></label></div>'
+              + '</div></fieldset>'
+
+              // Fieldset: targeting
+              + '<fieldset><legend>Cible</legend><div class="jf-ann-grid-2">'
+              + '<div class="jf-ann-field"><label class="lbl">Rôles (aucune coche = tous)</label>'
+              + '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;padding:6px 0">'
+              + '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-ann-role="user"' + (a.targetRoles && a.targetRoles.indexOf('user') >= 0 ? ' checked' : '') + ' /> Utilisateurs</label>'
+              + '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-ann-role="admin"' + (a.targetRoles && a.targetRoles.indexOf('admin') >= 0 ? ' checked' : '') + ' /> Admins</label>'
+              + '</div></div>'
+              + '<div class="jf-ann-field"><label class="lbl">Utilisateurs spécifiques (aucune coche = pas de filtre)</label>'
+              + '<div class="jf-ann-userlist" data-ann-userlist>Chargement…</div>'
+              + '</div></div></fieldset>'
+
+              // Fieldset: comparisons
+              + '<fieldset><legend>Comparaisons avant / après</legend>'
+              + '<div class="jf-ann-cmp-list" data-ann-comparisons></div>'
+              + '<button type="button" class="jf-reset-btn" data-ann-add-cmp style="margin-top:8px">'
+              + '<span class="material-icons" style="font-size:16px;vertical-align:middle">add</span> Ajouter une ligne</button>'
+              + '</fieldset>'
+
+              // Fieldset: CTA
+              + '<fieldset><legend>Bouton d\'action (optionnel)</legend><div class="jf-ann-grid-2">'
+              + '<div class="jf-ann-field"><label class="lbl">Label</label>'
+              + '<input type="text" data-ann-field="ctaLabel" value="' + escAttr(a.ctaLabel || '') + '" maxlength="80" placeholder="Voir le changelog complet" /></div>'
+              + '<div class="jf-ann-field"><label class="lbl">URL (https://… ou /…)</label>'
+              + '<input type="url" data-ann-field="ctaUrl" value="' + escAttr(a.ctaUrl || '') + '" placeholder="https://github.com/.../releases/v0.3.10" /></div>'
+              + '</div></fieldset>'
+
+              // Actions
+              + '<div class="jf-ann-actions">'
+              + '<button type="button" class="primary" data-ann-save>Enregistrer cette annonce</button>'
+              + '<button type="button" data-ann-reset-seen>Réinitialiser \'vue par\'</button>'
+              + '<button type="button" class="danger" data-ann-delete>Supprimer</button>'
+              + '</div>'
               + '</div>'
 
-              + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">'
-              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Cible : rôles</div>'
-              + '<label class="emby-checkbox-label" style="display:block"><input type="checkbox" is="emby-checkbox" data-ann-role="user"' + (a.targetRoles && a.targetRoles.indexOf('user') >= 0 ? ' checked' : '') + ' /><span>Utilisateurs (non-admin)</span></label>'
-              + '<label class="emby-checkbox-label" style="display:block"><input type="checkbox" is="emby-checkbox" data-ann-role="admin"' + (a.targetRoles && a.targetRoles.indexOf('admin') >= 0 ? ' checked' : '') + ' /><span>Admins</span></label>'
-              + '<div class="fieldDescription" style="margin-top:0.3em">Aucune coche = tout le monde.</div></div>'
-              + '<div><div class="inputLabel inputLabelUnfocused" style="margin-bottom:0.4em">Cible : utilisateurs spécifiques</div>'
-              + '<div data-ann-userpicker style="max-height:160px;overflow-y:auto;padding:6px;border:1px solid rgba(255,255,255,0.12);border-radius:5px;background:rgba(0,0,0,0.2);font-size:13px">Chargement...</div>'
-              + '<div class="fieldDescription" style="margin-top:0.3em">Aucune coche = pas de filtre par utilisateur.</div></div>'
+              // Live preview pane
+              + '<div class="jf-ann-preview">'
+              + '<div class="jf-ann-preview-head"><span>Aperçu live</span><span style="opacity:.5">(rendu côté user)</span></div>'
+              + '<div class="jf-ann-preview-body" data-ann-preview></div>'
               + '</div>'
-
-              + '<div data-ann-comparisons></div>'
-              + '<button type="button" class="jf-reset-btn" data-ann-add-cmp><span class="material-icons">add</span> Ajouter une comparaison avant/après</button>'
-
-              + '<div style="display:grid;grid-template-columns:1fr 2fr;gap:14px">'
-              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Bouton CTA (label)</label>'
-              + '<input is="emby-input" type="text" data-ann-field="ctaLabel" value="' + escAttr(a.ctaLabel || '') + '" maxlength="80" placeholder="Voir le changelog complet" /></label>'
-              + '<label class="inputContainer"><label class="inputLabel inputLabelUnfocused">Bouton CTA (URL https://… ou /…)</label>'
-              + '<input is="emby-input" type="url" data-ann-field="ctaUrl" value="' + escAttr(a.ctaUrl || '') + '" placeholder="https://github.com/.../releases/v0.3.9" /></label>'
-              + '</div>'
-
-              + '<div style="display:flex;gap:0.6em;flex-wrap:wrap;margin-top:0.6em">'
-              + '<button type="button" class="jf-reset-btn" data-ann-reset-seen>Réinitialiser \'vue par\' (re-afficher à tous)</button>'
-              + '<button type="button" class="jf-reset-btn" data-ann-delete style="color:#d9534f">Supprimer cette annonce</button>'
               + '</div>';
 
             row.appendChild(summary);
             row.appendChild(detail);
 
-            // Body live preview
-            var bodyInput = detail.querySelector('[data-ann-field="body"]');
+            // Wire up: live preview updates
             var preview = detail.querySelector('[data-ann-preview]');
-            bodyInput.addEventListener('input', function () { preview.innerHTML = mdPreviewRender(bodyInput.value); });
+            function updatePreview() {
+              var current = readAnnouncementFromRow(row, item);
+              preview.innerHTML = renderAnnouncementPreview(current);
+            }
+            detail.addEventListener('input', updatePreview);
+            detail.addEventListener('change', function (ev) {
+              updatePreview();
+              if (ev.target.closest('[data-ann-save]')) return; // skip on save click
+              markRowDirty(row, true);
+            });
+            // Initial render
+            setTimeout(updatePreview, 0);
+
+            // User list
+            var userlist = detail.querySelector('[data-ann-userlist]');
+            loadAnnouncementUsers().then(function (users) {
+              userlist.innerHTML = '';
+              users.forEach(function (u) {
+                var lbl = document.createElement('label');
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.annUserId = u.id;
+                if (a.targetUserIds && a.targetUserIds.indexOf(u.id) >= 0) cb.checked = true;
+                lbl.appendChild(cb);
+                var span = document.createElement('span');
+                span.textContent = u.name + (u.isAdministrator ? ' (admin)' : '');
+                lbl.appendChild(span);
+                userlist.appendChild(lbl);
+              });
+              updatePreview();
+            });
 
             // Comparisons
             var cmpContainer = detail.querySelector('[data-ann-comparisons]');
@@ -3195,36 +3323,30 @@
               var current = collectComparisons(cmpContainer);
               current.push({ label: '', before: '', after: '', highlight: '' });
               renderComparisons(cmpContainer, current);
+              markRowDirty(row, true);
+              updatePreview();
             });
 
-            // User picker
-            var picker = detail.querySelector('[data-ann-userpicker]');
-            loadAnnouncementUsers().then(function (users) {
-              picker.innerHTML = '';
-              users.forEach(function (u) {
-                var lbl = document.createElement('label');
-                lbl.style.display = 'flex';
-                lbl.style.alignItems = 'center';
-                lbl.style.gap = '0.4em';
-                lbl.style.padding = '2px 4px';
-                var cb = document.createElement('input');
-                cb.type = 'checkbox';
-                cb.dataset.annUserId = u.id;
-                cb.style.margin = '0';
-                cb.style.width = '1em';
-                cb.style.height = '1em';
-                if (a.targetUserIds && a.targetUserIds.indexOf(u.id) >= 0) cb.checked = true;
-                lbl.appendChild(cb);
-                var span = document.createElement('span');
-                span.textContent = u.name + (u.isAdministrator ? ' (admin)' : '');
-                lbl.appendChild(span);
-                picker.appendChild(lbl);
-              });
+            // Per-row Save
+            var saveBtn = detail.querySelector('[data-ann-save]');
+            saveBtn.addEventListener('click', function () {
+              saveBtn.disabled = true; saveBtn.textContent = 'Sauvegarde…';
+              saveAllAnnouncements()
+                .then(function () {
+                  markRowDirty(row, false);
+                  saveBtn.textContent = '✓ Enregistré';
+                  setTimeout(function () { saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer cette annonce'; }, 1500);
+                })
+                .catch(function (err) {
+                  saveBtn.disabled = false; saveBtn.textContent = 'Enregistrer cette annonce';
+                  var msg = (err && (err.responseText || err.message)) || 'erreur inconnue';
+                  Dashboard.alert('Échec de la sauvegarde : ' + msg);
+                });
             });
 
             // Reset seen
             detail.querySelector('[data-ann-reset-seen]').addEventListener('click', function () {
-              if (!a.id) { alert('Sauve d\'abord l\'annonce.'); return; }
+              if (!a.id) { Dashboard.alert('Sauvegarde d\'abord cette annonce avant de réinitialiser le suivi.'); return; }
               if (!confirm('Réinitialiser le suivi : tous les utilisateurs ciblés re-verront cette annonce ?')) return;
               ApiClient.ajax({
                 type: 'POST',
@@ -3237,37 +3359,40 @@
               if (!confirm('Supprimer définitivement cette annonce ?')) return;
               _annData.items.splice(idx, 1);
               renderAnnouncementsList();
-              saveAnnouncementsToServer();
+              saveAllAnnouncements();
             });
 
             return row;
           }
 
+          function markRowDirty(row, dirty) {
+            var btn = row.querySelector('[data-ann-save]');
+            if (!btn) return;
+            if (dirty) btn.classList.add('dirty');
+            else btn.classList.remove('dirty');
+          }
+
           function renderComparisons(container, list) {
             container.innerHTML = '';
-            if (!list.length) return;
-            var header = document.createElement('div');
-            header.className = 'inputLabel inputLabelUnfocused';
-            header.style.marginBottom = '0.4em';
-            header.textContent = 'Comparaisons avant / après';
-            container.appendChild(header);
-
             list.forEach(function (c, i) {
               var row = document.createElement('div');
-              row.style.display = 'grid';
-              row.style.gridTemplateColumns = '1.5fr 1fr 1fr 0.7fr auto';
-              row.style.gap = '8px';
-              row.style.marginBottom = '6px';
+              row.className = 'jf-ann-cmp-row';
               row.innerHTML =
-                '<input is="emby-input" type="text" data-cmp-field="label" value="' + escAttr(c.label || '') + '" placeholder="Latence streaming" />'
-                + '<input is="emby-input" type="text" data-cmp-field="before" value="' + escAttr(c.before || '') + '" placeholder="200ms" />'
-                + '<input is="emby-input" type="text" data-cmp-field="after" value="' + escAttr(c.after || '') + '" placeholder="140ms" />'
-                + '<input is="emby-input" type="text" data-cmp-field="highlight" value="' + escAttr(c.highlight || '') + '" placeholder="-30%" />'
-                + '<button type="button" class="jf-reset-btn" data-cmp-delete style="color:#d9534f">×</button>';
+                '<input type="text" data-cmp-field="label" value="' + escAttr(c.label || '') + '" placeholder="Latence streaming" />'
+                + '<input type="text" data-cmp-field="before" value="' + escAttr(c.before || '') + '" placeholder="200 ms" />'
+                + '<input type="text" data-cmp-field="after" value="' + escAttr(c.after || '') + '" placeholder="140 ms" />'
+                + '<input type="text" data-cmp-field="highlight" value="' + escAttr(c.highlight || '') + '" placeholder="-30%" />'
+                + '<button type="button" class="jf-ann-cmp-del" data-cmp-delete title="Supprimer cette ligne">×</button>';
               row.querySelector('[data-cmp-delete]').addEventListener('click', function () {
                 var cur = collectComparisons(container);
                 cur.splice(i, 1);
                 renderComparisons(container, cur);
+                var annRow = container.closest('.jf-ann-row');
+                if (annRow) {
+                  markRowDirty(annRow, true);
+                  var ev = new Event('input', { bubbles: true });
+                  annRow.dispatchEvent(ev);
+                }
               });
               container.appendChild(row);
             });
@@ -3275,10 +3400,9 @@
 
           function collectComparisons(container) {
             var result = [];
-            container.querySelectorAll('[data-cmp-field="label"]').forEach(function (labelEl) {
-              var row = labelEl.parentElement;
+            container.querySelectorAll('.jf-ann-cmp-row').forEach(function (row) {
               result.push({
-                label: labelEl.value.trim(),
+                label: row.querySelector('[data-cmp-field="label"]').value.trim(),
                 before: row.querySelector('[data-cmp-field="before"]').value.trim(),
                 after: row.querySelector('[data-cmp-field="after"]').value.trim(),
                 highlight: row.querySelector('[data-cmp-field="highlight"]').value.trim()
@@ -3287,36 +3411,43 @@
             return result;
           }
 
+          // Reads a single row back into an Announcement object. `existingItem` provides id + publishedAt.
+          function readAnnouncementFromRow(row, existingItem) {
+            var existing = (existingItem && existingItem.announcement) || {};
+            var idx = Number(row.dataset.annIdx);
+            var roles = [];
+            row.querySelectorAll('[data-ann-role]').forEach(function (cb) { if (cb.checked) roles.push(cb.dataset.annRole); });
+            var userIds = [];
+            row.querySelectorAll('[data-ann-user-id]').forEach(function (cb) { if (cb.checked) userIds.push(cb.dataset.annUserId); });
+            var importance = pickRadio('annImp_' + idx, ANN_IMPORTANCE_OPTIONS, 'info');
+            var cmpContainer = row.querySelector('[data-ann-comparisons]');
+            return {
+              id: existing.id || '',
+              title: row.querySelector('[data-ann-field="title"]').value,
+              version: row.querySelector('[data-ann-field="version"]').value,
+              body: row.querySelector('[data-ann-field="body"]').value,
+              icon: row.querySelector('[data-ann-field="icon"]').value,
+              isActive: !!row.querySelector('[data-ann-field="isActive"]').checked,
+              publishedAt: existing.publishedAt || new Date().toISOString(),
+              targetRoles: roles,
+              targetUserIds: userIds,
+              importance: importance,
+              comparisons: collectComparisons(cmpContainer),
+              ctaLabel: row.querySelector('[data-ann-field="ctaLabel"]').value || null,
+              ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null
+            };
+          }
+
           function collectAnnouncementsFromUi() {
             var items = [];
-            document.querySelectorAll('#annList .jf-msg-row').forEach(function (row, idx) {
-              var existing = _annData.items[idx] ? _annData.items[idx].announcement : {};
-              var roles = [];
-              row.querySelectorAll('[data-ann-role]').forEach(function (cb) { if (cb.checked) roles.push(cb.dataset.annRole); });
-              var userIds = [];
-              row.querySelectorAll('[data-ann-user-id]').forEach(function (cb) { if (cb.checked) userIds.push(cb.dataset.annUserId); });
-              var importance = pickRadio('annImp_' + idx, ANN_IMPORTANCE_OPTIONS, 'info');
-              var cmpContainer = row.querySelector('[data-ann-comparisons]');
-              items.push({
-                id: existing.id || '',
-                title: row.querySelector('[data-ann-field="title"]').value,
-                version: row.querySelector('[data-ann-field="version"]').value,
-                body: row.querySelector('[data-ann-field="body"]').value,
-                icon: row.querySelector('[data-ann-field="icon"]').value,
-                isActive: !!row.querySelector('[data-ann-field="isActive"]').checked,
-                publishedAt: existing.publishedAt || new Date().toISOString(),
-                targetRoles: roles,
-                targetUserIds: userIds,
-                importance: importance,
-                comparisons: collectComparisons(cmpContainer),
-                ctaLabel: row.querySelector('[data-ann-field="ctaLabel"]').value || null,
-                ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null
-              });
+            document.querySelectorAll('#annList .jf-ann-row').forEach(function (row, idx) {
+              items.push(readAnnouncementFromRow(row, _annData.items[idx]));
             });
             return items;
           }
 
-          function saveAnnouncementsToServer() {
+          // Single POST. Used by per-row Save AND by the global Save button.
+          function saveAllAnnouncements() {
             var items = collectAnnouncementsFromUi();
             var multiMode = pickRadio('annMultiMode', ANN_MULTIMODE_OPTIONS, 'one-at-a-time');
             return ApiClient.ajax({
@@ -3326,6 +3457,8 @@
               contentType: 'application/json'
             }).then(loadAnnouncements);
           }
+          // Exported on window so the global save handler can include it via Promise.allSettled.
+          window.__md_saveAllAnnouncements = saveAllAnnouncements;
 
           function initAnnouncementsUi() {
             var addBtn = document.getElementById('addAnnouncement');
@@ -3347,26 +3480,16 @@
                 totalUsers: 0
               });
               renderAnnouncementsList();
-              // Auto-expand the new row
-              var rows = document.querySelectorAll('#annList .jf-msg-row');
+              var rows = document.querySelectorAll('#annList .jf-ann-row');
               if (rows.length) rows[rows.length - 1].classList.add('expanded');
             });
 
-            // Auto-save on multi-mode change.
+            // multi-mode change triggers a save (lightweight, just a radio).
             document.querySelectorAll('input[name="annMultiMode"]').forEach(function (el) {
-              el.addEventListener('change', saveAnnouncementsToServer);
+              el.addEventListener('change', function () { saveAllAnnouncements(); });
             });
-
-            // Save on blur of any announcement field — keeps the model in sync without
-            // requiring the admin to click Save. The big global Save button still triggers
-            // a final POST too.
-            var annList = document.getElementById('annList');
-            if (annList) {
-              annList.addEventListener('change', function (ev) {
-                if (ev.target.closest('#annList')) saveAnnouncementsToServer();
-              });
-            }
           }
+
 
           document
             .getElementById('MaintenanceDeluxeConfigPage')
