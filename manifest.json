@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.3.12.0",
-        "checksum": "PLACEHOLDER_PATCHED_BY_RELEASE_WORKFLOW",
+        "checksum": "4F34393023A8D07F0078DD570A6123A3",
         "changelog": "v0.3.12 - Fix critique : la modal d'annonce ne s'affichait pas apres login. Le hook fetchAndShowAnnouncements ne tournait qu'une seule fois au load initial de banner.js. Si l'user etait sur la page login (pas de token) au moment du chargement du script, le code exit early avant le hook annonces. Apres login - SPA navigate vers home - le hook n'etait jamais re-trigger. Fix : nouvelle fonction maybeShowAnnouncements() idempotente (track token deja checke) appelee dans refetchAndApplyMaintenance qui s'execute a chaque navigation SPA (hashchange / popstate / viewshow). Au passage de login (no-token -> token), le hook se declenche automatiquement avec un petit delay 800ms pour laisser la home page se mounter visuellement. Reset auto du flag au logout pour que la prochaine connexion re-trigger. Aucune autre regression - le init initial fonctionne identique pour les users deja loggues au chargement.",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.3.12/MaintenanceDeluxe-v0.3.12.zip",
-        "timestamp": "2026-05-14T00:00:00"
+        "timestamp": "2026-05-14T20:05:38"
       },
       {
         "version": "0.3.11.0",
