@@ -1456,8 +1456,8 @@
                 if (_previewRafScheduled) return;
                 _previewRafScheduled = true;
                 // requestAnimationFrame would be ideal but fires only when the tab is
-                // visible — admins often have the preview tab in background. Use a
-                // ~33ms throttle (≈30 fps) so updates feel real-time without thrashing.
+                // visible -- admins often have the preview tab in background. Use a
+                // ~33ms throttle (~30 fps) so updates feel real-time without thrashing.
                 setTimeout(flushPreviewUpdate, 33);
             });
             // Announce readiness so the parent can send the initial state immediately.
