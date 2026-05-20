@@ -4,6 +4,31 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3.0] — 2026-05-20
+
+Phase 2 annonces — **image hero**. Nouveau champ optionnel `ImageUrl` (+ alt text) sur les annonces, rendu entre le meta header et le body de la modale.
+
+### Ajouté
+
+- **🖼️ Champ `ImageUrl` + `ImageAlt`** sur `Announcement` (les deux nullable). Rendu sous forme de `<img loading="lazy">` entre meta et body. Mêmes règles d'URL safe que `ctaUrl` (`http://`, `https://`, ou single-leading-slash). Cap 2000 chars URL / 200 chars alt.
+- **Admin UI** : nouvelle fieldset "Image (optionnelle)" avec deux inputs (URL + alt). Aperçu live admin rend l'image en temps réel.
+- **CSS scopé** : `.jf-ann-image` (client) + `.pv-image` (admin preview), `border-radius:8px`, bordure subtile coherente.
+
+### Modifié
+
+- **`POST /announcements/admin`** : valide `ImageUrl` via `IsUrlSafe` (rejet 400 si scheme non-safe). Trim + cap `ImageAlt`.
+- **`buildAnnouncementCardHtml`** : insertion conditionnelle de l'image entre `<meta>` et `<body>`. Reuse du regex protocol-relative-safe. Bénéficie automatiquement aux modes **carousel** (chaque slide a sa propre image) et **stack** (cartes empilées).
+
+### Notes techniques
+
+- `loading="lazy"` : l'image n'est téléchargée que quand elle entre dans le viewport — utile pour le mode stack avec plusieurs annonces qui ont chacune une image.
+- Pas de migration : champs nullable, configs v0.5.2 chargent avec `ImageUrl = null` (= aucune image).
+
+### Tests
+
+- 2 nouveaux tests : `Announcement_ImageUrl_DefaultsToNull` + `SelectDeliverableForUser_PreservesImageFields` (regression guard pour le round-trip serveur → client).
+- 183 → **185 tests** (+2).
+
 ## [0.5.2.0] — 2026-05-20
 
 Phase 2 annonces — **Schedule** : les annonces bénéficient maintenant du même système de planning que les rotation messages des bannières. Five types supportés : `always`, `fixed`, `annual`, `weekly`, `daily`.

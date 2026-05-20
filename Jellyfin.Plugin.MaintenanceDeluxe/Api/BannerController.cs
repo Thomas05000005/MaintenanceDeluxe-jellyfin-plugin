@@ -710,6 +710,9 @@ public class BannerController : ControllerBase
         {
             if (!IsUrlSafe(a.CtaUrl))
                 return BadRequest($"Invalid ctaUrl on announcement '{a.Title}': only http(s) or relative URLs allowed.");
+            // v0.5.3: image URL must follow the same allowlist as ctaUrl (no protocol-relative).
+            if (!IsUrlSafe(a.ImageUrl))
+                return BadRequest($"Invalid imageUrl on announcement '{a.Title}': only http(s) or relative URLs allowed.");
 
             a.Title = NormaliseOptionalString(a.Title, 200) ?? string.Empty;
             a.Version = NormaliseOptionalString(a.Version, 64) ?? string.Empty;
@@ -720,6 +723,9 @@ public class BannerController : ControllerBase
             a.TargetRoles = AnnouncementHelper.NormaliseTargetRoles(a.TargetRoles);
             a.TargetUserIds = AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds);
             a.Theme = NormaliseAnnouncementThemeOverride(a.Theme);
+            // v0.5.3: trim + cap image fields. Image URL allowlist already enforced above.
+            a.ImageUrl = NormaliseOptionalString(a.ImageUrl, 2000);
+            a.ImageAlt = NormaliseOptionalString(a.ImageAlt, 200);
             // Clamp ExpireAfterDays to a sensible 1..365 window. null means "never auto-expire".
             // Values <= 0 are dropped (treated as "no expiration") to avoid permanently-expired
             // entries that admins would have to manually toggle. Values > 365 are clamped down so

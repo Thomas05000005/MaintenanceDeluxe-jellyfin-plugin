@@ -516,6 +516,19 @@ public class Announcement
     /// matching the current moment.</summary>
     [JsonPropertyName("schedule")]
     public BannerSchedule? Schedule { get; set; }
+
+    /// <summary>Gets or sets the optional image / screenshot URL displayed above the body.
+    /// Same allowlist as <see cref="CtaUrl"/>: <c>http://</c>, <c>https://</c>, or
+    /// single-leading-slash path (no protocol-relative <c>//host</c>). Max 2000 chars.
+    /// Null/empty = no image rendered. Useful to show a before/after screenshot, a logo,
+    /// or a poster for an event announcement.</summary>
+    [JsonPropertyName("imageUrl")]
+    public string? ImageUrl { get; set; }
+
+    /// <summary>Gets or sets the optional alt text for the image (a11y). Defaults to the
+    /// announcement title in the client renderer when null/empty. Max 200 chars.</summary>
+    [JsonPropertyName("imageAlt")]
+    public string? ImageAlt { get; set; }
 }
 
 /// <summary>

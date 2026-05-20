@@ -1758,6 +1758,8 @@
             ".jf-ann-title{margin:0;font-size:20px;font-weight:600;flex:1;color:#F5EFE3;}",
             ".jf-ann-meta{font-size:11px;letter-spacing:.1em;text-transform:uppercase;",
             "opacity:.6;margin-bottom:14px;}",
+            ".jf-ann-image{display:block;max-width:100%;height:auto;border-radius:8px;",
+            "margin:0 0 16px;border:1px solid rgba(255,255,255,.08);}",
             ".jf-ann-body{font-size:14px;line-height:1.55;}",
             ".jf-ann-body p{margin:0 0 10px;}",
             ".jf-ann-body ul{margin:6px 0;padding-left:20px;}",
@@ -1875,6 +1877,12 @@
                 } catch (e) {}
             }
             html += "<div class=\"jf-ann-meta\">" + meta.join(" \u2022 ") + "</div>";
+        }
+        // v0.5.3: optional hero image between meta and body. Same allowlist as ctaUrl.
+        if (a.imageUrl && /^(https?:\/\/[^\/]|\/(?!\/))/i.test(a.imageUrl)) {
+            var altText = a.imageAlt ? escAnn(a.imageAlt) : escAnn(a.title || "");
+            html += "<img class=\"jf-ann-image\" src=\"" + encodeURI(a.imageUrl) + "\""
+                 + " alt=\"" + altText + "\" loading=\"lazy\" />";
         }
         if (a.body) html += "<div class=\"jf-ann-body\">" + mdToHtml(a.body) + "</div>";
         if (a.comparisons && a.comparisons.length) {

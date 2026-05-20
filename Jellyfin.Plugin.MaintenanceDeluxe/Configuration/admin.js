@@ -3440,6 +3440,11 @@
                + escAnn(themeLabel) + (inheriting ? '' : ' *') + '</span>';
             h += '</div>';
             if (a.version) h += '<div class="pv-meta">' + escAnn(a.version) + '</div>';
+            // v0.5.3: hero image preview, same safe-scheme allowlist as the client.
+            if (a.imageUrl && /^(https?:\/\/[^\/]|\/(?!\/))/i.test(a.imageUrl)) {
+              var altText = a.imageAlt ? escAttr(a.imageAlt) : escAttr(a.title || '');
+              h += '<img class="pv-image" src="' + encodeURI(a.imageUrl) + '" alt="' + altText + '" loading="lazy" />';
+            }
             if (a.body) h += '<div class="pv-body">' + annMdRender(a.body) + '</div>';
             if (a.comparisons && a.comparisons.length) {
               h += '<div class="pv-compare"><div class="pv-compare-title">Avant / Après</div>';
@@ -3509,6 +3514,17 @@
               + '<textarea data-ann-field="body" placeholder="**Markdown** supporté : *italique*, - listes, [liens](https://...)">' + escHtml(a.body || '') + '</textarea>'
               + '<div class="hint">**gras**, *italique*, - liste, [texte](url)</div>'
               + '</div></fieldset>'
+
+              // Fieldset: image (v0.5.3) - optional hero image rendered between meta and body
+              + '<fieldset><legend>Image (optionnelle)</legend><div class="jf-ann-grid-2">'
+              + '<div class="jf-ann-field"><label class="lbl">URL de l\'image (https://... ou /...)</label>'
+              + '<input type="url" data-ann-field="imageUrl" value="' + escAttr(a.imageUrl || '') + '" maxlength="2000" placeholder="https://example.com/screenshot.png" />'
+              + '<div class="hint">Affichée au-dessus du corps. Mêmes règles d\'URL que le CTA (pas de //host).</div>'
+              + '</div>'
+              + '<div class="jf-ann-field"><label class="lbl">Texte alternatif (accessibilité)</label>'
+              + '<input type="text" data-ann-field="imageAlt" value="' + escAttr(a.imageAlt || '') + '" maxlength="200" placeholder="Capture d\'écran de la nouvelle UI" />'
+              + '<div class="hint">Décrit l\'image pour les lecteurs d\'écran. Vide = utilise le titre de l\'annonce.</div>'
+              + '</div></div></fieldset>'
 
               // Fieldset: state + importance
               + '<fieldset><legend>État & importance</legend><div class="jf-ann-grid-2">'
@@ -3798,7 +3814,9 @@
               comparisons: collectComparisons(cmpContainer),
               ctaLabel: row.querySelector('[data-ann-field="ctaLabel"]').value || null,
               ctaUrl: row.querySelector('[data-ann-field="ctaUrl"]').value || null,
-              theme: (themeVal && ANN_THEME_OPTIONS.indexOf(themeVal) >= 0) ? themeVal : null
+              theme: (themeVal && ANN_THEME_OPTIONS.indexOf(themeVal) >= 0) ? themeVal : null,
+              imageUrl: row.querySelector('[data-ann-field="imageUrl"]').value || null,
+              imageAlt: row.querySelector('[data-ann-field="imageAlt"]').value || null
             };
           }
 

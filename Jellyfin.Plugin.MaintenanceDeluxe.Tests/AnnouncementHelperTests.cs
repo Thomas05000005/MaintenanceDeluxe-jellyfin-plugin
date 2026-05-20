@@ -281,6 +281,34 @@ public class AnnouncementHelperTests
         Assert.True(AnnouncementHelper.IsScheduleActive(inJuneOnly.Schedule, june15));
     }
 
+    // ── ImageUrl allowlist via shared IsUrlSafe (v0.5.3) ──────────────────────
+    // The actual filtering uses BannerController.IsUrlSafe (already tested in NormalisationTests).
+    // These tests document that imageUrl follows the same rules and ensure the JSON
+    // contract stays stable for the client.
+
+    [Fact]
+    public void Announcement_ImageUrl_DefaultsToNull()
+    {
+        var a = MakeAnnouncement();
+        Assert.Null(a.ImageUrl);
+        Assert.Null(a.ImageAlt);
+    }
+
+    [Fact]
+    public void SelectDeliverableForUser_PreservesImageFields()
+    {
+        // Regression: image fields must round-trip through the selection pipeline so
+        // the client receives them (the server projection is the raw Announcement object).
+        var a = MakeAnnouncement(id: "img-test", publishedAt: DateTimeOffset.UtcNow.AddHours(-1));
+        a.ImageUrl = "https://example.com/banner.png";
+        a.ImageAlt = "Banner alt text";
+        var result = AnnouncementHelper.SelectDeliverableForUser(
+            new[] { a }, new List<AnnouncementsSeenEntry>(), "u", isAdmin: false);
+        Assert.Single(result);
+        Assert.Equal("https://example.com/banner.png", result[0].ImageUrl);
+        Assert.Equal("Banner alt text", result[0].ImageAlt);
+    }
+
     [Fact]
     public void SelectDeliverableForUser_FiltersDraftsAndExpired()
     {
