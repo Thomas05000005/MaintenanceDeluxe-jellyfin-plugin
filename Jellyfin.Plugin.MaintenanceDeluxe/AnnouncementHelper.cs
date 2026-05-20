@@ -13,13 +13,16 @@ namespace Jellyfin.Plugin.MaintenanceDeluxe;
 internal static class AnnouncementHelper
 {
     /// <summary>Returns true if the announcement targets the given user. The targeting model is:
-    /// (1) <c>IsActive</c> must be true,
-    /// (2) if <c>TargetRoles</c> is non-empty, the user's role must be in the list (recognised: "user", "admin"),
-    /// (3) if <c>TargetUserIds</c> is non-empty, the user's UUID must be in the list.
-    /// An empty list at (2) or (3) means "no filter on that dimension". Both filters are AND-combined.</summary>
+    /// (1) <c>IsActive</c> must be true AND <c>IsDraft</c> must be false,
+    /// (2) the announcement must not be expired (see <see cref="IsExpired"/>),
+    /// (3) if <c>TargetRoles</c> is non-empty, the user's role must be in the list (recognised: "user", "admin"),
+    /// (4) if <c>TargetUserIds</c> is non-empty, the user's UUID must be in the list.
+    /// An empty list at (3) or (4) means "no filter on that dimension". All filters are AND-combined.</summary>
     internal static bool IsTargetedAtUser(Announcement a, string userId, bool isAdmin)
     {
         if (!a.IsActive) return false;
+        if (a.IsDraft) return false;
+        if (IsExpired(a, DateTimeOffset.UtcNow)) return false;
 
         if (a.TargetRoles is { Count: > 0 })
         {
@@ -35,6 +38,18 @@ internal static class AnnouncementHelper
         }
 
         return true;
+    }
+
+    /// <summary>Returns true when an announcement has an <see cref="Announcement.ExpireAfterDays"/>
+    /// value set, a non-null <see cref="Announcement.PublishedAt"/>, and the expiration moment
+    /// (<c>PublishedAt + ExpireAfterDays</c>) is before <paramref name="now"/>. Stateless — does
+    /// not mutate the announcement (no auto-archive); admins still see expired items in the list
+    /// with an "Expirée" badge so they can clean up or re-publish.</summary>
+    internal static bool IsExpired(Announcement a, DateTimeOffset now)
+    {
+        if (a.ExpireAfterDays is not int days || days <= 0) return false;
+        if (a.PublishedAt is not DateTimeOffset publishedAt) return false;
+        return publishedAt.AddDays(days) < now;
     }
 
     /// <summary>Returns true if the given user has already seen the given announcement.

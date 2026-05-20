@@ -389,6 +389,19 @@
         }
         .jf-ann-summary-status.active { background: rgba(94, 179, 93, 0.18); color: #5EB35D; }
         .jf-ann-summary-status.inactive { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.45); }
+        /* v0.5.1 lifecycle badges */
+        .jf-ann-summary-status.draft {
+          background: rgba(232, 163, 61, 0.18); color: #E8A33D;
+          border: 1px dashed rgba(232, 163, 61, 0.4);
+        }
+        .jf-ann-summary-status.expired {
+          background: rgba(217, 83, 79, 0.15); color: #D9534F;
+          text-decoration: line-through; text-decoration-thickness: 1px;
+        }
+        .jf-ann-summary-status.expiring {
+          background: rgba(232, 163, 61, 0.12); color: #E8A33D;
+          /* No border, just colour shift -- still active, just warning */
+        }
         .jf-ann-summary-chevron {
           opacity: 0.4; transition: transform 0.2s, opacity 0.2s;
           font-size: 18px; line-height: 1; flex-shrink: 0;

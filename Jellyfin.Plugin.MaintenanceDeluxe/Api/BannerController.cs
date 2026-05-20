@@ -720,6 +720,16 @@ public class BannerController : ControllerBase
             a.TargetRoles = AnnouncementHelper.NormaliseTargetRoles(a.TargetRoles);
             a.TargetUserIds = AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds);
             a.Theme = NormaliseAnnouncementThemeOverride(a.Theme);
+            // Clamp ExpireAfterDays to a sensible 1..365 window. null means "never auto-expire".
+            // Values <= 0 are dropped (treated as "no expiration") to avoid permanently-expired
+            // entries that admins would have to manually toggle. Values > 365 are clamped down so
+            // a typo (365000) doesn't produce a meaningless year-2400 expiration.
+            if (a.ExpireAfterDays is int days)
+            {
+                if (days <= 0) a.ExpireAfterDays = null;
+                else if (days > 365) a.ExpireAfterDays = 365;
+            }
+            // IsDraft is a plain bool — no normalisation needed beyond the [FromBody] binding.
 
             // Cap and normalise comparison rows (admin can't ship an unbounded list).
             a.Comparisons = (a.Comparisons ?? new()).Take(20).Select(c => new AnnouncementComparison

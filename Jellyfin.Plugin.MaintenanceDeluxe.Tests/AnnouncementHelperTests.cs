@@ -13,7 +13,9 @@ public class AnnouncementHelperTests
         bool active = true,
         DateTimeOffset? publishedAt = null,
         List<string>? targetRoles = null,
-        List<string>? targetUserIds = null)
+        List<string>? targetUserIds = null,
+        bool isDraft = false,
+        int? expireAfterDays = null)
     {
         return new Announcement
         {
@@ -22,7 +24,9 @@ public class AnnouncementHelperTests
             IsActive = active,
             PublishedAt = publishedAt,
             TargetRoles = targetRoles ?? new(),
-            TargetUserIds = targetUserIds ?? new()
+            TargetUserIds = targetUserIds ?? new(),
+            IsDraft = isDraft,
+            ExpireAfterDays = expireAfterDays
         };
     }
 
@@ -105,6 +109,90 @@ public class AnnouncementHelperTests
         Assert.True(AnnouncementHelper.HasUserSeen(tracking, "a2", "alice"));
         Assert.False(AnnouncementHelper.HasUserSeen(tracking, "a2", "bob"));
         Assert.False(AnnouncementHelper.HasUserSeen(tracking, "a3", "alice")); // unknown announce
+    }
+
+    // ── IsTargetedAtUser: drafts + expiration (v0.5.1) ───────────────────────
+
+    [Fact]
+    public void IsTargetedAtUser_DraftIsNeverDelivered_EvenIfActive()
+    {
+        var a = MakeAnnouncement(active: true, isDraft: true);
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: true));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_PublishedNonDraft_IsDelivered()
+    {
+        var a = MakeAnnouncement(active: true, isDraft: false);
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_ExpiredAnnouncementIsFilteredOut()
+    {
+        // Published 10 days ago, expires after 7 -> 3 days past expiration.
+        var a = MakeAnnouncement(
+            publishedAt: DateTimeOffset.UtcNow.AddDays(-10),
+            expireAfterDays: 7);
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_NotYetExpiredAnnouncementIsDelivered()
+    {
+        // Published 2 days ago, expires after 7 -> 5 days remaining.
+        var a = MakeAnnouncement(
+            publishedAt: DateTimeOffset.UtcNow.AddDays(-2),
+            expireAfterDays: 7);
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_ExpireAfterDaysWithNullPublishedAt_NeverExpires()
+    {
+        // No PublishedAt means we can't compute expiration -> safe default is "not expired".
+        var a = MakeAnnouncement(publishedAt: null, expireAfterDays: 7);
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_NullExpireAfterDays_NeverExpires()
+    {
+        // Even with very old PublishedAt, no expiration window = never expires.
+        var a = MakeAnnouncement(
+            publishedAt: DateTimeOffset.UtcNow.AddYears(-1),
+            expireAfterDays: null);
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(a, "uuid", isAdmin: false));
+    }
+
+    [Theory]
+    [InlineData(-10, 7, true)]   // expired 3 days ago
+    [InlineData(-7, 7, true)]    // exactly at expiration boundary (published 7d ago, expires after 7d -> expired since 0s ago)
+    [InlineData(-3, 7, false)]   // 4 days remaining
+    [InlineData(0, 7, false)]    // just published
+    [InlineData(-30, 0, false)]  // 0 days = treated as "no expiration"
+    [InlineData(-30, -5, false)] // negative days = treated as "no expiration"
+    public void IsExpired_HandlesBoundaries(int publishedOffsetDays, int expireAfterDays, bool expectedExpired)
+    {
+        var a = MakeAnnouncement(
+            publishedAt: DateTimeOffset.UtcNow.AddDays(publishedOffsetDays),
+            expireAfterDays: expireAfterDays);
+        Assert.Equal(expectedExpired, AnnouncementHelper.IsExpired(a, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void SelectDeliverableForUser_FiltersDraftsAndExpired()
+    {
+        var announcements = new[]
+        {
+            MakeAnnouncement(id: "live", publishedAt: DateTimeOffset.UtcNow.AddDays(-1), expireAfterDays: 30),
+            MakeAnnouncement(id: "draft", isDraft: true, publishedAt: DateTimeOffset.UtcNow.AddDays(-1)),
+            MakeAnnouncement(id: "expired", publishedAt: DateTimeOffset.UtcNow.AddDays(-20), expireAfterDays: 7),
+        };
+        var result = AnnouncementHelper.SelectDeliverableForUser(announcements, new List<AnnouncementsSeenEntry>(), "u", false);
+        Assert.Single(result);
+        Assert.Equal("live", result[0].Id);
     }
 
     // ── SelectDeliverableForUser ─────────────────────────────────────────────

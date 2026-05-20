@@ -3298,6 +3298,50 @@
             _annData.items.forEach(function (it, idx) { list.appendChild(buildAnnouncementRow(it, idx)); });
           }
 
+          // Returns true when an announcement has expired given its publishedAt + expireAfterDays.
+          // Mirrors AnnouncementHelper.IsExpired on the server. Cosmetic only on the client
+          // (server is the source of truth for filtering) -- used to surface an "Expirée" badge
+          // in the admin list so the admin understands why users no longer see this entry.
+          function isAnnouncementExpired(a) {
+            if (!a || !a.expireAfterDays || a.expireAfterDays <= 0) return false;
+            if (!a.publishedAt) return false;
+            var publishedMs = new Date(a.publishedAt).getTime();
+            if (isNaN(publishedMs)) return false;
+            return publishedMs + a.expireAfterDays * 86400000 < Date.now();
+          }
+
+          // Returns the number of days remaining before expiration, or null if not applicable.
+          // Negative = past expiration.
+          function announcementDaysLeft(a) {
+            if (!a || !a.expireAfterDays || a.expireAfterDays <= 0) return null;
+            if (!a.publishedAt) return null;
+            var publishedMs = new Date(a.publishedAt).getTime();
+            if (isNaN(publishedMs)) return null;
+            var msLeft = publishedMs + a.expireAfterDays * 86400000 - Date.now();
+            return Math.ceil(msLeft / 86400000);
+          }
+
+          // The right-most pill in the summary row. Priority: draft > expired > inactive > active.
+          // Draft trumps everything because a draft can't be "active" or "expired" from the
+          // user's POV -- it's hidden regardless.
+          function summaryLifecycleBadge(a) {
+            if (a.isDraft) {
+              return '<div class="jf-ann-summary-status draft" title="Cette annonce est en brouillon, elle n\'est pas livrée aux utilisateurs.">Brouillon</div>';
+            }
+            if (isAnnouncementExpired(a)) {
+              return '<div class="jf-ann-summary-status expired" title="Cette annonce a dépassé sa date d\'expiration et n\'est plus livrée.">Expirée</div>';
+            }
+            if (!a.isActive) {
+              return '<div class="jf-ann-summary-status inactive">Inactive</div>';
+            }
+            var daysLeft = announcementDaysLeft(a);
+            if (daysLeft !== null && daysLeft <= 7 && daysLeft > 0) {
+              return '<div class="jf-ann-summary-status expiring" title="Cette annonce expire dans ' + daysLeft + ' jour(s).">'
+                   + 'Active (' + daysLeft + 'j)</div>';
+            }
+            return '<div class="jf-ann-summary-status active">Active</div>';
+          }
+
 
           // ── Markdown preview (mirrors banner.js mdToHtml: bold, italic, lists, [text](url) ─
           function annMdRender(src) {
@@ -3405,7 +3449,7 @@
               + (a.version ? '<small>' + escHtml(a.version) + '</small>' : '')
               + '</div>'
               + '<div class="jf-ann-summary-stats">' + item.seenCount + '/' + item.totalUsers + ' vu (' + seenPct + '%)</div>'
-              + '<div class="jf-ann-summary-status ' + (a.isActive ? 'active' : 'inactive') + '">' + (a.isActive ? 'Active' : 'Inactive') + '</div>'
+              + summaryLifecycleBadge(a)
               + '<div class="jf-ann-summary-chevron">▾</div>';
             summary.addEventListener('click', function () { row.classList.toggle('expanded'); });
 
@@ -3445,6 +3489,22 @@
               + '<div class="jf-ann-field" style="justify-content:center"><label class="emby-checkbox-label">'
               + '<input data-ann-field="isActive" type="checkbox"' + (a.isActive ? ' checked' : '') + ' />'
               + '<span>Active (afficher aux users ciblés)</span></label></div>'
+              + '</div></fieldset>'
+
+              // Fieldset: lifecycle (draft + auto-expire) -- v0.5.1
+              + '<fieldset><legend>Cycle de vie</legend><div class="jf-ann-grid-2">'
+              + '<div class="jf-ann-field" style="justify-content:center"><label class="emby-checkbox-label">'
+              + '<input data-ann-field="isDraft" type="checkbox"' + (a.isDraft ? ' checked' : '') + ' />'
+              + '<span>Brouillon (ne livre jamais, même si active)</span></label>'
+              + '<div class="hint">Garde l\'annonce visible en admin pour préparer son contenu avant publication.</div>'
+              + '</div>'
+              + '<div class="jf-ann-field">'
+              + '<label class="lbl">Expire après (jours)</label>'
+              + '<input data-ann-field="expireAfterDays" type="number" min="1" max="365" '
+              +   'value="' + (a.expireAfterDays && a.expireAfterDays > 0 ? a.expireAfterDays : '') + '" '
+              +   'placeholder="Aucune expiration" style="max-width:200px" />'
+              + '<div class="hint">Vide = jamais. Sinon 1-365 jours après la date de publication. Utile pour les annonces saisonnières.</div>'
+              + '</div>'
               + '</div></fieldset>'
 
               // Fieldset: visual theme override (per-announcement)
@@ -3662,6 +3722,12 @@
             var cmpContainer = row.querySelector('[data-ann-comparisons]');
             var themeSel = row.querySelector('[data-ann-field="theme"]');
             var themeVal = themeSel ? themeSel.value : '';
+            // v0.5.1: collect lifecycle fields. expireAfterDays as null when empty
+            // (the server normalises 0/negative to null too, but cleaner to send null directly).
+            var expireInput = row.querySelector('[data-ann-field="expireAfterDays"]');
+            var expireRaw = expireInput ? expireInput.value.trim() : '';
+            var expireVal = expireRaw === '' ? null : parseInt(expireRaw, 10);
+            if (expireVal !== null && (isNaN(expireVal) || expireVal <= 0)) expireVal = null;
             return {
               id: existing.id || '',
               title: row.querySelector('[data-ann-field="title"]').value,
@@ -3669,6 +3735,8 @@
               body: row.querySelector('[data-ann-field="body"]').value,
               icon: row.querySelector('[data-ann-field="icon"]').value,
               isActive: !!row.querySelector('[data-ann-field="isActive"]').checked,
+              isDraft: !!(row.querySelector('[data-ann-field="isDraft"]') || {}).checked,
+              expireAfterDays: expireVal,
               publishedAt: existing.publishedAt || new Date().toISOString(),
               targetRoles: roles,
               targetUserIds: userIds,

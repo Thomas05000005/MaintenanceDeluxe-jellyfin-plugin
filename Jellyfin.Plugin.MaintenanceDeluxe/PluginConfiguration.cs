@@ -491,6 +491,22 @@ public class Announcement
     /// against {"velours", "oled", "neon", "glass"}.</summary>
     [JsonPropertyName("theme")]
     public string? Theme { get; set; }
+
+    /// <summary>Gets or sets whether this announcement is a draft. Drafts are never delivered
+    /// to end users — they're visible in the admin UI only (with a "Brouillon" badge), so admins
+    /// can write/preview content before flipping the switch. Different from <see cref="IsActive"/>:
+    /// an active draft is still hidden from users; a published-but-inactive announcement is also
+    /// hidden but for a different reason (paused, not unfinished).</summary>
+    [JsonPropertyName("isDraft")]
+    public bool IsDraft { get; set; }
+
+    /// <summary>Gets or sets the optional auto-expire window in days. When set and
+    /// <see cref="PublishedAt"/> is non-null, the announcement is considered expired once
+    /// <c>PublishedAt + ExpireAfterDays</c> is in the past — server-side filter, no persistence
+    /// change. Useful for seasonal annonces (Halloween, end-of-year) that should disappear
+    /// automatically without admin intervention. Null = never auto-expires.</summary>
+    [JsonPropertyName("expireAfterDays")]
+    public int? ExpireAfterDays { get; set; }
 }
 
 /// <summary>

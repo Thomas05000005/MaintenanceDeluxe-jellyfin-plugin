@@ -4,6 +4,37 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1.0] — 2026-05-20
+
+Phase 2 annonces — deux nouveaux champs admin pour réduire la friction sur les annonces : préparation à l'avance et nettoyage automatique.
+
+### Ajouté
+
+- **🟠 Brouillon** : nouveau toggle dans l'éditeur d'annonce, séparé de `Active`. Une annonce en brouillon reste visible dans la liste admin avec un badge orange dashed, mais le serveur ne la sert jamais aux users finaux même si `Active` est coché. Permet de préparer le contenu d'une annonce à l'avance puis de la publier en un clic en décochant `Brouillon`. Filtre serveur dans `AnnouncementHelper.IsTargetedAtUser`.
+- **⏰ Auto-expire après N jours** : nouveau champ `Expire après (jours)` dans l'éditeur (1-365, vide = jamais). Quand renseigné, le serveur filtre automatiquement les annonces dont `PublishedAt + ExpireAfterDays` est passé. Filtrage stateless dans `AnnouncementHelper.IsExpired` — pas de mutation, pas d'auto-archive. L'annonce reste visible en admin avec un badge rouge barré "Expirée" pour que l'admin sache pourquoi elle n'est plus servie.
+- **🎨 Badges summary enrichis** : la pilule à droite de chaque ligne annonce affiche maintenant 5 états possibles :
+  - **Active** (vert) — annonce livrée normalement
+  - **Inactive** (gris) — pause manuelle
+  - **Brouillon** (orange dashed) — préparation, pas encore publiée
+  - **Expirée** (rouge barré) — date d'expiration dépassée
+  - **Active (Xj)** (orange) — expire dans X jours ≤ 7
+  - Priorité : draft > expired > inactive > active.
+
+### Modifié
+
+- **`POST /announcements/admin`** : nouveau clamp `ExpireAfterDays` à 1-365. Valeurs ≤ 0 sont remplacées par `null` (= no expiration), valeurs > 365 sont clampées à 365 (évite typos `365000`). `IsDraft` est un bool simple, pas de normalisation.
+- **`Announcement`** : nouveaux champs `IsDraft` (bool, default false) et `ExpireAfterDays` (int nullable). Reflétés automatiquement dans la réponse `GET /announcements/admin` et `GET /announcements/active`.
+
+### Notes techniques
+
+- **Cas limites couverts** : 0 ou négatif = traité comme "no expiration" (drop à la sauvegarde par le clamp serveur). `PublishedAt` null = jamais expiré (safe default).
+- **Pas de migration** : les configs persistées en v0.5.0 chargent telles quelles, les deux nouveaux champs prennent leurs defaults (false/null) sur les annonces existantes.
+
+### Tests
+
+- **13 nouveaux cas xUnit** couvrant : draft never-delivered (2 cas), draft visible-in-admin (déjà testé via SelectDeliverable), expired filtre out, IsExpired boundaries (-10j, -7j exact, -3j, 0j, days=0, days=-5), null PublishedAt safe default, intégration SelectDeliverableForUser avec mix live/draft/expired.
+- 156 tests v0.5.0 → **169 tests v0.5.1** (+13).
+
 ## [0.5.0.0] — 2026-05-20
 
 Phase 2 annonces partielle : les modes **carousel** et **stack** sont enfin actifs côté client. Depuis v0.3.9 (Phase 1), le sélecteur "Mode d'affichage" de l'admin proposait trois choix mais le client ignorait deux d'entre eux. v0.5.0 ferme la promesse.
