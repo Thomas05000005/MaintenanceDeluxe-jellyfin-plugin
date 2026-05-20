@@ -1298,6 +1298,7 @@
 
             initAppearanceWiring();
             initLivePreview();
+            initViewportSimulator();
             wireLivePreviewListeners();
             initExpandMode();
             initDirtyTracker();
@@ -2165,6 +2166,60 @@
             // Give the iframe an URL resolved against the ApiClient base so it works
             // regardless of whether Jellyfin is at / or a sub-path.
             iframe.src = ApiClient.getUrl(PREVIEW_IFRAME_SRC);
+          }
+
+          // ── Viewport simulator (v0.5.4) ───────────────────────────────────
+          // Lets the admin preview the maintenance overlay at common device sizes
+          // (mobile portrait/landscape, tablet, desktop, TV). Pure CSS class on the
+          // iframe wrapper; the iframe itself is given a fixed width/height via the
+          // .preset-<name> rules in admin.css. Selection persists to localStorage so
+          // the admin doesn't have to re-pick after a refresh.
+          var VP_PRESETS = {
+            'responsive': { label: 'Auto', dims: '' },
+            'mobile-portrait': { label: 'iPhone portrait', dims: '375 x 667' },
+            'mobile-landscape': { label: 'iPhone paysage', dims: '667 x 375' },
+            'tablet': { label: 'iPad', dims: '768 x 1024' },
+            'desktop': { label: 'Laptop', dims: '1366 x 768' },
+            'tv': { label: 'HDTV', dims: '1920 x 1080' }
+          };
+          var VP_STORAGE_KEY = 'jf-md-vp-preset';
+
+          function initViewportSimulator() {
+            var toolbar = document.getElementById('appPreviewVpToolbar');
+            var frame = document.getElementById('appPreviewVpFrame');
+            var info = document.getElementById('appPreviewVpInfo');
+            if (!toolbar || !frame) return;
+            var initial = 'responsive';
+            try { initial = localStorage.getItem(VP_STORAGE_KEY) || 'responsive'; } catch (e) {}
+            if (!VP_PRESETS[initial]) initial = 'responsive';
+
+            function apply(preset) {
+              if (!VP_PRESETS[preset]) preset = 'responsive';
+              // Strip all preset classes, then re-add the active one.
+              Object.keys(VP_PRESETS).forEach(function (k) {
+                frame.classList.remove('preset-' + k);
+              });
+              if (preset === 'responsive') {
+                frame.classList.remove('preset');
+              } else {
+                frame.classList.add('preset');
+                frame.classList.add('preset-' + preset);
+              }
+              // Highlight the active button.
+              toolbar.querySelectorAll('.jf-vp-btn').forEach(function (b) {
+                b.classList.toggle('active', b.dataset.vp === preset);
+              });
+              // Update the info pill (right side of toolbar).
+              if (info) info.textContent = VP_PRESETS[preset].dims || 'panneau';
+              try { localStorage.setItem(VP_STORAGE_KEY, preset); } catch (e) {}
+            }
+
+            toolbar.addEventListener('click', function (ev) {
+              var btn = ev.target.closest('.jf-vp-btn');
+              if (!btn || !btn.dataset.vp) return;
+              apply(btn.dataset.vp);
+            });
+            apply(initial);
           }
 
           // ── Expand / fullscreen mode ──────────────────────────────────────

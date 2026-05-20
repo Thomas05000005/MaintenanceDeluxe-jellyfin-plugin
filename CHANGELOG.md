@@ -4,6 +4,29 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4.0] — 2026-05-20
+
+Phase 2 — **viewport simulator admin**. Tu peux maintenant prévisualiser l'overlay maintenance dans plusieurs tailles de devices sans changer de browser.
+
+### Ajouté
+
+- **🪟 Toolbar viewport** au-dessus de l'aperçu live (onglet Apparence) avec 6 presets :
+  - **Auto** (responsive, défaut) — largeur du panneau
+  - **📱 Portrait** 375×667
+  - **📱 Paysage** 667×375
+  - **📋 Tablet** 768×1024
+  - **🖥️ Desktop** 1366×768
+  - **📺 TV** 1920×1080
+- **Persistance localStorage** (`jf-md-vp-preset`) : la sélection survit aux refresh.
+- **Indicateur dimensions** à droite de la toolbar (ex. `1920 x 1080`).
+
+### Notes techniques
+
+- 100% client-side. Le backend C# est inchangé.
+- 5 classes CSS scopées `.jf-vp-frame.preset-<name>` qui forcent `width`/`height`/`min-height` sur l'iframe via `!important`.
+- Desktop/TV dépassent souvent le panneau admin → `max-width:95vw` + scroll horizontal du wrapper pour permettre l'inspection.
+- 185 tests xUnit inchangés.
+
 ## [0.5.3.0] — 2026-05-20
 
 Phase 2 annonces — **image hero**. Nouveau champ optionnel `ImageUrl` (+ alt text) sur les annonces, rendu entre le meta header et le body de la modale.

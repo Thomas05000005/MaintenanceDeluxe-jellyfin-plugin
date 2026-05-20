@@ -402,6 +402,48 @@
           background: rgba(232, 163, 61, 0.12); color: #E8A33D;
           /* No border, just colour shift -- still active, just warning */
         }
+        /* v0.5.4: viewport simulator toolbar above the preview iframe */
+        .jf-vp-toolbar {
+          display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+          padding: 6px 8px; background: rgba(255, 255, 255, 0.04);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          font-size: 11px;
+        }
+        .jf-vp-btn {
+          padding: 4px 10px; background: rgba(255, 255, 255, 0.06);
+          color: rgba(255, 255, 255, 0.65); border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 4px; cursor: pointer; font: inherit;
+          transition: background .15s, color .15s, border-color .15s;
+        }
+        .jf-vp-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+        .jf-vp-btn.active {
+          background: rgba(201, 169, 110, 0.25); color: #C9A96E;
+          border-color: rgba(201, 169, 110, 0.5);
+        }
+        .jf-vp-info {
+          margin-left: auto; padding: 4px 8px; color: rgba(255, 255, 255, 0.45);
+          font-variant-numeric: tabular-nums;
+        }
+        /* The wrapper that holds the iframe and frames it visually when a viewport
+           preset is active. Default = full panel width (responsive). */
+        .jf-vp-frame {
+          background: #000; min-height: 540px; height: calc(100% - 36px);
+          display: flex; align-items: flex-start; justify-content: center;
+          overflow: auto;
+        }
+        .jf-vp-frame.preset #appPreviewIframe {
+          flex: 0 0 auto; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        /* Concrete viewport presets. Width/height match real device-ish values rounded
+           to common breakpoints. min-height override on the iframe inline style ensures
+           the device size wins over the default 540px floor. */
+        .jf-vp-frame.preset-mobile-portrait #appPreviewIframe { width: 375px !important; height: 667px !important; min-height: 0 !important; }
+        .jf-vp-frame.preset-mobile-landscape #appPreviewIframe { width: 667px !important; height: 375px !important; min-height: 0 !important; }
+        .jf-vp-frame.preset-tablet #appPreviewIframe { width: 768px !important; height: 1024px !important; min-height: 0 !important; max-height: 80vh; }
+        .jf-vp-frame.preset-desktop #appPreviewIframe { width: 1366px !important; height: 768px !important; min-height: 0 !important; max-width: 95vw; max-height: 80vh; }
+        .jf-vp-frame.preset-tv #appPreviewIframe { width: 1920px !important; height: 1080px !important; min-height: 0 !important; max-width: 95vw; max-height: 80vh; }
+
         /* v0.5.2: schedule badge -- shown IN ADDITION to active/draft/expired/etc */
         .jf-ann-summary-status.schedule {
           background: rgba(91, 157, 217, 0.16); color: #5B9DD9;
