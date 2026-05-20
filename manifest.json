@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.5.1.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "checksum": "13D9BA1C19318985677DDC8EBF5D91D4",
         "changelog": "v0.5.1 - Phase 2 annonces : brouillon + auto-expire. Deux nouveaux champs admin pour reduire la friction sur les annonces (preparation a l'avance + nettoyage automatique). (1) BROUILLON : nouveau toggle 'Brouillon' dans l'editeur, separe de Active. Une annonce en brouillon reste visible dans la liste admin avec un badge orange dashed, mais le serveur ne la sert jamais aux users finaux meme si Active est coche. Permet de preparer le contenu d'une annonce a l'avance puis de la publier en un clic en decochant Brouillon. Filtre serveur ferme dans AnnouncementHelper.IsTargetedAtUser : draft -> not delivered. (2) AUTO-EXPIRE : nouveau champ 'Expire apres (jours)' (1-365, vide = jamais). Quand renseigne, le serveur filtre automatiquement les annonces dont PublishedAt + ExpireAfterDays est passe. Filtrage stateless dans AnnouncementHelper.IsExpired : pas de mutation, pas d'auto-archive (l'annonce reste visible en admin avec un badge rouge barre 'Expiree' pour que l'admin sache pourquoi elle n'est plus servie). Cas limites : 0 ou negatif = traite comme 'no expiration' (drop a la sauvegarde par le clamp serveur). PublishedAt null = jamais expire (safe default). (3) BADGES SUMMARY : la pilule a droite de chaque ligne annonce affiche maintenant 5 etats possibles : Active (vert), Inactive (gris), Brouillon (orange dashed), Expiree (rouge barre), Active (Xj) (orange si <=7 jours avant expiration). Priorite : draft > expired > inactive > active. (4) VALIDATION SERVEUR : POST /announcements/admin clamp ExpireAfterDays a 1-365 (>365 -> 365, <=0 -> null) pour eviter typos 365000 ou negatif qui creerait une annonce permanenly-expired. IsDraft est un bool simple. (5) TESTS : 13 nouveaux cas xUnit couvrant draft never-delivered, expired filtre, IsExpired boundaries (-10j, -7j exact, -3j, 0j, days=0, days=-5), null PublishedAt safe default, integration SelectDeliverableForUser. 156 tests v0.5.0 -> 169 tests v0.5.1 (+13).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.5.1/MaintenanceDeluxe-v0.5.1.zip",
-        "timestamp": "2026-05-20T00:00:00"
+        "timestamp": "2026-05-20T09:52:36"
       },
       {
         "version": "0.5.0.0",
