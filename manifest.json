@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.5.4.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
-        "changelog": "v0.5.4 - Phase 2 annonces : viewport simulator admin. Nouvelle toolbar au-dessus de l'apercu live (section Apparence) avec 5 presets de viewport : Auto (largeur du panneau, defaut), iPhone portrait 375x667, iPhone paysage 667x375, iPad 768x1024, Laptop 1366x768, HDTV 1920x1080. Au clic, l'iframe redimensionne en taille fixe et l'info dimensions s'affiche en bas de la toolbar. La selection persiste en localStorage (jf-md-vp-preset) donc l'admin garde son choix entre refresh. Implementation : 5 classes CSS scopees .jf-vp-frame.preset-<name> qui forcent width/height/min-height sur l'iframe via !important. JS initViewportSimulator() ajoute au boot, wire les boutons de la toolbar, applique la classe + update les indicateurs (active + dimensions). Aucun impact sur l'aspect runtime cote user final : le preset n'est qu'une regle CSS dans configPage.html, banner.js inchange. Le mode TV et Desktop dépassent souvent la largeur du panneau admin -> max-width:95vw + scroll horizontal pour permettre d'inspecter quand meme. 185 tests xUnit toujours verts (feature 100% client, backend C# untouched).",
+        "checksum": "D7C5EE756CDE406AF59919AB1D9E7F2B",
+        "changelog": "v0.5.4 - Phase 2 annonces : viewport simulator admin. Nouvelle toolbar au-dessus de l'apercu live (section Apparence) avec 5 presets de viewport : Auto (largeur du panneau, defaut), iPhone portrait 375x667, iPhone paysage 667x375, iPad 768x1024, Laptop 1366x768, HDTV 1920x1080. Au clic, l'iframe redimensionne en taille fixe et l'info dimensions s'affiche en bas de la toolbar. La selection persiste en localStorage (jf-md-vp-preset) donc l'admin garde son choix entre refresh. Implementation : 5 classes CSS scopees .jf-vp-frame.preset-<name> qui forcent width/height/min-height sur l'iframe via !important. JS initViewportSimulator() ajoute au boot, wire les boutons de la toolbar, applique la classe + update les indicateurs (active + dimensions). Aucun impact sur l'aspect runtime cote user final : le preset n'est qu'une regle CSS dans configPage.html, banner.js inchange. Le mode TV et Desktop d\u00e9passent souvent la largeur du panneau admin -> max-width:95vw + scroll horizontal pour permettre d'inspecter quand meme. 185 tests xUnit toujours verts (feature 100% client, backend C# untouched).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.5.4/MaintenanceDeluxe-v0.5.4.zip",
-        "timestamp": "2026-05-20T00:00:00"
+        "timestamp": "2026-05-20T10:57:16"
       },
       {
         "version": "0.5.3.0",
