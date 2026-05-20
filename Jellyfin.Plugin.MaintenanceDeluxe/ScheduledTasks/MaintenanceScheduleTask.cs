@@ -120,18 +120,10 @@ public class MaintenanceScheduleTask : IScheduledTask
             && maint.IsActive)
         {
             _logger.LogInformation("Scheduled maintenance deactivation triggered at {Time}.", now);
-            // Snapshot counts before DeactivateAsync clears the lists.
-            var snapshot = new MaintenanceSetting
-            {
-                IsActive = maint.IsActive,
-                Message = maint.Message,
-                StatusUrl = maint.StatusUrl,
-                CustomTitle = maint.CustomTitle,
-                CustomSubtitle = maint.CustomSubtitle,
-                ScheduledRestart = maint.ScheduledRestart,
-                MaintenanceDisabledUserIds = new List<string>(maint.MaintenanceDisabledUserIds),
-                WhitelistedUserIds = new List<string>(maint.WhitelistedUserIds)
-            };
+            // v0.7.0: reuse BannerController.ClonePublicFields instead of a hand-rolled snapshot
+            // that was missing ScheduledStart/End/ActivatedAt — webhook deactivation notification
+            // used to be missing those.
+            var snapshot = Jellyfin.Plugin.MaintenanceDeluxe.Api.BannerController.ClonePublicFields(maint);
             var hookSettings = maint.Webhook;
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(hookSettings, WebhookEvent.Deactivated, snapshot, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);

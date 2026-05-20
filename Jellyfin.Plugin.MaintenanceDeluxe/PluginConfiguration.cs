@@ -788,15 +788,19 @@ public class PluginConfiguration : BasePluginConfiguration
     [JsonPropertyName("maintenanceMode")]
     public MaintenanceSetting MaintenanceMode { get; set; }
 
-    /// <summary>Gets or sets the list of admin-authored announcements (see <see cref="Announcement"/>).</summary>
+    /// <summary>Gets or sets the list of admin-authored announcements (see <see cref="Announcement"/>).
+    /// v0.7.0: property-level initializer in addition to the constructor — XmlSerializer
+    /// can bypass the constructor on legacy XML with explicit nil values, leaving the field null
+    /// and causing NullReferenceException on downstream `.FirstOrDefault(...)` calls.</summary>
     [JsonPropertyName("announcements")]
-    public List<Announcement> Announcements { get; set; }
+    public List<Announcement> Announcements { get; set; } = new();
 
     /// <summary>Gets or sets the per-announcement "seen by" tracking. Each entry maps one
     /// announcement ID to the list of user UUIDs that have dismissed it. Cleared when the
-    /// admin resets an announcement via <c>POST /announcements/admin/{id}/reset-seen</c>.</summary>
+    /// admin resets an announcement via <c>POST /announcements/admin/{id}/reset-seen</c>.
+    /// v0.7.0: see Announcements above for the rationale of the property-level initializer.</summary>
     [JsonPropertyName("announcementsSeen")]
-    public List<AnnouncementsSeenEntry> AnnouncementsSeen { get; set; }
+    public List<AnnouncementsSeenEntry> AnnouncementsSeen { get; set; } = new();
 
     /// <summary>Gets or sets the multi-announcement display mode chosen by the admin:
     /// "one-at-a-time" (default — most recent only, next at next login),

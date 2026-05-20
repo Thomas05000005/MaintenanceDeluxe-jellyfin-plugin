@@ -78,14 +78,24 @@
     function checkTimeWindow(now, timeStart, timeEnd) {
         if (!timeStart && !timeEnd) return true;
         var nowMins = now.getHours() * 60 + now.getMinutes();
+        var sm = null, em = null;
         if (timeStart) {
             var sp = timeStart.split(':');
-            if (nowMins < parseInt(sp[0], 10) * 60 + parseInt(sp[1], 10)) return false;
+            sm = parseInt(sp[0], 10) * 60 + parseInt(sp[1], 10);
         }
         if (timeEnd) {
             var ep = timeEnd.split(':');
-            if (nowMins > parseInt(ep[0], 10) * 60 + parseInt(ep[1], 10)) return false;
+            em = parseInt(ep[0], 10) * 60 + parseInt(ep[1], 10);
         }
+        // v0.7.0: handle overnight windows (e.g. 22:00 -> 06:00). Mirrors the C# MatchesTimeWindow
+        // logic in AnnouncementHelper. Previously, an overnight window was always false.
+        if (sm !== null && em !== null) {
+            return sm <= em
+                ? (nowMins >= sm && nowMins <= em)        // same-day window
+                : (nowMins >= sm || nowMins <= em);        // overnight: in OR in
+        }
+        if (sm !== null && nowMins < sm) return false;     // open-ended end
+        if (em !== null && nowMins > em) return false;     // open-ended start
         return true;
     }
 
@@ -1248,6 +1258,10 @@
 
     // --- Main loop ---
     function tick() {
+        // v0.7.0: defensive null check. If CONFIG fetch failed (plugin disabled mid-session,
+        // network blip, server restart), CONFIG stays null and every CONFIG.* below would NRE.
+        // Just bail out -- the next nav will re-trigger refetchAndApplyMaintenance.
+        if (!CONFIG) { hideBanner(); return; }
         if (CONFIG.showInDashboard === false && isAdminPage()) { hideBanner(); return; }
 
         // Permanent override

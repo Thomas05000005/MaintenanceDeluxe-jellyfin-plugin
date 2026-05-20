@@ -204,21 +204,25 @@ public class NormalisationTests
     }
 
     [Fact]
-    public void ValidateSchedules_Weekly_EmptyDaysRejected()
+    public void ValidateSchedules_Weekly_EmptyDaysAutoCorrectedToAlways()
     {
-        var sched = new List<BannerSchedule?> { new() { Type = "weekly", WeekDays = new() } };
+        // v0.7.0: empty weekDays is auto-normalised to type="always" instead of returning a 400.
+        // This preserves backward-compat with legacy configs that had this case as silent never-active.
+        var sch = new BannerSchedule { Type = "weekly", WeekDays = new() };
+        var sched = new List<BannerSchedule?> { sch };
         var err = BannerController.ValidateSchedules(sched, "test");
-        Assert.NotNull(err);
-        Assert.Contains("at least one day", err);
+        Assert.Null(err);
+        Assert.Equal("always", sch.Type);
     }
 
     [Fact]
-    public void ValidateSchedules_Weekly_NullDaysRejected()
+    public void ValidateSchedules_Weekly_NullDaysAutoCorrectedToAlways()
     {
-        var sched = new List<BannerSchedule?> { new() { Type = "weekly", WeekDays = null! } };
+        var sch = new BannerSchedule { Type = "weekly", WeekDays = null! };
+        var sched = new List<BannerSchedule?> { sch };
         var err = BannerController.ValidateSchedules(sched, "test");
-        Assert.NotNull(err);
-        Assert.Contains("at least one day", err);
+        Assert.Null(err);
+        Assert.Equal("always", sch.Type);
     }
 
     [Theory]

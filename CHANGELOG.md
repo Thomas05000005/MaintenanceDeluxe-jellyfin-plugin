@@ -4,6 +4,52 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0.0] — 2026-05-20
+
+🔍 **Audit secondaire** : zones non couvertes par l'audit pré-v0.6.1 (code legacy, concurrence, webhooks). 11 fixes appliqués avec vérification avant/après pour chaque, +32 tests xUnit (234 → 266).
+
+### Sécurité
+
+- **🛡️ SSRF defense webhook URL** — nouvelle helper `IsWebhookHostSafe(url)` qui rejette :
+  - Loopback IPv4/IPv6 (`127.0.0.0/8`, `::1`)
+  - Link-local `169.254.0.0/16` — inclut **AWS / Azure / GCP metadata endpoints** (`169.254.169.254`, `169.254.170.2`)
+  - RFC1918 privé (`10/8`, `172.16/12`, `192.168/16`) + IPv6 ULA (`fc00::/7`)
+  - Hostnames `.localhost` / `.internal` / `.local` + literal `localhost`
+  Appliquée sur `SaveMaintenance` (webhook URL) **et** `TestWebhook` (sinon admin peut tester avant save).
+- **🔐 WebhookNotifier log sanitization** — l'URL contient un token (Discord/Slack) qui se retrouvait dans les exception messages loggués. Nouvelle helper `SanitiseExceptionMessage` strippe l'URL+hostname. `TestAsync` retourne un message générique au lieu d'`ex.Message` qui pouvait leak hostnames internes via SSL cert errors.
+
+### Corrigé
+
+- **🔴 `checkTimeWindow` JS sans midnight wrap** — bannières/annonces avec fenêtre daily `22:00-06:00` étaient invisibles la nuit (return `false` après minuit), alors que le C# `MatchesTimeWindow` gérait correctement. Divergence client/serveur fermée. **Test reproduction avant/après** : 15 cas couvrant overnight evening/early-morning/middle-of-day/boundary + cas normaux + open-ended.
+- **🔴 Init defensif `Announcements` / `AnnouncementsSeen`** — propriétés `List<>` sans initializer property-level. Le constructeur les init mais `XmlSerializer` peut le bypass sur XML legacy avec `xsi:nil`, laissant `null` → `NullReferenceException` à `config.Announcements.FirstOrDefault(...)`. Ajout de `= new()`.
+- **🟠 `ValidateSchedules` `WeekDays` empty / null** — v0.6.1 rejetait au save (régression). v0.7.0 auto-normalise en `type = "always"` pour préserver la compat avec configs legacy qui avaient ce cas comme "never-active" silencieux.
+- **🟠 `DetectFormat` URL host parsing** — substring match remplacé par `Uri.Host` exact match (incl. `canary.discord.com`, `ptb.discord.com`). Avant : `https://relay.com/discord-bot/api/webhooks/proxy` classifié Discord par erreur, relay reçoit du Discord JSON et le rejette.
+- **🟠 `GetActiveSessions` race condition** — `_sessionManager.Sessions.Where(...)` est une LINQ sur collection mutable. Snapshot via `.ToList()` avant les opérateurs.
+- **🟠 `ClonePublicFields` réutilisé par `MaintenanceScheduleTask`** — auparavant snapshot field-by-field hand-rolled qui manquait `ScheduledStart` / `ScheduledEnd` / `ActivatedAt`. Webhook deactivation notification reçoit maintenant tous les champs.
+- **🟠 WebhookNotifier respect `Retry-After` sur 429** — au lieu d'un retry immédiat qui re-foire, attend `Retry-After` (seconds ou HTTP-date) si ≤ 4s. Si > 4s, surface le 429 au caller au lieu de retry agressif.
+- **🟠 Webhook payload size cap 32KB** — évite Discord/Slack/proxy 400 sur payloads trop gros (admin avec `customTitle` + `customSubtitle` + `message` très longs). Log warning + retour `(0, "Payload too large…")`.
+- **🟡 `banner.js` `tick()` defensive null check sur `CONFIG`** — si `/config` fetch fail (plugin disabled mid-session, network blip, server restart), `CONFIG` reste `null` et chaque `CONFIG.*` throw. `hideBanner(); return;` early.
+- **🟡 `LastModified` monotone** — `Math.Max(config.LastModified, now)` au lieu d'écraser. Protège contre les horloges qui reculent (NTP correction, admin manuel) qui casseraient le polling client `if-modified-since`.
+
+### Notes techniques
+
+- `ValidateSchedules` rendue `internal` (était `private`) pour permettre les tests directs depuis `IsWebhookHostSafe`.
+- `ClonePublicFields` rendue `internal` (était `private`) pour réutilisation depuis `MaintenanceScheduleTask`.
+- `IsWebhookHostSafe` ne fait **pas** de DNS lookup pour éviter latence + TOCTOU. Blocklist coarse sur hostnames + IP literals.
+
+### Tests
+
+- 32 nouveaux cas xUnit :
+  - `WebhookNotifierTests` : 5 cas regression substring-match (relay.com/discord-bot/... etc), 13 cas SSRF blocklist hosts, 4 boundary public ranges (172.15, 172.32, 11.x, 192.169)
+  - `NormalisationTests` : `ValidateSchedules_Weekly_EmptyDaysAutoCorrectedToAlways` + `NullDaysAutoCorrectedToAlways`
+  - Tests JS manuels (node CLI) sur `checkTimeWindow` : 15 cas overnight + boundary
+- 234 v0.6.1 → **266 tests v0.7.0** (+32)
+
+### Faux positifs identifiés et rejetés
+- "`SaveConfiguration` hors du mutex" → faux : déjà dans le `try { ... }` couvert par `_mutex.WaitAsync()`.
+- "Custom theme exposé via /config = info leak" → faux : ajouté volontairement en v0.6.0 pour cohérence, documenté.
+- "Double-escaping dans `mdToHtml`" → faux : le `&quot;` est correctement interprété dans l'attribut `href` par le navigateur.
+
 ## [0.6.1.0] — 2026-05-20
 
 🩹 **Patch hotfix install + audit logique**. v0.6.0 ne pouvait pas être installé via le manifest Jellyfin à cause d'un typo `sourceUrl`. Cette release corrige ça + applique tous les fixes identifiés par l'audit logique pré-release.

@@ -353,7 +353,12 @@ public class BannerController : ControllerBase
         // Maintenance mode is managed by its own endpoint — preserve the live state unchanged.
         config.MaintenanceMode = Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting();
 
-        config.LastModified = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        // v0.7.0: LastModified must be monotonic. If the system clock jumps backwards (NTP
+        // correction, admin manually setting time), a naive `now` would shrink LastModified
+        // and break client-side if-modified-since style polling. Math.Max ensures we never
+        // regress, only stall briefly until real time catches up.
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        config.LastModified = Math.Max(config.LastModified, now);
         Plugin.Instance.UpdateConfiguration(config);
         Plugin.Instance.SaveConfiguration();
         return NoContent();
@@ -409,8 +414,11 @@ public class BannerController : ControllerBase
             return BadRequest($"scheduledRestart must be within {MaxScheduledRestartHorizonDays} days from now.");
 
         // Webhook URL must be https:// (no http:// — secrets in webhook tokens must not transit cleartext).
+        // v0.7.0: SSRF defense — reject loopback / private / link-local / metadata hosts.
         if (maintenance.Webhook is not null && !string.IsNullOrWhiteSpace(maintenance.Webhook.Url))
         {
+            var (safe, reason) = IsWebhookHostSafe(maintenance.Webhook.Url);
+            if (!safe) return BadRequest(reason ?? "Webhook URL refused.");
             if (!Uri.TryCreate(maintenance.Webhook.Url, UriKind.Absolute, out var hookUri)
                 || hookUri.Scheme != Uri.UriSchemeHttps)
                 return BadRequest("Webhook URL must be a valid https:// URL.");
@@ -512,6 +520,9 @@ public class BannerController : ControllerBase
         if (body is null || string.IsNullOrWhiteSpace(body.Url))
             return BadRequest(new { error = "Webhook URL is required." });
 
+        // v0.7.0: SSRF defense applies to test calls too.
+        var (safe, reason) = IsWebhookHostSafe(body.Url);
+        if (!safe) return BadRequest(new { error = reason ?? "Webhook URL refused." });
         if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             return BadRequest(new { error = "Webhook URL must be a valid https:// URL." });
 
@@ -559,7 +570,11 @@ public class BannerController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetActiveSessions()
     {
-        var sessions = _sessionManager.Sessions
+        // v0.7.0: snapshot the live collection before LINQ. _sessionManager.Sessions is
+        // a live IEnumerable that can be mutated by other threads (session start/end), and
+        // a Where/Select chain over it can observe a session disappearing mid-iteration.
+        var snapshot = _sessionManager.Sessions.ToList();
+        var sessions = snapshot
             .Where(s => s.NowPlayingItem is not null)
             .Select(s => new
             {
@@ -875,8 +890,10 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Snapshots the count-bearing fields of MaintenanceSetting so a deactivation
-    /// notification can report accurate counts even after the lists have been cleared.</summary>
-    private static MaintenanceSetting ClonePublicFields(MaintenanceSetting m) => new()
+    /// notification can report accurate counts even after the lists have been cleared.
+    /// v0.7.0: rendered `internal` so MaintenanceScheduleTask can reuse it instead of its
+    /// own field-by-field copy that was missing ScheduledStart/ScheduledEnd/ActivatedAt.</summary>
+    internal static MaintenanceSetting ClonePublicFields(MaintenanceSetting m) => new()
     {
         IsActive = m.IsActive,
         Message = m.Message,
@@ -934,8 +951,15 @@ public class BannerController : ControllerBase
                     break;
 
                 case "weekly":
+                    // v0.7.0: instead of rejecting empty weekDays (which would break legacy configs
+                    // that had this case as a silent "never-active"), auto-normalise to "always".
+                    // This mutation is acceptable because the caller saves the normalised list back.
                     if (sch.WeekDays is null || sch.WeekDays.Count == 0)
-                        return $"Invalid weekly schedule in {context}: weekDays must contain at least one day (0=Sun..6=Sat).";
+                    {
+                        sch.Type = "always";
+                        sch.WeekDays = new List<int>();
+                        break;
+                    }
                     foreach (var d in sch.WeekDays)
                     {
                         if (d < 0 || d > 6)
@@ -1003,6 +1027,75 @@ public class BannerController : ControllerBase
         // Single-leading-slash path: allow `/foo` but reject `//foo` (protocol-relative).
         return url.StartsWith("/", StringComparison.Ordinal)
             && !url.StartsWith("//", StringComparison.Ordinal);
+    }
+
+    /// <summary>SSRF defense for outbound webhook URLs (v0.7.0). The plugin makes the request
+    /// from the Jellyfin server's network context, so the admin (or an attacker via a compromised
+    /// admin session) could otherwise reach internal services that the user-facing network can't.
+    /// We reject:
+    /// - loopback IPv4/IPv6 (127.0.0.0/8, ::1)
+    /// - link-local (169.254.0.0/16, fe80::/10) — includes AWS/Azure/GCP metadata endpoints
+    /// - private RFC1918 ranges (10/8, 172.16/12, 192.168/16) and IPv6 ULA (fc00::/7)
+    /// - hostnames that resolve to any of the above
+    /// Localhost-by-name resolution is NOT performed here (DNS round-trip would add latency
+    /// and a TOCTOU window); we block the literal strings "localhost" / "localhost.localdomain"
+    /// as a coarse defense. Production users that need to reach the LAN can disable webhooks
+    /// or use a public reverse proxy.</summary>
+    internal static (bool Safe, string? Reason) IsWebhookHostSafe(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return (false, "Empty URL.");
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return (false, "Malformed URL.");
+        if (uri.Scheme != Uri.UriSchemeHttps) return (false, "URL must use https://.");
+
+        var host = uri.Host;
+        if (string.IsNullOrEmpty(host)) return (false, "URL has no host.");
+
+        // Coarse hostname blocklist (no DNS lookup).
+        var hostLower = host.ToLowerInvariant();
+        if (hostLower == "localhost" || hostLower == "localhost.localdomain"
+            || hostLower.EndsWith(".localhost", StringComparison.Ordinal)
+            || hostLower.EndsWith(".internal", StringComparison.Ordinal)
+            || hostLower.EndsWith(".local", StringComparison.Ordinal))
+        {
+            return (false, $"Webhook host '{host}' looks internal — refusing to call.");
+        }
+
+        // IP literal blocklist.
+        if (System.Net.IPAddress.TryParse(host.Trim('[', ']'), out var ip))
+        {
+            if (System.Net.IPAddress.IsLoopback(ip))
+                return (false, $"Webhook host '{host}' is loopback — refusing to call.");
+            if (ip.IsIPv6LinkLocal)
+                return (false, $"Webhook host '{host}' is IPv6 link-local — refusing to call.");
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                var bytes = ip.GetAddressBytes();
+                // 169.254.0.0/16 — link-local (incl. AWS/Azure/GCP metadata)
+                if (bytes[0] == 169 && bytes[1] == 254)
+                    return (false, $"Webhook host '{host}' is link-local (cloud metadata range) — refusing to call.");
+                // 10.0.0.0/8
+                if (bytes[0] == 10)
+                    return (false, $"Webhook host '{host}' is private (10.0.0.0/8) — refusing to call.");
+                // 172.16.0.0/12
+                if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                    return (false, $"Webhook host '{host}' is private (172.16.0.0/12) — refusing to call.");
+                // 192.168.0.0/16
+                if (bytes[0] == 192 && bytes[1] == 168)
+                    return (false, $"Webhook host '{host}' is private (192.168.0.0/16) — refusing to call.");
+                // 0.0.0.0/8 — invalid source/dest in normal traffic
+                if (bytes[0] == 0)
+                    return (false, $"Webhook host '{host}' uses the 0.0.0.0/8 reserved range — refusing to call.");
+            }
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                var bytes = ip.GetAddressBytes();
+                // fc00::/7 — Unique Local Address (IPv6 RFC1918 equivalent)
+                if ((bytes[0] & 0xFE) == 0xFC)
+                    return (false, $"Webhook host '{host}' is IPv6 ULA (fc00::/7) — refusing to call.");
+            }
+        }
+
+        return (true, null);
     }
 
     // ── Rich overlay content normalisation ─────────────────────────────────────

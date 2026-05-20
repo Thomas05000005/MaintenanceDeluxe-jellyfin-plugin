@@ -39,14 +39,21 @@ internal static class WebhookNotifier
     private static readonly TimeSpan _httpTimeout = TimeSpan.FromSeconds(5);
     private static readonly JsonSerializerOptions _json = new() { WriteIndented = false };
 
-    /// <summary>Auto-detects the payload format based on URL host.</summary>
+    /// <summary>Auto-detects the payload format based on URL host (v0.7.0: proper URI parsing
+    /// instead of substring match). Substring matching used to false-positive on URLs like
+    /// "https://my-relay.com/discord-bot/api/webhooks/..." which would get a Discord payload
+    /// shape that the relay's parser doesn't understand. Host comparison fixes that.</summary>
     internal static WebhookFormat DetectFormat(string? url)
     {
         if (string.IsNullOrWhiteSpace(url)) return WebhookFormat.Generic;
-        if (url.Contains("discord.com/api/webhooks/", StringComparison.OrdinalIgnoreCase)
-            || url.Contains("discordapp.com/api/webhooks/", StringComparison.OrdinalIgnoreCase))
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return WebhookFormat.Generic;
+        var host = uri.Host;
+        if (host.Equals("discord.com", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("discordapp.com", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("ptb.discord.com", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("canary.discord.com", StringComparison.OrdinalIgnoreCase))
             return WebhookFormat.Discord;
-        if (url.Contains("hooks.slack.com/services/", StringComparison.OrdinalIgnoreCase))
+        if (host.Equals("hooks.slack.com", StringComparison.OrdinalIgnoreCase))
             return WebhookFormat.Slack;
         return WebhookFormat.Generic;
     }
@@ -74,8 +81,26 @@ internal static class WebhookNotifier
         catch (Exception ex)
         {
             // Intentionally broad: a webhook failure must never block maintenance.
-            logger?.LogWarning(ex, "Webhook notification failed for event {Event}.", evt);
+            // v0.7.0: log only ex.GetType().Name + Message (not the full exception which can
+            // contain the webhook URL — and the URL itself contains a Discord/Slack token).
+            logger?.LogWarning(
+                "Webhook notification failed for event {Event}: {ExType}: {ExMessage}",
+                evt, ex.GetType().Name, SanitiseExceptionMessage(ex.Message, settings.Url));
         }
+    }
+
+    /// <summary>v0.7.0: strips webhook URLs / hostnames from exception messages before logging
+    /// so the log file (often viewed by less-privileged users) doesn't leak the token-bearing
+    /// URL. We replace any substring of the configured URL with `[redacted]`.</summary>
+    private static string SanitiseExceptionMessage(string? message, string? url)
+    {
+        if (string.IsNullOrEmpty(message)) return string.Empty;
+        if (string.IsNullOrEmpty(url)) return message;
+        var redacted = message.Replace(url, "[redacted-webhook-url]", StringComparison.OrdinalIgnoreCase);
+        // Also strip the host substring on its own, since some HTTP exceptions only quote the host.
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host))
+            redacted = redacted.Replace(uri.Host, "[redacted-host]", StringComparison.OrdinalIgnoreCase);
+        return redacted;
     }
 
     /// <summary>Sends a test payload. Returns (statusCode, responseBody) for the admin UI to display.
@@ -94,10 +119,22 @@ internal static class WebhookNotifier
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Test webhook failed.");
-            return (0, ex.Message);
+            // v0.7.0: same sanitisation as NotifyAsync — don't surface the URL in logs.
+            // The body returned to the admin UI also gets a generic message; if the admin
+            // needs the actual error, it's in Jellyfin server logs (host blocked there too).
+            logger?.LogWarning(
+                "Test webhook failed: {ExType}: {ExMessage}",
+                ex.GetType().Name, SanitiseExceptionMessage(ex.Message, url));
+            // Return a generic message rather than the raw exception (which can leak internal
+            // hostnames via SSL cert subject names, "Cannot connect to internal-api.local"...).
+            return (0, $"Webhook test failed: {ex.GetType().Name}. Check Jellyfin server logs for details.");
         }
     }
+
+    // v0.7.0: Discord embed total has a hard 6000-char limit. We cap before send so the
+    // request doesn't fail server-side with a cryptic 400. Same general guard for Slack
+    // (40000 chars block limit) and generic webhooks (~64KB common reverse-proxy cap).
+    private const int MaxPayloadBytes = 32 * 1024; // 32KB — safely below Discord/Slack/proxy limits
 
     private static async Task<(int StatusCode, string Body)> SendAsync(
         string url,
@@ -107,6 +144,13 @@ internal static class WebhookNotifier
         CancellationToken ct)
     {
         var json = JsonSerializer.Serialize(payload, _json);
+        if (json.Length > MaxPayloadBytes)
+        {
+            logger?.LogWarning(
+                "Webhook payload exceeds {Max} bytes (got {Got}); refusing to send to avoid HTTP 400.",
+                MaxPayloadBytes, json.Length);
+            return (0, $"Payload too large ({json.Length} bytes); max {MaxPayloadBytes}. Trim customTitle/customSubtitle/message.");
+        }
 
         for (var attempt = 1; attempt <= 2; attempt++)
         {
@@ -121,6 +165,21 @@ internal static class WebhookNotifier
                 var body = await resp.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
                 var status = (int)resp.StatusCode;
 
+                // v0.7.0: respect 429 Retry-After header per Discord/Slack docs.
+                // If the header asks us to wait longer than 4s, we skip the retry rather than
+                // burning the next webhook attempt — caller can retry later.
+                if (status == 429 && attempt == 1)
+                {
+                    var retryAfter = TryGetRetryAfterSeconds(resp);
+                    logger?.LogDebug("Webhook rate-limited (429), Retry-After={RetryAfter}s.", retryAfter);
+                    if (retryAfter > 0 && retryAfter <= 4)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(retryAfter), ct).ConfigureAwait(false);
+                        continue;
+                    }
+                    // Too long to wait or no header: don't retry, surface the rate-limit to the caller.
+                    return (status, body);
+                }
                 if (status >= 500 && attempt == 1)
                 {
                     logger?.LogDebug("Webhook returned {Status}, retrying once.", status);
@@ -140,6 +199,20 @@ internal static class WebhookNotifier
             }
         }
         return (0, "Webhook unreachable after 2 attempts.");
+    }
+
+    /// <summary>v0.7.0: parse the Retry-After header (seconds form or HTTP-date form).
+    /// Returns 0 if absent or unparseable.</summary>
+    private static int TryGetRetryAfterSeconds(HttpResponseMessage resp)
+    {
+        if (resp.Headers.RetryAfter is null) return 0;
+        if (resp.Headers.RetryAfter.Delta is TimeSpan delta) return (int)Math.Min(delta.TotalSeconds, 60);
+        if (resp.Headers.RetryAfter.Date is DateTimeOffset date)
+        {
+            var secs = (date - DateTimeOffset.UtcNow).TotalSeconds;
+            return (int)Math.Min(Math.Max(secs, 0), 60);
+        }
+        return 0;
     }
 
     // ─────────── Payload builders ───────────
