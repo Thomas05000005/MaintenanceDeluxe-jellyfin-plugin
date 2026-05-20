@@ -507,6 +507,15 @@ public class Announcement
     /// automatically without admin intervention. Null = never auto-expires.</summary>
     [JsonPropertyName("expireAfterDays")]
     public int? ExpireAfterDays { get; set; }
+
+    /// <summary>Gets or sets the optional time-based schedule. Null or <c>type="always"</c>
+    /// means the announcement is delivered any time (subject to other filters). Supports
+    /// the same 5 schedule types as banner messages (<see cref="BannerSchedule"/>):
+    /// "always" | "fixed" | "annual" | "weekly" | "daily". Filtered server-side via
+    /// <c>AnnouncementHelper.IsScheduleActive</c> — the client receives only announcements
+    /// matching the current moment.</summary>
+    [JsonPropertyName("schedule")]
+    public BannerSchedule? Schedule { get; set; }
 }
 
 /// <summary>

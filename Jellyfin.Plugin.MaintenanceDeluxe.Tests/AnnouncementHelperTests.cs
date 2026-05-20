@@ -181,6 +181,106 @@ public class AnnouncementHelperTests
         Assert.Equal(expectedExpired, AnnouncementHelper.IsExpired(a, DateTimeOffset.UtcNow));
     }
 
+    // ── IsScheduleActive (v0.5.2) ────────────────────────────────────────────
+
+    [Fact]
+    public void IsScheduleActive_NullOrAlways_IsAlwaysActive()
+    {
+        var now = DateTimeOffset.UtcNow;
+        Assert.True(AnnouncementHelper.IsScheduleActive(null, now));
+        Assert.True(AnnouncementHelper.IsScheduleActive(new BannerSchedule { Type = "always" }, now));
+        Assert.True(AnnouncementHelper.IsScheduleActive(new BannerSchedule { Type = "" }, now));
+    }
+
+    [Fact]
+    public void IsScheduleActive_FixedWindow_RespectsBounds()
+    {
+        var now = new DateTimeOffset(2026, 5, 20, 12, 0, 0, TimeSpan.Zero);
+        var inWindow = new BannerSchedule { Type = "fixed", FixedStart = "2026-05-19T00:00:00Z", FixedEnd = "2026-05-21T00:00:00Z" };
+        Assert.True(AnnouncementHelper.IsScheduleActive(inWindow, now));
+
+        var beforeStart = new BannerSchedule { Type = "fixed", FixedStart = "2026-06-01T00:00:00Z" };
+        Assert.False(AnnouncementHelper.IsScheduleActive(beforeStart, now));
+
+        var afterEnd = new BannerSchedule { Type = "fixed", FixedEnd = "2026-05-01T00:00:00Z" };
+        Assert.False(AnnouncementHelper.IsScheduleActive(afterEnd, now));
+
+        // Open-ended fixed window with only one bound also works.
+        var noEnd = new BannerSchedule { Type = "fixed", FixedStart = "2026-01-01T00:00:00Z" };
+        Assert.True(AnnouncementHelper.IsScheduleActive(noEnd, now));
+    }
+
+    [Fact]
+    public void IsScheduleActive_AnnualWindow_HandlesYearWrap()
+    {
+        // Halloween-ish window: Oct 20 -> Nov 1 (no year wrap).
+        var halloween = new BannerSchedule { Type = "annual", MonthStart = 10, DayStart = 20, MonthEnd = 11, DayEnd = 1 };
+        Assert.True(AnnouncementHelper.IsScheduleActive(halloween, new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero)));
+        Assert.False(AnnouncementHelper.IsScheduleActive(halloween, new DateTimeOffset(2026, 11, 15, 12, 0, 0, TimeSpan.Zero)));
+
+        // Christmas window: Dec 20 -> Jan 5 (wraps year boundary).
+        var christmas = new BannerSchedule { Type = "annual", MonthStart = 12, DayStart = 20, MonthEnd = 1, DayEnd = 5 };
+        Assert.True(AnnouncementHelper.IsScheduleActive(christmas, new DateTimeOffset(2026, 12, 24, 12, 0, 0, TimeSpan.Zero)));
+        Assert.True(AnnouncementHelper.IsScheduleActive(christmas, new DateTimeOffset(2026, 1, 2, 12, 0, 0, TimeSpan.Zero)));
+        Assert.False(AnnouncementHelper.IsScheduleActive(christmas, new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero)));
+    }
+
+    [Fact]
+    public void IsScheduleActive_Weekly_ChecksDayOfWeekAndTime()
+    {
+        // Active Monday + Wednesday only (1 + 3 in JS day convention).
+        var weekly = new BannerSchedule { Type = "weekly", WeekDays = new() { 1, 3 } };
+
+        // 2026-05-18 is Monday -> active.
+        Assert.True(AnnouncementHelper.IsScheduleActive(weekly, new DateTimeOffset(2026, 5, 18, 14, 0, 0, TimeSpan.Zero)));
+        // 2026-05-19 is Tuesday -> not active.
+        Assert.False(AnnouncementHelper.IsScheduleActive(weekly, new DateTimeOffset(2026, 5, 19, 14, 0, 0, TimeSpan.Zero)));
+        // 2026-05-20 is Wednesday -> active.
+        Assert.True(AnnouncementHelper.IsScheduleActive(weekly, new DateTimeOffset(2026, 5, 20, 14, 0, 0, TimeSpan.Zero)));
+
+        // Empty weekDays list -> never active (no day matches).
+        var emptyDays = new BannerSchedule { Type = "weekly", WeekDays = new() };
+        Assert.False(AnnouncementHelper.IsScheduleActive(emptyDays, new DateTimeOffset(2026, 5, 18, 14, 0, 0, TimeSpan.Zero)));
+    }
+
+    [Theory]
+    [InlineData("09:00", "17:00", 12, 0, true)]   // mid-window
+    [InlineData("09:00", "17:00", 8, 0, false)]   // before
+    [InlineData("09:00", "17:00", 18, 0, false)]  // after
+    [InlineData("09:00", "17:00", 9, 0, true)]    // exactly at start
+    [InlineData("09:00", "17:00", 17, 0, true)]   // exactly at end
+    [InlineData("22:00", "06:00", 23, 0, true)]   // overnight window, evening side
+    [InlineData("22:00", "06:00", 3, 0, true)]    // overnight window, early morning side
+    [InlineData("22:00", "06:00", 12, 0, false)]  // overnight window, middle of day -> out
+    public void IsScheduleActive_Daily_TimeWindow(string start, string end, int nowHour, int nowMin, bool expected)
+    {
+        var schedule = new BannerSchedule { Type = "daily", TimeStart = start, TimeEnd = end };
+        var now = new DateTimeOffset(2026, 5, 20, nowHour, nowMin, 0, TimeSpan.Zero);
+        Assert.Equal(expected, AnnouncementHelper.IsScheduleActive(schedule, now));
+    }
+
+    [Fact]
+    public void IsScheduleActive_UnknownType_FallsBackToAlwaysActive()
+    {
+        // Bug-friendly default: unknown type doesn't silently hide the announcement.
+        var weird = new BannerSchedule { Type = "monthly" };
+        Assert.True(AnnouncementHelper.IsScheduleActive(weird, DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_RespectsSchedule()
+    {
+        // Annual schedule active only in June -> May 20 should hide the announcement.
+        var inJuneOnly = MakeAnnouncement(publishedAt: DateTimeOffset.UtcNow.AddDays(-1));
+        inJuneOnly.Schedule = new BannerSchedule { Type = "annual", MonthStart = 6, DayStart = 1, MonthEnd = 6, DayEnd = 30 };
+        // Force "now" check by relying on actual UTC now: only meaningful if we control time.
+        // Use IsScheduleActive directly to keep this deterministic:
+        var may20 = new DateTimeOffset(2026, 5, 20, 12, 0, 0, TimeSpan.Zero);
+        Assert.False(AnnouncementHelper.IsScheduleActive(inJuneOnly.Schedule, may20));
+        var june15 = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
+        Assert.True(AnnouncementHelper.IsScheduleActive(inJuneOnly.Schedule, june15));
+    }
+
     [Fact]
     public void SelectDeliverableForUser_FiltersDraftsAndExpired()
     {

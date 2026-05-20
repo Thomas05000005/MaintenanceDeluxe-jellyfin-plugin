@@ -3321,25 +3321,58 @@
             return Math.ceil(msLeft / 86400000);
           }
 
+          // Short label for a non-always schedule (e.g. "Planning fixe", "Annuel", "Lun-Mer-Ven 09:00-17:00").
+          // Returns null when the schedule is missing or type === 'always'.
+          function summaryScheduleLabel(schedule) {
+            if (!schedule || !schedule.type || schedule.type === 'always') return null;
+            switch (schedule.type) {
+              case 'fixed': return 'Fenêtre fixe';
+              case 'annual': return 'Annuel';
+              case 'weekly': {
+                var days = schedule.weekDays || [];
+                if (days.length === 0) return 'Hebdo (aucun jour)';
+                if (days.length === 7) return 'Hebdo (chaque jour)';
+                var names = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
+                return 'Hebdo: ' + days.map(function (d) { return names[d] || '?'; }).join(' ');
+              }
+              case 'daily': {
+                if (schedule.timeStart && schedule.timeEnd) {
+                  return 'Quotidien ' + schedule.timeStart + '-' + schedule.timeEnd;
+                }
+                return 'Quotidien';
+              }
+              default: return schedule.type;
+            }
+          }
+
           // The right-most pill in the summary row. Priority: draft > expired > inactive > active.
           // Draft trumps everything because a draft can't be "active" or "expired" from the
-          // user's POV -- it's hidden regardless.
+          // user's POV -- it's hidden regardless. A schedule badge is rendered IN ADDITION when
+          // the announcement has a non-always schedule, so the admin sees "Active + Annuel" at
+          // a glance.
           function summaryLifecycleBadge(a) {
+            var scheduleLabel = summaryScheduleLabel(a.schedule);
+            var scheduleHtml = scheduleLabel
+              ? '<div class="jf-ann-summary-status schedule" title="Planning actif : ' + escAttr(scheduleLabel) + '">' + escHtml(scheduleLabel) + '</div>'
+              : '';
             if (a.isDraft) {
-              return '<div class="jf-ann-summary-status draft" title="Cette annonce est en brouillon, elle n\'est pas livrée aux utilisateurs.">Brouillon</div>';
+              return scheduleHtml
+                + '<div class="jf-ann-summary-status draft" title="Cette annonce est en brouillon, elle n\'est pas livrée aux utilisateurs.">Brouillon</div>';
             }
             if (isAnnouncementExpired(a)) {
-              return '<div class="jf-ann-summary-status expired" title="Cette annonce a dépassé sa date d\'expiration et n\'est plus livrée.">Expirée</div>';
+              return scheduleHtml
+                + '<div class="jf-ann-summary-status expired" title="Cette annonce a dépassé sa date d\'expiration et n\'est plus livrée.">Expirée</div>';
             }
             if (!a.isActive) {
-              return '<div class="jf-ann-summary-status inactive">Inactive</div>';
+              return scheduleHtml + '<div class="jf-ann-summary-status inactive">Inactive</div>';
             }
             var daysLeft = announcementDaysLeft(a);
             if (daysLeft !== null && daysLeft <= 7 && daysLeft > 0) {
-              return '<div class="jf-ann-summary-status expiring" title="Cette annonce expire dans ' + daysLeft + ' jour(s).">'
-                   + 'Active (' + daysLeft + 'j)</div>';
+              return scheduleHtml
+                + '<div class="jf-ann-summary-status expiring" title="Cette annonce expire dans ' + daysLeft + ' jour(s).">'
+                + 'Active (' + daysLeft + 'j)</div>';
             }
-            return '<div class="jf-ann-summary-status active">Active</div>';
+            return scheduleHtml + '<div class="jf-ann-summary-status active">Active</div>';
           }
 
 
@@ -3507,6 +3540,14 @@
               + '</div>'
               + '</div></fieldset>'
 
+              // Fieldset: schedule (v0.5.2) -- réutilise le composant des banner messages.
+              // Les classes .msg-sch-* sont scopées au row via querySelector, donc pas de
+              // collision avec les autres editors présents dans la page.
+              + '<fieldset><legend>Planning</legend>'
+              + '<div class="hint" style="margin-bottom:8px">Limite l\'annonce à une fenêtre temporelle. "Always" = aucune contrainte (par défaut).</div>'
+              + getScheduleDetailHtml()
+              + '</fieldset>'
+
               // Fieldset: visual theme override (per-announcement)
               + '<fieldset><legend>Apparence</legend>'
               + '<div class="jf-ann-field"><label class="lbl">Thème pour cette annonce</label>'
@@ -3562,6 +3603,11 @@
 
             row.appendChild(summary);
             row.appendChild(detail);
+
+            // Wire up: schedule editor (v0.5.2) -- has to run after detail is in the DOM
+            // so the day-of-week buttons and annual presets can attach.
+            wireScheduleEditor(detail);
+            populateSchedule(detail, a.schedule || { type: 'always' });
 
             // Wire up: live preview updates
             var preview = detail.querySelector('[data-ann-preview]');
@@ -3728,6 +3774,13 @@
             var expireRaw = expireInput ? expireInput.value.trim() : '';
             var expireVal = expireRaw === '' ? null : parseInt(expireRaw, 10);
             if (expireVal !== null && (isNaN(expireVal) || expireVal <= 0)) expireVal = null;
+            // v0.5.2: collect schedule. "always" is the no-op default -- we send null instead
+            // to keep the persisted config lean (the server treats null and {type:"always"} identically).
+            var schedule = null;
+            if (row.querySelector('.msg-sch-type')) {
+              var collected = collectSchedule(row);
+              if (collected && collected.type !== 'always') schedule = collected;
+            }
             return {
               id: existing.id || '',
               title: row.querySelector('[data-ann-field="title"]').value,
@@ -3737,6 +3790,7 @@
               isActive: !!row.querySelector('[data-ann-field="isActive"]').checked,
               isDraft: !!(row.querySelector('[data-ann-field="isDraft"]') || {}).checked,
               expireAfterDays: expireVal,
+              schedule: schedule,
               publishedAt: existing.publishedAt || new Date().toISOString(),
               targetRoles: roles,
               targetUserIds: userIds,

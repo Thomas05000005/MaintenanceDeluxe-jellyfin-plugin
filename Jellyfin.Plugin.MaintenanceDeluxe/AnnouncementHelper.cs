@@ -15,14 +15,17 @@ internal static class AnnouncementHelper
     /// <summary>Returns true if the announcement targets the given user. The targeting model is:
     /// (1) <c>IsActive</c> must be true AND <c>IsDraft</c> must be false,
     /// (2) the announcement must not be expired (see <see cref="IsExpired"/>),
-    /// (3) if <c>TargetRoles</c> is non-empty, the user's role must be in the list (recognised: "user", "admin"),
-    /// (4) if <c>TargetUserIds</c> is non-empty, the user's UUID must be in the list.
-    /// An empty list at (3) or (4) means "no filter on that dimension". All filters are AND-combined.</summary>
+    /// (3) the announcement's <c>Schedule</c> must match the current moment (see <see cref="IsScheduleActive"/>),
+    /// (4) if <c>TargetRoles</c> is non-empty, the user's role must be in the list (recognised: "user", "admin"),
+    /// (5) if <c>TargetUserIds</c> is non-empty, the user's UUID must be in the list.
+    /// An empty list at (4) or (5) means "no filter on that dimension". All filters are AND-combined.</summary>
     internal static bool IsTargetedAtUser(Announcement a, string userId, bool isAdmin)
     {
+        var now = DateTimeOffset.UtcNow;
         if (!a.IsActive) return false;
         if (a.IsDraft) return false;
-        if (IsExpired(a, DateTimeOffset.UtcNow)) return false;
+        if (IsExpired(a, now)) return false;
+        if (!IsScheduleActive(a.Schedule, now)) return false;
 
         if (a.TargetRoles is { Count: > 0 })
         {
@@ -50,6 +53,90 @@ internal static class AnnouncementHelper
         if (a.ExpireAfterDays is not int days || days <= 0) return false;
         if (a.PublishedAt is not DateTimeOffset publishedAt) return false;
         return publishedAt.AddDays(days) < now;
+    }
+
+    /// <summary>Returns true when a <see cref="BannerSchedule"/> is currently active at
+    /// <paramref name="now"/>. Mirrors the JS <c>isInSchedule</c> in banner.js so that
+    /// banner messages (filtered client-side) and announcements (filtered server-side via
+    /// this method) behave identically. Null schedule, missing type, or type="always" all
+    /// return true (no time filter).</summary>
+    internal static bool IsScheduleActive(BannerSchedule? schedule, DateTimeOffset now)
+    {
+        if (schedule is null || string.IsNullOrEmpty(schedule.Type) || schedule.Type == "always") return true;
+
+        switch (schedule.Type)
+        {
+            case "fixed":
+                if (!string.IsNullOrEmpty(schedule.FixedStart)
+                    && DateTimeOffset.TryParse(schedule.FixedStart, out var fs)
+                    && now < fs) return false;
+                if (!string.IsNullOrEmpty(schedule.FixedEnd)
+                    && DateTimeOffset.TryParse(schedule.FixedEnd, out var fe)
+                    && now > fe) return false;
+                return true;
+
+            case "annual":
+                {
+                    var ms = schedule.MonthStart;
+                    var ds = schedule.DayStart;
+                    var me = schedule.MonthEnd;
+                    var de = schedule.DayEnd;
+                    if (ms is null || ds is null || me is null || de is null)
+                    {
+                        // No month/day range -> only the time-of-day window applies.
+                        return MatchesTimeWindow(now, schedule.TimeStart, schedule.TimeEnd);
+                    }
+                    var nowMd = (now.Month * 100) + now.Day;
+                    var startMd = (ms.Value * 100) + ds.Value;
+                    var endMd = (me.Value * 100) + de.Value;
+                    // Range may wrap the year boundary (Dec 20 -> Jan 5).
+                    var inRange = startMd <= endMd
+                        ? nowMd >= startMd && nowMd <= endMd
+                        : nowMd >= startMd || nowMd <= endMd;
+                    return inRange && MatchesTimeWindow(now, schedule.TimeStart, schedule.TimeEnd);
+                }
+
+            case "weekly":
+                if (schedule.WeekDays is null || schedule.WeekDays.Count == 0) return false;
+                // BannerSchedule.WeekDays uses 0=Sunday convention (matching JS Date.getDay()).
+                var jsWeekDay = (int)now.DayOfWeek; // C#: Sunday=0 .. Saturday=6, same as JS.
+                if (!schedule.WeekDays.Contains(jsWeekDay)) return false;
+                return MatchesTimeWindow(now, schedule.TimeStart, schedule.TimeEnd);
+
+            case "daily":
+                return MatchesTimeWindow(now, schedule.TimeStart, schedule.TimeEnd);
+
+            default:
+                // Unknown type -> treat as "always" so a config bug doesn't silently hide every
+                // announcement; the admin will notice the unknown badge instead.
+                return true;
+        }
+    }
+
+    /// <summary>True if <paramref name="now"/> falls within the inclusive HH:MM window
+    /// [<paramref name="timeStart"/>, <paramref name="timeEnd"/>]. Empty/missing bounds default
+    /// to "always within". Mirrors the JS <c>checkTimeWindow</c> helper.</summary>
+    private static bool MatchesTimeWindow(DateTimeOffset now, string? timeStart, string? timeEnd)
+    {
+        if (string.IsNullOrEmpty(timeStart) && string.IsNullOrEmpty(timeEnd)) return true;
+        var nowMinutes = (now.Hour * 60) + now.Minute;
+        var startMinutes = ParseHhMm(timeStart) ?? 0;
+        var endMinutes = ParseHhMm(timeEnd) ?? (23 * 60 + 59);
+        // Same-day window (08:00-18:00): in if start <= now <= end.
+        // Overnight window (22:00-06:00): in if now >= start OR now <= end.
+        return startMinutes <= endMinutes
+            ? nowMinutes >= startMinutes && nowMinutes <= endMinutes
+            : nowMinutes >= startMinutes || nowMinutes <= endMinutes;
+    }
+
+    private static int? ParseHhMm(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return null;
+        var parts = s.Split(':');
+        if (parts.Length != 2) return null;
+        if (!int.TryParse(parts[0], out var h) || !int.TryParse(parts[1], out var m)) return null;
+        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+        return (h * 60) + m;
     }
 
     /// <summary>Returns true if the given user has already seen the given announcement.

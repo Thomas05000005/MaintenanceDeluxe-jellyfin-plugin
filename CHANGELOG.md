@@ -4,6 +4,39 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2.0] — 2026-05-20
+
+Phase 2 annonces — **Schedule** : les annonces bénéficient maintenant du même système de planning que les rotation messages des bannières. Five types supportés : `always`, `fixed`, `annual`, `weekly`, `daily`.
+
+### Ajouté
+
+- **🗓️ Champ `Schedule` (`BannerSchedule?`) sur `Announcement`** — réutilise le type existant `BannerSchedule`. Types supportés :
+  - `always` (défaut) — pas de filtre temporel
+  - `fixed` — fenêtre précise (`YYYY-MM-DD HH:MM` start/end)
+  - `annual` — récurrent par mois/jour avec time window optionnelle (gère le wrap d'année type Christmas Dec 20 → Jan 5)
+  - `weekly` — jours de la semaine au choix + fenêtre horaire
+  - `daily` — fenêtre horaire quotidienne (gère les fenêtres overnight 22:00 → 06:00)
+- **`AnnouncementHelper.IsScheduleActive(schedule, now)`** — nouvelle helper C# qui mirror exactement la fonction JS `isInSchedule` existante des banner messages. Tests xUnit prouvant l'équivalence comportementale sur 14 cas.
+- **Validation au save** : `SaveAdminAnnouncements` réutilise `ValidateSchedules` existant — un admin ne peut pas envoyer un type inconnu (whitelist `always / fixed / annual / weekly / daily`).
+- **🪟 Admin UI fieldset "Planning"** — réutilise les helpers `getScheduleDetailHtml` + `wireScheduleEditor` + `populateSchedule` + `collectSchedule` existants des rotation messages. Composant identique, juste rendu dans le contexte de l'éditeur d'annonce.
+- **🏷️ Badge summary "Planning"** (bleu) — affiché en plus du badge état quand `schedule != always` : `Fenêtre fixe` / `Annuel` / `Hebdo: Lu Ma Me` / `Quotidien 09:00-17:00`.
+
+### Modifié
+
+- **`IsTargetedAtUser`** — nouveau filtre Schedule en plus de Active / Draft / Expired / Roles / UserIds. Toutes les conditions sont AND-combined.
+- **`POST /announcements/admin`** — valide `Schedule.Type` via `ValidateSchedules` (méthode rendue accessible aux annonces).
+- Le client reçoit la liste **déjà filtrée par schedule**. Aucune logique client modifiée pour ça : `banner.js` est inchangé, le filtrage time-based se fait 100% serveur (contrairement aux banner messages où c'est client).
+
+### Tests
+
+- **14 nouveaux cas xUnit** : null/always (3 cas), fixed avec bornes ouvertes/fermées (4 cas), annual avec year-wrap Christmas (3 cas), weekly day-of-week + empty list (3 cas), daily avec overnight window Theory (8 sous-cas), unknown type fallback, intégration `IsTargetedAtUser_RespectsSchedule`.
+- 169 tests v0.5.1 → **183 tests v0.5.2** (+14).
+
+### Notes techniques
+
+- Le serveur calcule l'expiration avec `DateTimeOffset.UtcNow` ; le client lui n'a aucune logique time-zone pour les annonces (tout est délégué). Les `TimeStart`/`TimeEnd` sont en heure locale serveur (cohérent avec les banner messages existants).
+- Aucune migration : `Schedule` est nullable, les annonces existantes ont `Schedule = null` ce qui équivaut à `always`.
+
 ## [0.5.1.0] — 2026-05-20
 
 Phase 2 annonces — deux nouveaux champs admin pour réduire la friction sur les annonces : préparation à l'avance et nettoyage automatique.

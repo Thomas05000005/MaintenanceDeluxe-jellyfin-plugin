@@ -731,6 +731,14 @@ public class BannerController : ControllerBase
             }
             // IsDraft is a plain bool — no normalisation needed beyond the [FromBody] binding.
 
+            // Schedule: reuse the same whitelist validation as banner messages so an admin can't
+            // ship an unknown type string (would silently fall through to "always" client-side).
+            if (a.Schedule is not null)
+            {
+                var schedErr = ValidateSchedules(new[] { a.Schedule }, $"announcement '{a.Title}'");
+                if (schedErr is not null) return BadRequest(schedErr);
+            }
+
             // Cap and normalise comparison rows (admin can't ship an unbounded list).
             a.Comparisons = (a.Comparisons ?? new()).Take(20).Select(c => new AnnouncementComparison
             {
