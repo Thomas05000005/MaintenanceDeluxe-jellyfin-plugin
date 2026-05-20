@@ -1797,7 +1797,51 @@
             ".jf-ann-title{font-size:26px;}",
             ".jf-ann-body{font-size:17px;}",
             ".jf-ann-btn{padding:13px 24px;font-size:15px;}",
-            "}"
+            "}",
+            // -- Carousel mode (v0.5.0) --
+            // Chevrons live OUTSIDE the card so they sit on the backdrop and don't
+            // shrink the card area. Hidden on small screens (mobile uses swipe via
+            // ArrowLeft/ArrowRight keys + the buttons collapse to the bottom inline).
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav{",
+            "position:absolute;top:50%;transform:translateY(-50%);",
+            "width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.18);",
+            "background:rgba(0,0,0,.45);color:#F5EFE3;font-size:24px;line-height:1;",
+            "display:flex;align-items:center;justify-content:center;cursor:pointer;",
+            "transition:background .15s,opacity .15s;font-family:inherit;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav:hover:not(:disabled){background:rgba(0,0,0,.7);}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav:disabled{opacity:.3;cursor:not-allowed;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav-prev{left:24px;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav-next{right:24px;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-counter{",
+            "position:absolute;bottom:24px;left:50%;transform:translateX(-50%);",
+            "font-size:12px;letter-spacing:.12em;text-transform:uppercase;",
+            "color:rgba(245,239,227,.7);padding:6px 14px;border-radius:14px;",
+            "background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);}",
+            // Mobile: collapse chevrons to floating buttons at the bottom corners
+            "@media(max-width:700px){",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav{top:auto;bottom:24px;transform:none;",
+            "width:40px;height:40px;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav-prev{left:24px;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-nav-next{right:24px;}",
+            "#jf-ann-overlay.jf-ann-carousel .jf-ann-counter{bottom:72px;}",
+            "}",
+            // -- Stack mode (v0.5.0) --
+            // Wrap holds the header + N cards + footer. Cards are spaced with their own
+            // margin; no full-height card scroll -- the overlay itself scrolls.
+            "#jf-ann-overlay.jf-ann-stack{padding:24px 16px;}",
+            "#jf-ann-overlay.jf-ann-stack .jf-ann-stack-wrap{",
+            "width:100%;max-width:min(700px,92vw);display:flex;flex-direction:column;gap:18px;",
+            "margin:auto;}",
+            "#jf-ann-overlay.jf-ann-stack .jf-ann-stack-header{",
+            "padding:8px 4px;color:rgba(245,239,227,.7);font-size:11px;",
+            "letter-spacing:.12em;text-transform:uppercase;text-align:center;}",
+            // Override max-height: in stack mode each card grows to its content, the
+            // overlay scrolls instead.
+            "#jf-ann-overlay.jf-ann-stack .jf-ann-modal{max-height:none;overflow:visible;}",
+            "#jf-ann-overlay.jf-ann-stack .jf-ann-stack-footer{",
+            "position:sticky;bottom:0;padding:14px 4px 6px;text-align:center;",
+            "background:linear-gradient(to top,rgba(0,0,0,.85) 60%,rgba(0,0,0,0));",
+            "margin-top:8px;}"
         ].join("\n");
         document.head.appendChild(s);
     }
@@ -1808,43 +1852,18 @@
         });
     }
 
-    function buildAnnouncementModal(a) {
-        injectAnnouncementStyles();
-        var themeKey = resolveAnnTheme(a);
-        injectAnnTheme(themeKey);
-        var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
-        // Defensive: if a previous overlay is still mid-transition (e.g. close() called
-        // and showAnnouncementModal triggered for the next item before the CSS transition
-        // completes), strip the stale node so the document never holds two #jf-ann-overlay
-        // IDs simultaneously (querySelector would only see the first, breaking handlers).
-        var existing = document.getElementById("jf-ann-overlay");
-        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
-        var overlay = document.createElement("div");
-        overlay.id = "jf-ann-overlay";
-        overlay.className = "jf-ann-theme-" + themeKey;
-        overlay.setAttribute("role", "dialog");
-        overlay.setAttribute("aria-modal", "true");
-        overlay.setAttribute("aria-labelledby", "jf-ann-title");
-        // Belt-and-suspenders inline styles. The class-based CSS in injectAnnouncementStyles
-        // already uses !important, but Jellyfin Media Player (Electron) aggressively caches
-        // the previous banner.js across server restarts, so an old version without !important
-        // could still be served. Inline styles via cssText beat all class CSS and guarantee
-        // the modal is centered + dimmed even from a stale cached script context.
-        overlay.style.cssText =
-            "position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;" +
-            "width:100vw!important;height:100vh!important;margin:0!important;" +
-            "z-index:" + ANN_OVERLAY_Z + "!important;" +
-            "background:rgba(0,0,0,.68)!important;" +
-            "backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);" +
-            "display:flex!important;align-items:center!important;justify-content:center!important;" +
-            "padding:24px;box-sizing:border-box;" +
-            "opacity:0;transition:opacity .25s ease;font-family:inherit;";
-        overlay.style.setProperty("--jf-ann-accent", accent);
-
-        var html = "<div class=\"jf-ann-modal\">";
+    // Returns the inner-card HTML for an announcement. Stays pure (no DOM creation,
+    // no side effects) so it can be reused: one-at-a-time wraps it in a fresh overlay,
+    // carousel mode swaps it inside an existing overlay on chevron click, stack mode
+    // concatenates N of them in a scrollable overlay.
+    // The `withOk` flag controls whether the per-card "Compris" button is rendered
+    // (true for one-at-a-time / carousel; false for stack which has a single global
+    // "Tout fermer" button instead).
+    function buildAnnouncementCardHtml(a, withOk) {
+        var html = "<div class=\"jf-ann-modal\" data-jf-ann-card-id=\"" + escAnn(a.id || "") + "\">";
         html += "<div class=\"jf-ann-head\">";
         html += "<div class=\"jf-ann-icon\">" + escAnn(a.icon || "\ud83d\udce3") + "</div>";
-        html += "<h1 id=\"jf-ann-title\" class=\"jf-ann-title\">" + escAnn(a.title) + "</h1>";
+        html += "<h1 class=\"jf-ann-title\">" + escAnn(a.title) + "</h1>";
         html += "</div>";
         if (a.version || a.publishedAt) {
             var meta = [];
@@ -1880,11 +1899,57 @@
                      + "target=\"_blank\" rel=\"noopener noreferrer\">" + escAnn(a.ctaLabel) + "</a>";
             }
         }
-        html += "<button type=\"button\" class=\"jf-ann-btn jf-ann-btn-primary\" data-jf-ann-ok>Compris</button>";
+        if (withOk) {
+            html += "<button type=\"button\" class=\"jf-ann-btn jf-ann-btn-primary\" data-jf-ann-ok>Compris</button>";
+        }
         html += "</div>";
         html += "</div>";
+        return html;
+    }
 
-        overlay.innerHTML = html;
+    // Creates the chromeless overlay (positioning, backdrop, theme class, accent var)
+    // but leaves innerHTML empty. Caller fills it. Used by all three display modes.
+    function createAnnouncementOverlay(themeKey, accent) {
+        injectAnnouncementStyles();
+        injectAnnTheme(themeKey);
+        // Defensive: if a previous overlay is still mid-transition (e.g. close() called
+        // and showAnnouncementModal triggered for the next item before the CSS transition
+        // completes), strip the stale node so the document never holds two #jf-ann-overlay
+        // IDs simultaneously (querySelector would only see the first, breaking handlers).
+        var existing = document.getElementById("jf-ann-overlay");
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+        var overlay = document.createElement("div");
+        overlay.id = "jf-ann-overlay";
+        overlay.className = "jf-ann-theme-" + themeKey;
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        // Belt-and-suspenders inline styles. The class-based CSS in injectAnnouncementStyles
+        // already uses !important, but Jellyfin Media Player (Electron) aggressively caches
+        // the previous banner.js across server restarts, so an old version without !important
+        // could still be served. Inline styles via cssText beat all class CSS and guarantee
+        // the modal is centered + dimmed even from a stale cached script context.
+        overlay.style.cssText =
+            "position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;" +
+            "width:100vw!important;height:100vh!important;margin:0!important;" +
+            "z-index:" + ANN_OVERLAY_Z + "!important;" +
+            "background:rgba(0,0,0,.68)!important;" +
+            "backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);" +
+            "display:flex!important;align-items:center!important;justify-content:center!important;" +
+            "padding:24px;box-sizing:border-box;" +
+            "opacity:0;transition:opacity .25s ease;font-family:inherit;";
+        overlay.style.setProperty("--jf-ann-accent", accent);
+        return overlay;
+    }
+
+    function buildAnnouncementModal(a) {
+        var themeKey = resolveAnnTheme(a);
+        var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
+        var overlay = createAnnouncementOverlay(themeKey, accent);
+        overlay.setAttribute("aria-labelledby", "jf-ann-title");
+        overlay.innerHTML = buildAnnouncementCardHtml(a, /* withOk */ true);
+        // Re-set aria-labelledby target since the card title no longer has an id by default.
+        var titleEl = overlay.querySelector(".jf-ann-title");
+        if (titleEl) titleEl.id = "jf-ann-title";
         return overlay;
     }
 
@@ -1930,6 +1995,164 @@
         if (ok) ok.addEventListener("click", close);
     }
 
+    // Carousel mode: one overlay, chevrons to flip between cards, counter "1/N".
+    // Mark-seen is best-effort per slide (fire-and-forget on next/prev), and the final
+    // close marks the currently-visible one. If the user never navigates past slide 0,
+    // we still mark slide 0 as seen on close (consistent with one-at-a-time behaviour).
+    function showCarouselAnnouncementModal(list, token, onAllDismissed) {
+        var idx = 0;
+        var markedIds = Object.create(null);
+        // The overlay theme/accent come from the FIRST card; we re-set them when navigating.
+        var first = list[0];
+        var themeKey = resolveAnnTheme(first);
+        var accent = ANN_IMPORTANCE_ACCENT[first.importance] || ANN_IMPORTANCE_ACCENT.info;
+        var overlay = createAnnouncementOverlay(themeKey, accent);
+        overlay.classList.add("jf-ann-carousel");
+        overlay.setAttribute("aria-labelledby", "jf-ann-title");
+
+        function render() {
+            var a = list[idx];
+            // Update theme + accent for the current slide so the overlay matches it.
+            overlay.className = "jf-ann-theme-" + resolveAnnTheme(a) + " jf-ann-carousel";
+            overlay.style.setProperty("--jf-ann-accent",
+                ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info);
+            injectAnnTheme(resolveAnnTheme(a));
+
+            var html = buildAnnouncementCardHtml(a, /* withOk */ true);
+            // Append nav controls outside the card so they overlay backdrop, not card content.
+            html += "<button type=\"button\" class=\"jf-ann-nav jf-ann-nav-prev\""
+                 + (idx === 0 ? " disabled aria-disabled=\"true\"" : "")
+                 + " aria-label=\"Annonce pr\u00e9c\u00e9dente\">\u2039</button>";
+            html += "<button type=\"button\" class=\"jf-ann-nav jf-ann-nav-next\""
+                 + (idx === list.length - 1 ? " disabled aria-disabled=\"true\"" : "")
+                 + " aria-label=\"Annonce suivante\">\u203a</button>";
+            html += "<div class=\"jf-ann-counter\" aria-live=\"polite\">"
+                 + (idx + 1) + " / " + list.length + "</div>";
+            overlay.innerHTML = html;
+            var titleEl = overlay.querySelector(".jf-ann-title");
+            if (titleEl) titleEl.id = "jf-ann-title";
+            wire();
+        }
+
+        function markSeenLocal(a) {
+            if (!a || !a.id || markedIds[a.id]) return;
+            markedIds[a.id] = true;
+            dismissAnnouncementOnServer(a.id, token); // fire-and-forget
+        }
+
+        function close() {
+            // Mark the currently-visible card as seen before tearing down.
+            markSeenLocal(list[idx]);
+            overlay.classList.remove("visible");
+            overlay.style.opacity = "0";
+            setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
+            document.removeEventListener("keydown", onKey);
+            if (typeof onAllDismissed === "function") onAllDismissed();
+        }
+
+        function goTo(newIdx) {
+            if (newIdx < 0 || newIdx >= list.length || newIdx === idx) return;
+            // Mark the slide we're leaving as seen.
+            markSeenLocal(list[idx]);
+            idx = newIdx;
+            render();
+        }
+
+        function onKey(ev) {
+            if (ev.key === "Escape") { close(); }
+            else if (ev.key === "ArrowLeft") { goTo(idx - 1); }
+            else if (ev.key === "ArrowRight") { goTo(idx + 1); }
+        }
+
+        function wire() {
+            var prev = overlay.querySelector(".jf-ann-nav-prev");
+            var next = overlay.querySelector(".jf-ann-nav-next");
+            var ok = overlay.querySelector("[data-jf-ann-ok]");
+            if (prev) prev.addEventListener("click", function () { goTo(idx - 1); });
+            if (next) next.addEventListener("click", function () { goTo(idx + 1); });
+            if (ok) ok.addEventListener("click", close);
+        }
+
+        render();
+        overlay.addEventListener("click", function (ev) {
+            // Backdrop click closes only if it landed on the overlay itself (not on
+            // a child element). Nav buttons sit on the backdrop so we need this guard.
+            if (ev.target === overlay) close();
+        });
+        document.addEventListener("keydown", onKey);
+        (document.documentElement || document.body).appendChild(overlay);
+        requestAnimationFrame(function () {
+            overlay.classList.add("visible");
+            overlay.style.opacity = "1";
+        });
+    }
+
+    // Stack mode: one overlay containing N stacked cards in a scrollable column.
+    // No carousel nav, no per-card "Compris" \u2014 instead a single "Tout fermer" button
+    // marks every announcement as seen at once. Visually all cards share the FIRST card's
+    // theme to keep the stack coherent (mixing 4 themes in one column would be jarring).
+    function showStackAnnouncementModal(list, token, onAllDismissed) {
+        var first = list[0];
+        var themeKey = resolveAnnTheme(first);
+        // Per-card accent var would need !important to override the overlay-level one,
+        // so we just inherit the first card's accent for the stack. Each card still
+        // gets its importance badge via its existing markup.
+        var accent = ANN_IMPORTANCE_ACCENT[first.importance] || ANN_IMPORTANCE_ACCENT.info;
+        var overlay = createAnnouncementOverlay(themeKey, accent);
+        overlay.classList.add("jf-ann-stack");
+        overlay.setAttribute("aria-labelledby", "jf-ann-title");
+        // Override the default centering: in stack mode we want the scrollable column to
+        // start near the top so long stacks aren't clipped by viewport centring.
+        overlay.style.alignItems = "flex-start";
+        overlay.style.overflowY = "auto";
+
+        var html = "<div class=\"jf-ann-stack-wrap\">";
+        html += "<div class=\"jf-ann-stack-header\">"
+             +    "<div class=\"jf-ann-stack-count\">"
+             +      list.length + " annonces"
+             +    "</div>"
+             + "</div>";
+        for (var i = 0; i < list.length; i++) {
+            html += buildAnnouncementCardHtml(list[i], /* withOk */ false);
+        }
+        html += "<div class=\"jf-ann-stack-footer\">"
+             +    "<button type=\"button\" class=\"jf-ann-btn jf-ann-btn-primary\" data-jf-ann-close-all>"
+             +      "Tout marquer comme vu"
+             +    "</button>"
+             + "</div>";
+        html += "</div>";
+        overlay.innerHTML = html;
+        var firstTitle = overlay.querySelector(".jf-ann-title");
+        if (firstTitle) firstTitle.id = "jf-ann-title";
+
+        function close() {
+            // Mark every announcement as seen on the server. Fire-and-forget is fine \u2014
+            // server is idempotent on /seen, and the next fetch would re-show any failure.
+            for (var j = 0; j < list.length; j++) {
+                if (list[j] && list[j].id) dismissAnnouncementOnServer(list[j].id, token);
+            }
+            overlay.classList.remove("visible");
+            overlay.style.opacity = "0";
+            setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
+            document.removeEventListener("keydown", onKey);
+            if (typeof onAllDismissed === "function") onAllDismissed();
+        }
+
+        function onKey(ev) { if (ev.key === "Escape") close(); }
+
+        var closeBtn = overlay.querySelector("[data-jf-ann-close-all]");
+        if (closeBtn) closeBtn.addEventListener("click", close);
+        overlay.addEventListener("click", function (ev) {
+            if (ev.target === overlay) close();
+        });
+        document.addEventListener("keydown", onKey);
+        (document.documentElement || document.body).appendChild(overlay);
+        requestAnimationFrame(function () {
+            overlay.classList.add("visible");
+            overlay.style.opacity = "1";
+        });
+    }
+
     function fetchAndShowAnnouncements(token, multiMode) {
         if (!token) return;
         fetch("/MaintenanceDeluxe/announcements/active", {
@@ -1938,12 +2161,23 @@
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (list) {
                 if (!Array.isArray(list) || list.length === 0) return;
-                // Phase 1: only "one-at-a-time" mode is fully wired. The other modes
-                // (carousel, stack) are stored server-side but fall back to one-at-a-time
-                // here until their UI is implemented in a follow-up release.
+                // If only one announcement, the display mode is irrelevant \u2014 use the
+                // simplest path (no carousel chrome, no stack header).
+                if (list.length === 1) {
+                    showAnnouncementModal(list[0], token, null);
+                    return;
+                }
+                if (multiMode === "carousel") {
+                    showCarouselAnnouncementModal(list, token, null);
+                    return;
+                }
+                if (multiMode === "stack") {
+                    showStackAnnouncementModal(list, token, null);
+                    return;
+                }
+                // Default: one-at-a-time. Show the first, refetch on dismiss to pop the next.
                 showAnnouncementModal(list[0], token, function () {
-                    // Re-fetch on dismiss to pop the next one (if any) for one-at-a-time mode.
-                    if (multiMode !== "stack") fetchAndShowAnnouncements(token, multiMode);
+                    fetchAndShowAnnouncements(token, multiMode);
                 });
             })
             .catch(function () { /* silent \u2014 announcements are non-critical */ });

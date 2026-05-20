@@ -4,6 +4,37 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0.0] — 2026-05-20
+
+Phase 2 annonces partielle : les modes **carousel** et **stack** sont enfin actifs côté client. Depuis v0.3.9 (Phase 1), le sélecteur "Mode d'affichage" de l'admin proposait trois choix mais le client ignorait deux d'entre eux. v0.5.0 ferme la promesse.
+
+### Ajouté
+
+- **🎠 Mode carousel** : si plusieurs annonces non-vues à délivrer, une seule modale avec deux chevrons gauche/droite et un compteur "1 / N" en bas. Chaque slide applique son propre thème (palette + police + animation) à l'overlay. Le marquage "vu" fire-and-forget se fait quand on quitte la slide (via flèches) OU au close final. Navigation clavier : `←`/`→` pour naviguer, `Escape` pour fermer. Sur mobile (≤700px), les chevrons collapsent en boutons flottants en bas de l'écran.
+- **📚 Mode stack** : toutes les annonces empilées verticalement dans une seule modale scrollable. Header "N annonces" en haut, un bouton sticky "Tout marquer comme vu" en bas. Pas de bouton "Compris" par carte — un seul bouton global qui POST `/seen` sur les N IDs en parallèle (fire-and-forget). Visuellement, toutes les cartes partagent le thème de la première pour rester cohérent (mixer 4 thèmes empilés serait illisible).
+
+### Modifié
+
+- **Refactor `buildAnnouncementCardHtml(a, withOk)`** : fonction pure qui retourne le HTML de la carte annonce (sans overlay). Réutilisée par les 3 modes.
+- **Refactor `createAnnouncementOverlay(themeKey, accent)`** : crée un overlay chromeless vide (positioning, backdrop, thème, accent var). Réutilisé par les 3 modes.
+- **`buildAnnouncementModal(a)`** devient un wrapper de 5 lignes au-dessus des deux helpers.
+
+### Notes techniques
+
+- **Edge case** : si une seule annonce non-vue est disponible, le mode admin est ignoré et on retombe sur la modale classique (pas de carousel-à-1-slide ridicule ni de stack-à-1-carte vide).
+- 26 nouvelles règles CSS scopées via `#jf-ann-overlay.jf-ann-carousel` et `#jf-ann-overlay.jf-ann-stack` — zéro impact sur le mode one-at-a-time existant.
+- Backend C# inchangé : la sélection serveur (`SelectDeliverableForUser`) retourne déjà la liste complète des annonces non-vues, le client la traite selon le mode.
+- 156 tests xUnit toujours verts (aucun test C# modifié).
+- Chevrons `‹` / `›` échappés en `‹` / `›` pour respecter la contrainte ASCII-safe du `banner.js` (CI lint).
+
+### Phase 2 — reste à faire
+
+- Viewport simulator admin (presets mobile/tablet/TV)
+- Schedule fixed/annual/weekly/daily sur annonces
+- Support image / screenshot
+- Brouillon/publié, auto-expire
+- Éditeur de thème custom (Phase 2 thèmes, planifiée v0.4.0)
+
 ## [0.4.1.0] — 2026-05-20
 
 Audit complet de revue de code après v0.4.0 (14 fixes : 1 sécurité + 13 qualité/perf/UX). Aucun changement de comportement pour les configs valides — toutes les améliorations sont défensives ou portent sur la performance et l'UX.
