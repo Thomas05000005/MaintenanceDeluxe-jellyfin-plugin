@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.5.3.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "checksum": "4EFE38DB7DE661472883A681BD2CD489",
         "changelog": "v0.5.3 - Phase 2 annonces : image hero. Nouveau champ optionnel ImageUrl + ImageAlt sur Announcement, rendu sous forme d'<img> entre le meta header et le body de la modale annonce. Memes regles d'URL safe que ctaUrl (http/https/relatif, pas de //host). Cap 2000 chars pour l'URL, 200 pour l'alt text. Si vide, aucune image rendue (comportement identique a v0.5.2). Cote client : tag <img> avec loading='lazy', alt={imageAlt ou title de fallback}, border-radius:8px et bordure subtile coherente avec le card. CSS scope dans injectAnnouncementStyles. Cote admin : nouvelle fieldset 'Image (optionnelle)' avec deux inputs (URL + alt text). Live preview admin rend l'image en temps reel pour valider l'apparence avant publication. Validation server-side dans SaveAdminAnnouncements rejette les schemes non-safe avec un 400. Mode carousel : chaque slide affiche sa propre image. Mode stack : chaque carte empilee affiche sa propre image, scroll continue donc pas de souci de hauteur. 2 nouveaux tests xUnit (defaults + round-trip preservation a travers SelectDeliverableForUser). 183 tests v0.5.2 -> 185 tests v0.5.3 (+2).",
         "targetAbi": "10.11.6.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.5.3/MaintenanceDeluxe-v0.5.3.zip",
-        "timestamp": "2026-05-20T00:00:00"
+        "timestamp": "2026-05-20T10:46:11"
       },
       {
         "version": "0.5.2.0",
