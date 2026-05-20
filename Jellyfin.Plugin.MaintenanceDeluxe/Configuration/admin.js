@@ -4,7 +4,7 @@
           // `_pluginVersion` so a config exported now is traceable to the version
           // that produced it. The csproj <AssemblyVersion> remains the source of
           // truth — keep this string aligned with it.
-          var PLUGIN_VERSION = '0.7.0.0';
+          var PLUGIN_VERSION = '0.8.0.0';
 
           var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
@@ -1762,6 +1762,12 @@
                 var more = items.length > 20 ? '<li>… +' + (items.length - 20) + ' autres</li>' : '';
                 itemsHtml = '<ul class="jf-dconf-items">' + lis + more + '</ul>';
               }
+              // v0.8.0: aria-modal sur l'overlay aussi (pas seulement la card), pour que les
+              // assistive techs comprennent que le contenu hors modale est inert. Le card garde
+              // aussi role=dialog pour les screen readers qui lookup ascending.
+              ov.setAttribute('role', 'dialog');
+              ov.setAttribute('aria-modal', 'true');
+              ov.setAttribute('aria-labelledby', 'jf-dconf-title');
               ov.innerHTML =
                 '<div class="jf-dconf-card" role="dialog" aria-modal="true" aria-labelledby="jf-dconf-title">'
                 + '<h3 id="jf-dconf-title" class="jf-dconf-title">' + escHtml(title) + '</h3>'
@@ -1779,15 +1785,40 @@
               var cancelBtn = ov.querySelector('.jf-dconf-cancel');
               var dangerBtn = ov.querySelector('.jf-dconf-danger');
               var countdownTimer = null;
+              // v0.8.0: remember previous focus so we can restore it on close (a11y).
+              var previousFocus = document.activeElement;
               function cleanup(answer) {
                 if (countdownTimer) clearInterval(countdownTimer);
                 document.removeEventListener('keydown', onKey);
                 if (ov.parentNode) ov.parentNode.removeChild(ov);
+                // v0.8.0: restore focus to the element that opened the modal.
+                if (previousFocus && typeof previousFocus.focus === 'function') {
+                  try { previousFocus.focus(); } catch (e) { /* ignore */ }
+                }
                 resolve(answer);
               }
+              // v0.8.0: focus trap. Tab from danger -> cancel, Shift+Tab from cancel -> danger.
+              // Two focusables only so the cycle is trivial; if more inputs are added later, add
+              // them to the list. Disabled danger button is skipped during the countdown.
+              function focusables() {
+                var list = [cancelBtn];
+                if (!dangerBtn.disabled) list.push(dangerBtn);
+                return list;
+              }
               function onKey(e) {
-                if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
-                else if (e.key === 'Enter' && !dangerBtn.disabled) { e.preventDefault(); cleanup(true); }
+                if (e.key === 'Escape') { e.preventDefault(); cleanup(false); return; }
+                if (e.key === 'Enter' && !dangerBtn.disabled) { e.preventDefault(); cleanup(true); return; }
+                if (e.key === 'Tab') {
+                  var list = focusables();
+                  if (list.length === 0) { e.preventDefault(); return; }
+                  var active = document.activeElement;
+                  var idx = list.indexOf(active);
+                  if (e.shiftKey) {
+                    if (idx <= 0) { e.preventDefault(); list[list.length - 1].focus(); }
+                  } else {
+                    if (idx === -1 || idx === list.length - 1) { e.preventDefault(); list[0].focus(); }
+                  }
+                }
               }
               cancelBtn.addEventListener('click', function () { cleanup(false); });
               dangerBtn.addEventListener('click', function () { if (!dangerBtn.disabled) cleanup(true); });
@@ -1938,7 +1969,32 @@
 
             row.querySelector('.jf-rn-up').addEventListener('click', function () { moveReleaseNote(row, -1); });
             row.querySelector('.jf-rn-down').addEventListener('click', function () { moveReleaseNote(row, 1); });
-            row.querySelector('.jf-rn-del').addEventListener('click', function () { row.remove(); });
+            // v0.8.0: confirmation avant suppression d'une release note. L'admin peut
+            // avoir passe 10 min a la rediger -- un clic accidentel ne doit pas tout
+            // perdre. On saute la confirm si la section est totalement vide (titre,
+            // body et icone vides) : virer un slot vide doit rester rapide.
+            row.querySelector('.jf-rn-del').addEventListener('click', function () {
+              var titleEl = row.querySelector('.jf-rn-title');
+              var bodyEl = row.querySelector('.jf-rn-body');
+              var iconEl = row.querySelector('.jf-rn-icon');
+              var titleVal = titleEl ? titleEl.value.trim() : '';
+              var bodyVal = bodyEl ? bodyEl.value.trim() : '';
+              var iconVal = iconEl ? iconEl.value.trim() : '';
+              if (!titleVal && !bodyVal && !iconVal) {
+                row.remove();
+                return;
+              }
+              dangerConfirm({
+                title: 'Supprimer cette release note ?',
+                message: titleVal
+                  ? 'Tu vas supprimer la section "' + titleVal + '". Cette action ne peut pas etre annulee.'
+                  : 'Tu vas supprimer cette section. Cette action ne peut pas etre annulee.',
+                confirmLabel: 'Supprimer',
+                delaySeconds: titleVal ? 2 : 0
+              }).then(function (ok) {
+                if (ok) row.remove();
+              });
+            });
             return row;
           }
 
@@ -2306,6 +2362,11 @@
           var _draftAutosaveTimer = null;
           var DRAFT_KEY = 'md_draft_v1';
           var DRAFT_AUTOSAVE_DELAY = 500;
+          // v0.8.0: flag leve si localStorage.setItem leve (typiquement QuotaExceededError).
+          // Au lieu de catch silently, on warn une fois en console et on memorise le flag
+          // pour que d'autres feedbacks (ex: save reussie) puissent mentionner que le
+          // brouillon n'est pas persiste.
+          var _draftSaveFailed = false;
 
           function setConfigDirty(dirty) {
             _configDirty = !!dirty;
@@ -2357,7 +2418,21 @@
                   _draftAutosaveTimer = null;
                   var snap = buildDraftSnapshot();
                   if (!snap) return;
-                  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); } catch (e) {}
+                  try {
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify(snap));
+                    // Reset le flag si une sauvegarde reussit apres un echec precedent
+                    // (ex: l'admin a vide d'autres entrees localStorage entre-temps).
+                    _draftSaveFailed = false;
+                  } catch (e) {
+                    // v0.8.0: typiquement QuotaExceededError quand le localStorage est sature.
+                    // On warn une seule fois pour ne pas spammer la console a chaque keystroke.
+                    if (!_draftSaveFailed) {
+                      _draftSaveFailed = true;
+                      try {
+                        console.warn('[MaintenanceDeluxe] Brouillon automatique non sauvegarde (localStorage sature ?) :', e && e.name);
+                      } catch (e2) { /* ignore */ }
+                    }
+                  }
                 }, DRAFT_AUTOSAVE_DELAY);
               });
             });
@@ -2501,7 +2576,19 @@
                 }
                 resultEl.style.color = '';
                 resultEl.textContent = 'Envoi en cours…';
+                // v0.8.0: anti double-clic. Le bouton est desactive AVANT l'appel
+                // et reactive dans then() ET catch() via reenable() pour eviter deux
+                // POST paralleles si l'admin clique trop vite.
+                var originalLabel = testBtn.textContent;
                 testBtn.disabled = true;
+                testBtn.textContent = 'Test en cours...';
+                var done = false;
+                function reenable() {
+                  if (done) return;
+                  done = true;
+                  testBtn.disabled = false;
+                  testBtn.textContent = originalLabel;
+                }
                 ApiClient.ajax({
                   type: 'POST',
                   url: ApiClient.getUrl('MaintenanceDeluxe/maintenance/test-webhook'),
@@ -2509,7 +2596,6 @@
                   contentType: 'application/json',
                   dataType: 'json'
                 }).then(function (resp) {
-                  testBtn.disabled = false;
                   var status = resp && resp.statusCode;
                   if (status >= 200 && status < 300) {
                     resultEl.style.color = '#4CAF50';
@@ -2519,11 +2605,12 @@
                     var bodyPreview = (resp && resp.body) ? String(resp.body).slice(0, 200) : '';
                     resultEl.textContent = '❌ Échec (HTTP ' + (status || '?') + ') : ' + bodyPreview;
                   }
+                  reenable();
                 }).catch(function (err) {
-                  testBtn.disabled = false;
                   resultEl.style.color = '#c47';
                   var msg = (err && err.statusText) || (err && err.message) || 'Erreur réseau.';
                   resultEl.textContent = '❌ ' + msg;
+                  reenable();
                 });
               });
             }
@@ -2541,12 +2628,23 @@
               });
             }
             var impCancel = document.getElementById('mdImportCancelBtn');
-            if (impCancel) impCancel.addEventListener('click', function () {
-              document.getElementById('mdImportModal').style.display = 'none';
-              _pendingImport = null;
-            });
+            if (impCancel) impCancel.addEventListener('click', function () { closeImportModal(); });
             var impApply = document.getElementById('mdImportApplyBtn');
             if (impApply) impApply.addEventListener('click', applyImportedConfig);
+            // v0.8.0: ESC + clic backdrop ferment aussi le modal d'import et resettent
+            // _pendingImport. Sinon l'admin peut Cancel via ESC puis re-cliquer Apply,
+            // ce qui appliquerait l'ancien payload silencieusement.
+            var impModalEl = document.getElementById('mdImportModal');
+            if (impModalEl) {
+              impModalEl.addEventListener('click', function (e) {
+                if (e.target === impModalEl) closeImportModal();
+              });
+              document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && impModalEl.style.display !== 'none') {
+                  closeImportModal();
+                }
+              });
+            }
 
             // Uptime Kuma helper
             var kumaBtn = document.getElementById('mdKumaBtn');
@@ -3124,10 +3222,40 @@
             }
             modal.style.display = 'flex';
             _pendingImport = parsed;
+            // v0.8.0: reactive le bouton Apply maintenant qu'on a un payload valide.
+            var applyBtn = document.getElementById('mdImportApplyBtn');
+            if (applyBtn) {
+              applyBtn.disabled = false;
+              applyBtn.removeAttribute('title');
+            }
+          }
+
+          // v0.8.0: ferme le modal d'import ET reset _pendingImport. A appeler depuis
+          // tous les chemins de fermeture (bouton Cancel, ESC, backdrop click, apres
+          // application reussie) pour eviter qu'un ancien payload reste applicable.
+          function closeImportModal() {
+            var modal = document.getElementById('mdImportModal');
+            if (modal) modal.style.display = 'none';
+            _pendingImport = null;
+            var applyBtn = document.getElementById('mdImportApplyBtn');
+            if (applyBtn) {
+              applyBtn.disabled = true;
+              applyBtn.setAttribute('title', 'Selectionner un fichier d\'abord');
+            }
           }
 
           function applyImportedConfig() {
-            if (!_pendingImport) return;
+            if (!_pendingImport) {
+              // v0.8.0: defense supplementaire au cas ou le bouton serait reste
+              // cliquable. Affiche un feedback explicite plutot que de noop silencieux.
+              var resultElGuard = document.getElementById('mdConfigIoResult');
+              if (resultElGuard) {
+                resultElGuard.style.display = 'block';
+                resultElGuard.style.color = '#e6a817';
+                resultElGuard.textContent = 'Selectionne d\'abord un fichier de config a importer.';
+              }
+              return;
+            }
             var resultEl = document.getElementById('mdConfigIoResult');
             try {
               if (_pendingImport.global) {
@@ -3143,7 +3271,6 @@
                 applyMaintenanceUi(maint);
               }
               setConfigDirty(true);
-              document.getElementById('mdImportModal').style.display = 'none';
               if (resultEl) {
                 resultEl.style.display = 'block';
                 resultEl.style.color = '#4CAF50';
@@ -3156,7 +3283,7 @@
                 resultEl.textContent = '❌ Erreur à l’application : ' + (e && e.message);
               }
             }
-            _pendingImport = null;
+            closeImportModal();
           }
 
           function importConfigFromFile(file) {

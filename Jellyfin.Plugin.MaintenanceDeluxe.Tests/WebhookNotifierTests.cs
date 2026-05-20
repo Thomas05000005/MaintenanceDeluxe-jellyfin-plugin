@@ -1,3 +1,6 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using Jellyfin.Plugin.MaintenanceDeluxe.Api;
 using Xunit;
 
@@ -84,5 +87,61 @@ public class WebhookNotifierTests
     {
         var (safe, _) = BannerController.IsWebhookHostSafe(url);
         Assert.Equal(expectedSafe, safe);
+    }
+
+    // ── SanitiseExceptionMessage (v0.8.0) ──────────────────────────────────────
+    // The exception message logged after a webhook failure must never echo the
+    // full webhook URL (it contains a Discord/Slack token) nor the bare host
+    // (the host alone is enough for an attacker to know which provider you're
+    // using). Each row pins one of those redactions.
+
+    [Theory]
+    [InlineData("Failed: https://hooks.slack.com/services/T001/B001/XXX", "https://hooks.slack.com/services/T001/B001/XXX", "Failed: [redacted-webhook-url]")]
+    [InlineData("Cannot connect to hooks.slack.com", "https://hooks.slack.com/services/T001/B001/XXX", "Cannot connect to [redacted-host]")]
+    [InlineData("Generic error message", "https://hooks.slack.com/services/T001/B001/XXX", "Generic error message")]
+    [InlineData("", "https://hooks.slack.com/services/X", "")]
+    [InlineData(null, "https://hooks.slack.com/services/X", "")]
+    [InlineData("Something failed", null, "Something failed")]
+    [InlineData("Something failed", "", "Something failed")]
+    public void SanitiseExceptionMessage_RedactsUrlAndHost(string? message, string? url, string expected)
+    {
+        Assert.Equal(expected, WebhookNotifier.SanitiseExceptionMessage(message, url));
+    }
+
+    // ── TryGetRetryAfterSeconds (v0.8.0) ───────────────────────────────────────
+    // 60s cap is intentional: we don't want a misbehaving provider to be able to
+    // stall the activation flow for an arbitrary amount of time via Retry-After.
+
+    [Fact]
+    public void TryGetRetryAfterSeconds_NullResponse_Returns0()
+    {
+        using var resp = new HttpResponseMessage();
+        Assert.Equal(0, WebhookNotifier.TryGetRetryAfterSeconds(resp));
+    }
+
+    [Fact]
+    public void TryGetRetryAfterSeconds_DeltaCapped60s()
+    {
+        using var resp = new HttpResponseMessage();
+        resp.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(120));
+        var result = WebhookNotifier.TryGetRetryAfterSeconds(resp);
+        Assert.True(result <= 60);
+        Assert.True(result > 0);
+    }
+
+    [Fact]
+    public void TryGetRetryAfterSeconds_DeltaWithinLimit()
+    {
+        using var resp = new HttpResponseMessage();
+        resp.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(4));
+        Assert.Equal(4, WebhookNotifier.TryGetRetryAfterSeconds(resp));
+    }
+
+    [Fact]
+    public void TryGetRetryAfterSeconds_PastDateReturns0()
+    {
+        using var resp = new HttpResponseMessage();
+        resp.Headers.RetryAfter = new RetryConditionHeaderValue(DateTimeOffset.UtcNow.AddMinutes(-5));
+        Assert.Equal(0, WebhookNotifier.TryGetRetryAfterSeconds(resp));
     }
 }

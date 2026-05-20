@@ -92,7 +92,7 @@ internal static class WebhookNotifier
     /// <summary>v0.7.0: strips webhook URLs / hostnames from exception messages before logging
     /// so the log file (often viewed by less-privileged users) doesn't leak the token-bearing
     /// URL. We replace any substring of the configured URL with `[redacted]`.</summary>
-    private static string SanitiseExceptionMessage(string? message, string? url)
+    internal static string SanitiseExceptionMessage(string? message, string? url)
     {
         if (string.IsNullOrEmpty(message)) return string.Empty;
         if (string.IsNullOrEmpty(url)) return message;
@@ -203,7 +203,7 @@ internal static class WebhookNotifier
 
     /// <summary>v0.7.0: parse the Retry-After header (seconds form or HTTP-date form).
     /// Returns 0 if absent or unparseable.</summary>
-    private static int TryGetRetryAfterSeconds(HttpResponseMessage resp)
+    internal static int TryGetRetryAfterSeconds(HttpResponseMessage resp)
     {
         if (resp.Headers.RetryAfter is null) return 0;
         if (resp.Headers.RetryAfter.Delta is TimeSpan delta) return (int)Math.Min(delta.TotalSeconds, 60);

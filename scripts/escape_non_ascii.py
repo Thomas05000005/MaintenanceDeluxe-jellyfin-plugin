@@ -71,7 +71,10 @@ def main() -> int:
         print(f"error: {p} is not a file", file=sys.stderr)
         return 2
 
-    text = p.read_text(encoding="utf-8")
+    # utf-8-sig: transparently strips a UTF-8 BOM (﻿) if the file has one.
+    # Without this, the BOM was reported as a non-ASCII char and either crashed
+    # the rewrite path or produced a spurious --check failure.
+    text = p.read_text(encoding="utf-8-sig")
 
     if args.check:
         hits = find_non_ascii(text)

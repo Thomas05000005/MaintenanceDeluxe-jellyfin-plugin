@@ -876,11 +876,11 @@
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.2em">
                   <label class="inputLabel inputLabelUnfocused" for="scheduledStart">Activer à</label>
-                  <input id="scheduledStart" is="emby-input" type="datetime-local" />
+                  <input id="scheduledStart" is="emby-input" type="datetime-local" placeholder="YYYY-MM-DDTHH:MM" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}" />
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.6em">
                   <label class="inputLabel inputLabelUnfocused" for="scheduledEnd">Désactiver à (optionnel)</label>
-                  <input id="scheduledEnd" is="emby-input" type="datetime-local" />
+                  <input id="scheduledEnd" is="emby-input" type="datetime-local" placeholder="YYYY-MM-DDTHH:MM" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}" />
                 </div>
 
                 <p class="jf-controls-group" style="margin-bottom:0.4em">Redémarrage programmé</p>
@@ -889,7 +889,7 @@
                 </div>
                 <div class="inputContainer" style="margin-bottom:1.2em">
                   <label class="inputLabel inputLabelUnfocused" for="scheduledRestart">Redémarrer à</label>
-                  <input id="scheduledRestart" is="emby-input" type="datetime-local" />
+                  <input id="scheduledRestart" is="emby-input" type="datetime-local" placeholder="YYYY-MM-DDTHH:MM" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}" />
                 </div>
               </div>
 

@@ -537,6 +537,31 @@ public class AnnouncementHelperTests
         Assert.Empty(AnnouncementHelper.NormaliseTargetRoles(null));
     }
 
+    // ── Regression guards (v0.8.0) ────────────────────────────────────────────
+
+    [Fact]
+    public void IsTargetedAtUser_DraftWithRoleAndUuidFilters_NeverDelivered()
+    {
+        // Verifie que draft trumps tous les autres filtres - regression guard contre reorder.
+        var a = MakeAnnouncement(
+            isDraft: true,
+            targetRoles: new() { "admin" },
+            targetUserIds: new() { "alice-uuid" });
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "alice-uuid", isAdmin: true));
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "alice-uuid", isAdmin: false));
+    }
+
+    [Fact]
+    public void IsScheduleActive_Daily_MidnightWrap_ExactBoundaries()
+    {
+        var schedule = new BannerSchedule { Type = "daily", TimeStart = "23:00", TimeEnd = "01:00" };
+        Assert.True(AnnouncementHelper.IsScheduleActive(schedule, new DateTimeOffset(2026, 5, 20, 0, 0, 0, TimeSpan.Zero)));
+        Assert.True(AnnouncementHelper.IsScheduleActive(schedule, new DateTimeOffset(2026, 5, 20, 0, 1, 0, TimeSpan.Zero)));
+        Assert.True(AnnouncementHelper.IsScheduleActive(schedule, new DateTimeOffset(2026, 5, 20, 23, 0, 0, TimeSpan.Zero)));
+        Assert.False(AnnouncementHelper.IsScheduleActive(schedule, new DateTimeOffset(2026, 5, 20, 22, 59, 0, TimeSpan.Zero)));
+        Assert.False(AnnouncementHelper.IsScheduleActive(schedule, new DateTimeOffset(2026, 5, 20, 1, 1, 0, TimeSpan.Zero)));
+    }
+
     [Fact]
     public void NormaliseTargetUserIds_FiltersMalformedAndDeduplicates()
     {

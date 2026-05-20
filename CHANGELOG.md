@@ -4,6 +4,57 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0.0] — 2026-05-21
+
+♿ **Tour de fixes a11y + UX + CI robustesse** (4 agents en parallèle, +13 tests = 279 verts). Aucun nouveau champ — uniquement des améliorations défensives.
+
+### A11y (8 fixes)
+
+- **Focus trap** dans toutes les modales : `dangerConfirm` (admin), `showAnnouncementModal`, mode `carousel`, mode `stack` (banner.js). Tab et Shift+Tab cyclent dans la modale, le focus est restauré au close.
+- **Scroll lock body** lors d'affichage modale annonce — `overflow:hidden` sur `documentElement` + `body` au open, restore au close. Empêche le scroll du contenu derrière.
+- **Compteur carousel SR-friendly** — `counterEl` créé une fois hors `render()` avec `aria-atomic="true"`, mutation via `textContent` au lieu d'`innerHTML` wipe (sinon screen reader rate les changements).
+- **`prefers-reduced-motion` respecté** sur thème néon pulse, badge dirty pulse, `jfDconfFade` overlay animation, preview néon glow.
+- **Contraste WCAG AA** sur les badges (`draft`/`expired`/`expiring`/`schedule-incomplete`) — couleurs éclaircies (`#FFD27A`, `#FF8A87`) + opacity backgrounds augmentés.
+- **Touch targets 44x44** sur `.jf-dconf-btn` (padding 12+) et `.jf-url-btn` (`min-height: 44px` + flexbox center).
+- **Focus visible** outline doré sur les inputs `.jf-ann-field` via `:focus-visible`.
+- **`backdrop-filter` fallback** solide via `@supports not (backdrop-filter)` — fallback opaque pour les vieux Chromium TV (Tizen 4-5, webOS 3-4).
+
+### UX (5 fixes)
+
+- **Webhook test button race** — désactivé pendant la requête avec texte "Test en cours…", `reenable()` partagé entre `.then()` et `.catch()`.
+- **Import config Cancel** — `_pendingImport = null` sur Cancel / ESC / backdrop. Bouton Apply garde-fou + feedback "Sélectionne d'abord un fichier" si pas de payload.
+- **Release notes delete confirmation** — `dangerConfirm` si la section a du contenu (titre/body/icon non vides), delete direct si slot vide.
+- **Draft autosave feedback** — `_draftSaveFailed` flag + `console.warn` one-shot si quota localStorage dépassé. Plus de silent discard.
+- **datetime-local fallback** — `placeholder="YYYY-MM-DDTHH:MM"` + `pattern` regex sur les 3 inputs (`scheduledStart`/`End`/`Restart`) pour les vieux Safari mobile.
+
+### Infrastructure CI (3 fixes)
+
+- **`escape_non_ascii.py`** : `encoding="utf-8-sig"` (strippe BOM UTF-8 automatiquement).
+- **`check_version_coherence.py`** : try/except sur parsing JSON/XML malformés → exit code 2 avec message clair.
+- **`WebhookNotifier.SanitiseExceptionMessage`** + **`TryGetRetryAfterSeconds`** passées `private` → `internal` pour les tests directs.
+
+### Tests (+13 cas)
+
+- `SanitiseExceptionMessage_RedactsUrlAndHost` Theory (7 cas) — couvre URL stripping, host stripping, edge cases null/empty.
+- `TryGetRetryAfterSeconds_*` (4 cas) — null response, delta capped 60s, delta within limit, past date returns 0.
+- `IsTargetedAtUser_DraftWithRoleAndUuidFilters_NeverDelivered` — regression guard si l'ordre des checks change.
+- `IsScheduleActive_Daily_MidnightWrap_ExactBoundaries` — boundary midnight + 1min / 22:59 / 23:00 / 01:01.
+
+**Total : 266 → 279 tests verts**.
+
+### Méthodologie
+
+Cette release a été produite par **4 agents en parallèle** sur des fichiers distincts pour éviter les conflits de merge :
+- Agent A — `banner.js` (focus trap × 3 modales, scroll lock, counter SR, prefers-reduced-motion)
+- Agent B — `admin.css` (touch targets, contraste, prefers-reduced-motion CSS, backdrop-filter fallback)
+- Agent C — `admin.js` (webhook race, import cancel, release notes confirm, draft feedback)
+- Agent D — `scripts/*.py` + `configPage.html` + `WebhookNotifier.cs` (private→internal) + 13 tests xUnit
+
+### Notes techniques
+
+- Aucune migration : tous les fixes sont défensifs ou cosmétiques. Configs v0.7.x chargent telles quelles.
+- `banner.js` reste pure ASCII (vérifié via `escape_non_ascii.py --check`).
+
 ## [0.7.0.0] — 2026-05-20
 
 🔍 **Audit secondaire** : zones non couvertes par l'audit pré-v0.6.1 (code legacy, concurrence, webhooks). 11 fixes appliqués avec vérification avant/après pour chaque, +32 tests xUnit (234 → 266).

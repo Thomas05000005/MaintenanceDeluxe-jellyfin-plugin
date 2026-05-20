@@ -23,16 +23,28 @@ ASSEMBLY_VERSION_RE = re.compile(r"<AssemblyVersion>([^<]+)</AssemblyVersion>")
 
 
 def read_csproj_version() -> str:
-    text = CSPROJ.read_text(encoding="utf-8")
+    try:
+        text = CSPROJ.read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"FAIL: cannot read {CSPROJ}: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(2)
     m = ASSEMBLY_VERSION_RE.search(text)
     if not m:
-        raise SystemExit(f"error: no <AssemblyVersion> in {CSPROJ}")
+        print(f"FAIL: no <AssemblyVersion> in {CSPROJ}", file=sys.stderr)
+        sys.exit(2)
     return m.group(1).strip()
 
 
 def read_manifest_top_version() -> str:
-    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    return manifest[0]["versions"][0]["version"].strip()
+    # Guard every step: an empty/truncated manifest.json (e.g. mid-release-please write)
+    # used to crash with a cryptic JSONDecodeError or IndexError. Now we surface a clear
+    # failure with exit 2 so CI shows "malformed manifest" instead of a stack trace.
+    try:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        return manifest[0]["versions"][0]["version"].strip()
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError, OSError) as e:
+        print(f"FAIL: malformed manifest.json: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(2)
 
 
 def main() -> int:

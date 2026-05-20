@@ -264,7 +264,7 @@
         "#jf-url-popup-hint { margin-bottom:10px; opacity:.85; font-size:12px; line-height:1.4; text-align:center; }",
         "#jf-url-popup-btns { display:flex; gap:8px; justify-content:center; align-items:center; }",
         ".jf-url-primary-btns { display:inline-grid; grid-template-columns:1fr 1fr; gap:8px; }",
-        ".jf-url-btn { padding:7px 16px; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600; line-height:1.4; white-space:nowrap; font-family:inherit; text-align:center; text-decoration:none; display:inline-block; box-sizing:border-box; }",
+        ".jf-url-btn { padding:12px 18px; min-height:44px; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600; line-height:1.4; white-space:nowrap; font-family:inherit; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; }",
         ".jf-url-btn-open { background:#1976d2; color:#fff; }",
         ".jf-url-btn-copy { background:#333; color:#e0e0e0; }",
         ".jf-url-btn-cancel { background:none; color:#888; padding:7px 8px; }",
@@ -1661,6 +1661,11 @@
                 "background:linear-gradient(180deg,rgba(14,14,28,.96) 0%,rgba(8,8,18,.98) 100%);",
                 "color:#DDE3F0;border-radius:16px;",
                 "animation:jfAnnGlowPulse 4.5s ease-in-out infinite;}",
+                // a11y v0.8.0: respect prefers-reduced-motion -- disable the pulse
+                // animation entirely when the user has asked for reduced motion.
+                "@media (prefers-reduced-motion: reduce){",
+                "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-modal{animation:none!important;}",
+                "}",
                 "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-modal::before{",
                 "height:2px;background:linear-gradient(90deg,transparent 0%,var(--jf-ann-accent,#5B9DD9) 50%,transparent 100%);}",
                 "#jf-ann-overlay.jf-ann-theme-neon .jf-ann-title{",
@@ -2049,6 +2054,15 @@
 
     function showAnnouncementModal(a, token, onDismissed) {
         var overlay = buildAnnouncementModal(a);
+        // a11y v0.8.0: capture focus + scroll state BEFORE attaching the overlay so
+        // we can restore both at close time. Lock body+html scroll to prevent the
+        // background from scrolling under the modal (especially on iOS / overlays
+        // with backdrop-filter, where scroll bleed-through is the default).
+        var prevActive = document.activeElement;
+        var prevHtmlOverflow = document.documentElement.style.overflow;
+        var prevBodyOverflow = document.body ? document.body.style.overflow : "";
+        document.documentElement.style.overflow = "hidden";
+        if (document.body) document.body.style.overflow = "hidden";
         // Attach to documentElement (html), not body. Jellyfin sometimes sets a transform
         // or will-change on the body or its main wrapper, which would re-anchor our
         // position:fixed to that ancestor and break centering (modal would land in a
@@ -2060,6 +2074,10 @@
         requestAnimationFrame(function () {
             overlay.classList.add("visible");
             overlay.style.opacity = "1";
+            // Focus the primary OK button so screen readers announce the dialog and
+            // keyboard users can dismiss with Enter / Space immediately.
+            var okBtn = overlay.querySelector("[data-jf-ann-ok]");
+            if (okBtn) { try { okBtn.focus(); } catch (e) {} }
         });
 
         function close() {
@@ -2067,11 +2085,37 @@
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
+            // a11y v0.8.0: restore scroll lock + previous focus on close.
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            if (document.body) document.body.style.overflow = prevBodyOverflow;
+            if (prevActive && typeof prevActive.focus === "function") {
+                try { prevActive.focus(); } catch (e) {}
+            }
             dismissAnnouncementOnServer(a.id, token).then(function () {
                 if (typeof onDismissed === "function") onDismissed();
             });
         }
-        function onKey(ev) { if (ev.key === "Escape") close(); }
+        function onKey(ev) {
+            if (ev.key === "Escape") { close(); return; }
+            // a11y v0.8.0: focus trap. The single-card modal has only one focusable
+            // (the OK button) plus an optional CTA link. We cycle through whatever is
+            // currently focusable inside the overlay so Tab never escapes the dialog.
+            if (ev.key === "Tab") {
+                var focusables = overlay.querySelectorAll(
+                    "a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
+                if (!focusables.length) { ev.preventDefault(); return; }
+                var firstEl = focusables[0];
+                var lastEl = focusables[focusables.length - 1];
+                var active = document.activeElement;
+                if (ev.shiftKey && active === firstEl) {
+                    ev.preventDefault();
+                    try { lastEl.focus(); } catch (e) {}
+                } else if (!ev.shiftKey && active === lastEl) {
+                    ev.preventDefault();
+                    try { firstEl.focus(); } catch (e) {}
+                }
+            }
+        }
         document.addEventListener("keydown", onKey);
 
         overlay.addEventListener("click", function (ev) {
@@ -2096,6 +2140,23 @@
         overlay.classList.add("jf-ann-carousel");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
 
+        // a11y v0.8.0: capture focus + scroll state before opening so we can restore.
+        var prevActive = document.activeElement;
+        var prevHtmlOverflow = document.documentElement.style.overflow;
+        var prevBodyOverflow = document.body ? document.body.style.overflow : "";
+        document.documentElement.style.overflow = "hidden";
+        if (document.body) document.body.style.overflow = "hidden";
+
+        // a11y v0.8.0: counter element is created ONCE and updated via textContent on
+        // each navigation. Previously the counter was re-injected via innerHTML in
+        // render(), which made screen readers miss the aria-live change (the node
+        // identity reset on each render, so polite live regions did not fire). Keeping
+        // a stable node lets assistive tech announce "2 / 3" -> "3 / 3" properly.
+        var counterEl = document.createElement("div");
+        counterEl.className = "jf-ann-counter";
+        counterEl.setAttribute("aria-live", "polite");
+        counterEl.setAttribute("aria-atomic", "true");
+
         function render() {
             var a = list[idx];
             // Update theme + accent for the current slide so the overlay matches it.
@@ -2112,9 +2173,12 @@
             html += "<button type=\"button\" class=\"jf-ann-nav jf-ann-nav-next\""
                  + (idx === list.length - 1 ? " disabled aria-disabled=\"true\"" : "")
                  + " aria-label=\"Annonce suivante\">\u203a</button>";
-            html += "<div class=\"jf-ann-counter\" aria-live=\"polite\">"
-                 + (idx + 1) + " / " + list.length + "</div>";
+            // NOTE: counter HTML is intentionally NOT included here. We append the
+            // stable counterEl below (after innerHTML overwrites everything else) and
+            // only mutate its textContent so the aria-live region keeps its identity.
             overlay.innerHTML = html;
+            overlay.appendChild(counterEl);
+            counterEl.textContent = (idx + 1) + " / " + list.length;
             var titleEl = overlay.querySelector(".jf-ann-title");
             if (titleEl) titleEl.id = "jf-ann-title";
             wire();
@@ -2133,6 +2197,12 @@
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
+            // a11y v0.8.0: restore scroll lock + previous focus.
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            if (document.body) document.body.style.overflow = prevBodyOverflow;
+            if (prevActive && typeof prevActive.focus === "function") {
+                try { prevActive.focus(); } catch (e) {}
+            }
             if (typeof onAllDismissed === "function") onAllDismissed();
         }
 
@@ -2142,12 +2212,43 @@
             markSeenLocal(list[idx]);
             idx = newIdx;
             render();
+            // Move focus back to the OK button on slide change so keyboard users keep
+            // a sensible starting point inside the trap.
+            var okBtn = overlay.querySelector("[data-jf-ann-ok]");
+            if (okBtn) { try { okBtn.focus(); } catch (e) {} }
+        }
+
+        // a11y v0.8.0: focus trap. Focusables in carousel order are
+        // [prev, next, ok], skipping disabled nav buttons at slide boundaries.
+        function getCarouselFocusables() {
+            var out = [];
+            var prev = overlay.querySelector(".jf-ann-nav-prev");
+            var next = overlay.querySelector(".jf-ann-nav-next");
+            var ok = overlay.querySelector("[data-jf-ann-ok]");
+            if (prev && !prev.disabled) out.push(prev);
+            if (next && !next.disabled) out.push(next);
+            if (ok) out.push(ok);
+            return out;
         }
 
         function onKey(ev) {
-            if (ev.key === "Escape") { close(); }
-            else if (ev.key === "ArrowLeft") { goTo(idx - 1); }
-            else if (ev.key === "ArrowRight") { goTo(idx + 1); }
+            if (ev.key === "Escape") { close(); return; }
+            if (ev.key === "ArrowLeft") { goTo(idx - 1); return; }
+            if (ev.key === "ArrowRight") { goTo(idx + 1); return; }
+            if (ev.key === "Tab") {
+                var focusables = getCarouselFocusables();
+                if (!focusables.length) { ev.preventDefault(); return; }
+                var firstEl = focusables[0];
+                var lastEl = focusables[focusables.length - 1];
+                var active = document.activeElement;
+                if (ev.shiftKey && active === firstEl) {
+                    ev.preventDefault();
+                    try { lastEl.focus(); } catch (e) {}
+                } else if (!ev.shiftKey && active === lastEl) {
+                    ev.preventDefault();
+                    try { firstEl.focus(); } catch (e) {}
+                }
+            }
         }
 
         function wire() {
@@ -2170,6 +2271,9 @@
         requestAnimationFrame(function () {
             overlay.classList.add("visible");
             overlay.style.opacity = "1";
+            // Initial focus on the OK button (primary action).
+            var okBtn = overlay.querySelector("[data-jf-ann-ok]");
+            if (okBtn) { try { okBtn.focus(); } catch (e) {} }
         });
     }
 
@@ -2211,8 +2315,15 @@
         var firstTitle = overlay.querySelector(".jf-ann-title");
         if (firstTitle) firstTitle.id = "jf-ann-title";
 
+        // a11y v0.8.0: capture focus + scroll state before opening so we can restore.
+        var prevActive = document.activeElement;
+        var prevHtmlOverflow = document.documentElement.style.overflow;
+        var prevBodyOverflow = document.body ? document.body.style.overflow : "";
+        document.documentElement.style.overflow = "hidden";
+        if (document.body) document.body.style.overflow = "hidden";
+
         function close() {
-            // Mark every announcement as seen on the server. Fire-and-forget is fine \u2014
+            // Mark every announcement as seen on the server. Fire-and-forget is fine --
             // server is idempotent on /seen, and the next fetch would re-show any failure.
             for (var j = 0; j < list.length; j++) {
                 if (list[j] && list[j].id) dismissAnnouncementOnServer(list[j].id, token);
@@ -2221,10 +2332,36 @@
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
+            // a11y v0.8.0: restore scroll lock + previous focus.
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            if (document.body) document.body.style.overflow = prevBodyOverflow;
+            if (prevActive && typeof prevActive.focus === "function") {
+                try { prevActive.focus(); } catch (e) {}
+            }
             if (typeof onAllDismissed === "function") onAllDismissed();
         }
 
-        function onKey(ev) { if (ev.key === "Escape") close(); }
+        function onKey(ev) {
+            if (ev.key === "Escape") { close(); return; }
+            // a11y v0.8.0: focus trap. Primary focusable is data-jf-ann-close-all.
+            // If multiple matches (defensive; we only render one), cycle through them.
+            // We also include any CTA links the stacked cards may have rendered.
+            if (ev.key === "Tab") {
+                var focusables = overlay.querySelectorAll(
+                    "[data-jf-ann-close-all],a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
+                if (!focusables.length) { ev.preventDefault(); return; }
+                var firstEl = focusables[0];
+                var lastEl = focusables[focusables.length - 1];
+                var active = document.activeElement;
+                if (ev.shiftKey && active === firstEl) {
+                    ev.preventDefault();
+                    try { lastEl.focus(); } catch (e) {}
+                } else if (!ev.shiftKey && active === lastEl) {
+                    ev.preventDefault();
+                    try { firstEl.focus(); } catch (e) {}
+                }
+            }
+        }
 
         var closeBtn = overlay.querySelector("[data-jf-ann-close-all]");
         if (closeBtn) closeBtn.addEventListener("click", close);
@@ -2236,6 +2373,8 @@
         requestAnimationFrame(function () {
             overlay.classList.add("visible");
             overlay.style.opacity = "1";
+            // Initial focus on the close-all button (primary action).
+            if (closeBtn) { try { closeBtn.focus(); } catch (e) {} }
         });
     }
 
