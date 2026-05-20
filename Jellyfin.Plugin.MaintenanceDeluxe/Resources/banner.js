@@ -507,7 +507,8 @@
             textSpan.removeEventListener("click", textSpan._urlHandler);
             textSpan._urlHandler = null;
         }
-        var safeUrl = /^(https?:\/\/|\/)/i;
+        // Allowlist: absolute http(s) or single-leading-slash path (no `//host`).
+        var safeUrl = /^(https?:\/\/[^\/]|\/(?!\/))/i;
         if (msg.url && safeUrl.test(msg.url)) {
             var targetUrl = msg.url;
             textSpan._urlHandler = function (e) {
@@ -789,12 +790,12 @@
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
         }); };
         // safe-subset Markdown: bold, italic, lists, plus [text](url) links.
-        // For links we validate the URL with the same scheme allowlist as banner
-        // URLs (http/https/relative) BEFORE injection. encodeURI further escapes
-        // any quote/angle that would break out of the href attribute. The match
-        // happens AFTER the text has been HTML-escaped, so [<script>](url)
-        // becomes [&lt;script&gt;](url) and never executes.
-        var linkSafeUrl = /^(https?:\/\/|\/)/i;
+        // URL allowlist: absolute http(s) OR a single-leading-slash path (not //...
+        // which is protocol-relative and would navigate to an arbitrary host).
+        // The (?!\/) lookahead rejects `//evil.com` while keeping `/foo`.
+        // encodeURI further escapes quote/angle that would break out of href.
+        // Match runs AFTER esc(), so [<script>](url) becomes [&lt;script&gt;](url).
+        var linkSafeUrl = /^(https?:\/\/[^\/]|\/(?!\/))/i;
         function renderInline(s) {
             return s
                 .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
@@ -1416,6 +1417,23 @@
             // Origin check: only accept messages from the parent window AND from the same
             // origin (rejects malicious cross-origin iframes that could try to inject config).
             var allowedOrigin = window.location.origin;
+            // Coalesce rapid bursts of md-preview-update messages into a single render
+            // (~30 fps cap). Without this, a parent that floods postMessage (intentionally
+            // or via a buggy auto-save) would re-render the overlay dozens of times per
+            // second, hammering the main thread and pegging CPU.
+            var _pendingPreviewConfig = null;
+            var _previewRafScheduled = false;
+            function flushPreviewUpdate() {
+                _previewRafScheduled = false;
+                if (!_pendingPreviewConfig) return;
+                var incoming = _pendingPreviewConfig; _pendingPreviewConfig = null;
+                var merged = {};
+                for (var k1 in (MAINTENANCE || {})) merged[k1] = MAINTENANCE[k1];
+                for (var k2 in incoming) merged[k2] = incoming[k2];
+                MAINTENANCE = applyPreviewFallback(merged);
+                removeMaintenanceOverlay();
+                applyMaintenanceState();
+            }
             window.addEventListener("message", function (ev) {
                 if (ev.source !== window.parent) return;
                 if (ev.origin !== allowedOrigin) return;
@@ -1434,13 +1452,13 @@
                     return;
                 }
                 if (data.type !== "md-preview-update" || !data.config) return;
-                var incoming = data.config;
-                var merged = {};
-                for (var k1 in (MAINTENANCE || {})) merged[k1] = MAINTENANCE[k1];
-                for (var k2 in incoming) merged[k2] = incoming[k2];
-                MAINTENANCE = applyPreviewFallback(merged);
-                removeMaintenanceOverlay();
-                applyMaintenanceState();
+                _pendingPreviewConfig = data.config;
+                if (_previewRafScheduled) return;
+                _previewRafScheduled = true;
+                // requestAnimationFrame would be ideal but fires only when the tab is
+                // visible — admins often have the preview tab in background. Use a
+                // ~33ms throttle (≈30 fps) so updates feel real-time without thrashing.
+                setTimeout(flushPreviewUpdate, 33);
             });
             // Announce readiness so the parent can send the initial state immediately.
             // Target the parent's exact origin to avoid leaking the message anywhere else.
@@ -1497,11 +1515,17 @@
         if (_announcementsCheckedForToken === tok) return;        // already done for this session
         if (MAINTENANCE && MAINTENANCE.isActive) return;          // wait until maintenance ends
         _announcementsCheckedForToken = tok;
-        // Small delay so SPA home page has time to mount visually before the modal pops.
+        // Capture token in closure: if the user logs out during the 800ms delay and a NEW
+        // token is issued, the delayed fetch must NOT run against the new token (it would
+        // re-show an announcement the user has just dismissed in another tab, or hit the
+        // server with the old token after login).
+        var capturedTok = tok;
         if (_announcementsPendingTimer) clearTimeout(_announcementsPendingTimer);
         _announcementsPendingTimer = setTimeout(function () {
             _announcementsPendingTimer = null;
-            fetchAndShowAnnouncements(tok, (CONFIG && CONFIG.announcementMultiMode) || "one-at-a-time");
+            var liveTok = getToken();
+            if (!liveTok || liveTok !== capturedTok) return; // token changed during the delay -> abort
+            fetchAndShowAnnouncements(capturedTok, (CONFIG && CONFIG.announcementMultiMode) || "one-at-a-time");
         }, 800);
     }
 
@@ -1789,6 +1813,12 @@
         var themeKey = resolveAnnTheme(a);
         injectAnnTheme(themeKey);
         var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
+        // Defensive: if a previous overlay is still mid-transition (e.g. close() called
+        // and showAnnouncementModal triggered for the next item before the CSS transition
+        // completes), strip the stale node so the document never holds two #jf-ann-overlay
+        // IDs simultaneously (querySelector would only see the first, breaking handlers).
+        var existing = document.getElementById("jf-ann-overlay");
+        if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
         var overlay = document.createElement("div");
         overlay.id = "jf-ann-overlay";
         overlay.className = "jf-ann-theme-" + themeKey;
@@ -1844,8 +1874,8 @@
         }
         html += "<div class=\"jf-ann-footer\">";
         if (a.ctaLabel && a.ctaUrl) {
-            // Same safe-scheme allowlist as banner URLs.
-            if (/^(https?:\/\/|\/)/i.test(a.ctaUrl)) {
+            // Same safe-scheme allowlist as banner URLs (no protocol-relative //host).
+            if (/^(https?:\/\/[^\/]|\/(?!\/))/i.test(a.ctaUrl)) {
                 html += "<a class=\"jf-ann-btn\" href=\"" + encodeURI(a.ctaUrl) + "\" "
                      + "target=\"_blank\" rel=\"noopener noreferrer\">" + escAnn(a.ctaLabel) + "</a>";
             }

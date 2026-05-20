@@ -108,9 +108,27 @@ public class NormalisationTests
     [InlineData("data:text/html,foo", false)]
     [InlineData("vbscript:msgbox", false)]
     [InlineData("ftp://example.com", false)]
+    // Protocol-relative URLs must be rejected — they navigate to an arbitrary host
+    // when used in href, bypassing the http(s)/relative-path allowlist intent.
+    [InlineData("//evil.com", false)]
+    [InlineData("//evil.com/path", false)]
+    [InlineData("///triple-slash", false)]
     public void IsUrlSafe_RejectsDangerousSchemes(string? input, bool expected)
     {
         Assert.Equal(expected, BannerController.IsUrlSafe(input));
+    }
+
+    [Theory]
+    [InlineData("#C9A96E", "#FFFFFF", "#C9A96E")]
+    [InlineData("#c9a96e", "#FFFFFF", "#c9a96e")]
+    [InlineData("not-a-color", "#FFFFFF", "#FFFFFF")]
+    [InlineData("red;position:fixed;top:0", "#FFFFFF", "#FFFFFF")]
+    [InlineData("", "#FFFFFF", "#FFFFFF")]
+    [InlineData(null, "#FFFFFF", "#FFFFFF")]
+    [InlineData("#FFF", "#FFFFFF", "#FFFFFF")] // shorthand not accepted
+    public void NormaliseHexColorOrDefault_FallsBackOnInvalid(string? input, string fallback, string expected)
+    {
+        Assert.Equal(expected, BannerController.NormaliseHexColorOrDefault(input, fallback));
     }
 
     [Fact]
@@ -149,6 +167,39 @@ public class NormalisationTests
     public void NormaliseOptionalString_TrimsAndTruncates(string? input, int max, string? expected)
     {
         Assert.Equal(expected, BannerController.NormaliseOptionalString(input, max));
+    }
+
+    [Theory]
+    [InlineData("/foo", true, null)]                       // ok
+    [InlineData("/foo/bar*", true, null)]                  // wildcard ok
+    [InlineData("/foo?x=y", true, null)]                   // query chars ok
+    [InlineData("foo bar", false, "Invalid route pattern")] // space rejected by character class
+    [InlineData("/foo/../bar", false, "consecutive")]       // .. rejected (hygiene)
+    [InlineData("/foo//bar", false, "consecutive")]         // // rejected (hygiene)
+    [InlineData("../etc/passwd", false, "consecutive")]     // .. rejected
+    public void ValidateRoutes_RejectsBadPatterns(string pattern, bool valid, string? expectedFragment)
+    {
+        var lists = new List<List<string>?> { new List<string> { pattern } };
+        var err = BannerController.ValidateRoutes(lists, "test");
+        if (valid)
+        {
+            Assert.Null(err);
+        }
+        else
+        {
+            Assert.NotNull(err);
+            if (expectedFragment is not null)
+                Assert.Contains(expectedFragment, err);
+        }
+    }
+
+    [Fact]
+    public void ValidateRoutes_LongPatternRejected()
+    {
+        var lists = new List<List<string>?> { new List<string> { new string('a', 513) } };
+        var err = BannerController.ValidateRoutes(lists, "test");
+        Assert.NotNull(err);
+        Assert.Contains("512", err);
     }
 
     [Theory]

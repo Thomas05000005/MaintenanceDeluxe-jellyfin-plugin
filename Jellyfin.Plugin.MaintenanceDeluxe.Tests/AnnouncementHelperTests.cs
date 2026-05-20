@@ -183,6 +183,40 @@ public class AnnouncementHelperTests
         Assert.Equal("zzz", result[2].Id);
     }
 
+    [Fact]
+    public void SelectDeliverableForUser_NullUserIdsInSeenEntry_DoesNotCrash()
+    {
+        // Regression guard for the HashSet-based perf rewrite: a malformed entry where
+        // UserIds is null (older config schema) must be tolerated, not throw NRE.
+        var announcements = new[] { MakeAnnouncement(id: "a1") };
+        var seen = new List<AnnouncementsSeenEntry>
+        {
+            new() { AnnouncementId = "a1", UserIds = null! }
+        };
+        var result = AnnouncementHelper.SelectDeliverableForUser(announcements, seen, "alice", false);
+        Assert.Single(result); // alice hasn't seen it (null list = no users)
+    }
+
+    [Fact]
+    public void SelectDeliverableForUser_ManyAnnouncementsAndSeenEntries_StaysCorrect()
+    {
+        // Stress-test the O(1) lookup rewrite: 100 announcements × 50 seen entries.
+        // Validates the optimisation didn't change behaviour.
+        var announcements = new List<Announcement>();
+        for (var i = 0; i < 100; i++)
+            announcements.Add(MakeAnnouncement(id: $"a{i:D3}"));
+
+        var seen = new List<AnnouncementsSeenEntry>();
+        // alice has seen every even-numbered announcement.
+        for (var i = 0; i < 100; i += 2)
+            seen.Add(new AnnouncementsSeenEntry { AnnouncementId = $"a{i:D3}", UserIds = new() { "alice" } });
+
+        var result = AnnouncementHelper.SelectDeliverableForUser(announcements, seen, "alice", false);
+        Assert.Equal(50, result.Count); // 50 odd-numbered ones remain
+        Assert.All(result, a => Assert.True(int.Parse(a.Id[1..]) % 2 == 1, "Only odd-numbered announcements should remain unseen"));
+        Assert.DoesNotContain(result, a => seen.Any(s => s.AnnouncementId == a.Id));
+    }
+
     // ── MarkSeen / ResetSeen ─────────────────────────────────────────────────
 
     [Fact]

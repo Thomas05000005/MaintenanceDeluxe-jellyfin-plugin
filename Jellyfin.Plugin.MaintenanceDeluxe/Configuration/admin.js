@@ -1464,11 +1464,9 @@
             function isUrlSafe(url) {
               if (!url) return true;
               var l = url.toLowerCase();
-              return (
-                l.startsWith('http://') ||
-                l.startsWith('https://') ||
-                url.startsWith('/')
-              );
+              if (l.startsWith('http://') || l.startsWith('https://')) return true;
+              // `/foo` ok, but `//foo` is protocol-relative -> rejected (would navigate to arbitrary host).
+              return url.startsWith('/') && !url.startsWith('//');
             }
 
             function validateUrls(config) {
@@ -1547,9 +1545,25 @@
                 }
                 var schedStart = localToUtcIso(document.getElementById('scheduledStart').value);
                 var schedEnd = localToUtcIso(document.getElementById('scheduledEnd').value);
-                if (schedStart && schedEnd && new Date(schedEnd) <= new Date(schedStart)) {
-                  Dashboard.alert("Impossible d'enregistrer : l'heure de désactivation doit être postérieure à celle d'activation.");
-                  return;
+                if (schedStart || schedEnd) {
+                  var startDate = schedStart ? new Date(schedStart) : null;
+                  var endDate = schedEnd ? new Date(schedEnd) : null;
+                  // Reject malformed inputs (`new Date('32/13/2025')` → Invalid Date),
+                  // otherwise the <= comparison would yield NaN <= NaN === false and we'd
+                  // silently persist garbage. Browsers normally constrain datetime-local,
+                  // but a paste / spoofed value can slip through.
+                  if (startDate && isNaN(startDate.getTime())) {
+                    Dashboard.alert("Impossible d'enregistrer : la date d'activation programmée est invalide.");
+                    return;
+                  }
+                  if (endDate && isNaN(endDate.getTime())) {
+                    Dashboard.alert("Impossible d'enregistrer : la date de désactivation programmée est invalide.");
+                    return;
+                  }
+                  if (startDate && endDate && endDate <= startDate) {
+                    Dashboard.alert("Impossible d'enregistrer : l'heure de désactivation doit être postérieure à celle d'activation.");
+                    return;
+                  }
                 }
                 var permData = collectPermanentEntries();
                 var config = {
@@ -1719,6 +1733,76 @@
             });
           }
 
+          // Custom confirmation modal for destructive actions. Returns a Promise<boolean>.
+          // Optional `delaySeconds` disables the danger button for N seconds with a countdown
+          // (prevents accidental click-through on rage-clicked dialogs). Pass `items` to display
+          // an explicit list of what's being deleted/reset, so admin sees the scope.
+          function dangerConfirm(opts) {
+            opts = opts || {};
+            var title = opts.title || 'Confirmer';
+            var message = opts.message || '';
+            var detail = opts.detail || '';
+            var items = Array.isArray(opts.items) ? opts.items : null;
+            var confirmLabel = opts.confirmLabel || 'Confirmer';
+            var cancelLabel = opts.cancelLabel || 'Annuler';
+            var delaySec = Math.max(0, opts.delaySeconds | 0);
+            return new Promise(function (resolve) {
+              var ov = document.createElement('div');
+              ov.className = 'jf-dconf-overlay';
+              var itemsHtml = '';
+              if (items && items.length) {
+                var lis = items.slice(0, 20).map(function (i) { return '<li>' + escHtml(i) + '</li>'; }).join('');
+                var more = items.length > 20 ? '<li>… +' + (items.length - 20) + ' autres</li>' : '';
+                itemsHtml = '<ul class="jf-dconf-items">' + lis + more + '</ul>';
+              }
+              ov.innerHTML =
+                '<div class="jf-dconf-card" role="dialog" aria-modal="true" aria-labelledby="jf-dconf-title">'
+                + '<h3 id="jf-dconf-title" class="jf-dconf-title">' + escHtml(title) + '</h3>'
+                + '<p class="jf-dconf-msg">' + escHtml(message) + '</p>'
+                + itemsHtml
+                + (detail ? '<p class="jf-dconf-detail">' + escHtml(detail) + '</p>' : '')
+                + '<div class="jf-dconf-actions">'
+                +   '<button type="button" class="jf-dconf-btn jf-dconf-cancel">' + escHtml(cancelLabel) + '</button>'
+                +   '<button type="button" class="jf-dconf-btn jf-dconf-danger"' + (delaySec > 0 ? ' disabled' : '') + '>'
+                +     escHtml(confirmLabel) + (delaySec > 0 ? ' (' + delaySec + ')' : '')
+                +   '</button>'
+                + '</div>'
+                + '</div>';
+              document.body.appendChild(ov);
+              var cancelBtn = ov.querySelector('.jf-dconf-cancel');
+              var dangerBtn = ov.querySelector('.jf-dconf-danger');
+              var countdownTimer = null;
+              function cleanup(answer) {
+                if (countdownTimer) clearInterval(countdownTimer);
+                document.removeEventListener('keydown', onKey);
+                if (ov.parentNode) ov.parentNode.removeChild(ov);
+                resolve(answer);
+              }
+              function onKey(e) {
+                if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+                else if (e.key === 'Enter' && !dangerBtn.disabled) { e.preventDefault(); cleanup(true); }
+              }
+              cancelBtn.addEventListener('click', function () { cleanup(false); });
+              dangerBtn.addEventListener('click', function () { if (!dangerBtn.disabled) cleanup(true); });
+              ov.addEventListener('click', function (e) { if (e.target === ov) cleanup(false); });
+              document.addEventListener('keydown', onKey);
+              if (delaySec > 0) {
+                var left = delaySec;
+                countdownTimer = setInterval(function () {
+                  left -= 1;
+                  if (left <= 0) {
+                    clearInterval(countdownTimer); countdownTimer = null;
+                    dangerBtn.disabled = false;
+                    dangerBtn.textContent = confirmLabel;
+                  } else {
+                    dangerBtn.textContent = confirmLabel + ' (' + left + ')';
+                  }
+                }, 1000);
+              }
+              setTimeout(function () { (delaySec > 0 ? cancelBtn : dangerBtn).focus(); }, 0);
+            });
+          }
+
           // Converts a UTC ISO datetime string to the "YYYY-MM-DDTHH:MM" format used by datetime-local inputs.
           function utcToDatetimeLocal(isoStr) {
             if (!isoStr) return '';
@@ -1822,9 +1906,18 @@
               preview.style.display = 'block';
               preview.innerHTML = mdPreviewRender(bodyInput.value);
             }
+            // Debounce the markdown re-render on every keystroke. Counter updates remain
+            // instant (cheap, no re-parse) but the preview parse runs at most every 120ms
+            // — fast enough to feel real-time, slow enough to not re-parse 20 times when
+            // the user types a sentence in 2s.
+            var _previewTimer = null;
+            function schedulePreview() {
+              if (_previewTimer) clearTimeout(_previewTimer);
+              _previewTimer = setTimeout(function () { _previewTimer = null; updatePreview(); }, 120);
+            }
 
             titleInput.addEventListener('input', updateTitleCount);
-            bodyInput.addEventListener('input', function () { updateBodyCount(); updatePreview(); });
+            bodyInput.addEventListener('input', function () { updateBodyCount(); schedulePreview(); });
             updateTitleCount();
             updateBodyCount();
             updatePreview();
@@ -2023,10 +2116,11 @@
             var iframe = document.getElementById('appPreviewIframe');
             if (!iframe || !iframe.contentWindow || !_previewReady) return;
             try {
+              // Same-origin iframe (see initLivePreview comment on origin validation).
               iframe.contentWindow.postMessage({
                 type: 'md-preview-update',
                 config: buildPreviewConfig()
-              }, '*');
+              }, window.location.origin);
             } catch (e) { /* ignore */ }
           }
 
@@ -2089,9 +2183,12 @@
               var iframe = document.getElementById('appPreviewIframe');
               if (!iframe || !iframe.contentWindow) return;
               try {
+                // Iframe is same-origin (served by this plugin under /MaintenanceDeluxe/preview.html),
+                // so we can pin the target origin instead of `*`. Prevents leakage if the iframe
+                // ever ends up navigated to a third-party URL via misconfig.
                 iframe.contentWindow.postMessage(
                   { type: 'md-preview-expanded', expanded: !!expanded },
-                  '*'
+                  window.location.origin
                 );
               } catch (e) { /* iframe may be cross-origin or not loaded yet */ }
             }
@@ -2109,7 +2206,16 @@
             }
             function togglePanel() {
               var hidden = section.classList.toggle('jf-app-panel-hidden');
-              if (toggleBtn) toggleBtn.firstChild.nodeValue = (hidden ? 'Afficher le panneau ' : 'Masquer le panneau ');
+              if (!toggleBtn) return;
+              // toggleBtn may hold an icon child plus a text node; reach the first text node
+              // explicitly instead of assuming firstChild is the text (would crash on icon-first markup).
+              var textNode = null;
+              for (var i = 0; i < toggleBtn.childNodes.length; i++) {
+                if (toggleBtn.childNodes[i].nodeType === 3) { textNode = toggleBtn.childNodes[i]; break; }
+              }
+              var label = hidden ? 'Afficher le panneau ' : 'Masquer le panneau ';
+              if (textNode) textNode.nodeValue = label;
+              else toggleBtn.appendChild(document.createTextNode(label));
             }
 
             if (expandBtn) expandBtn.addEventListener('click', enterExpand);
@@ -2749,15 +2855,19 @@
             return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/active-sessions'))
               .then(function (sessions) {
                 if (!sessions || sessions.length === 0) return true;
-                var lines = sessions.map(function (s) {
-                  return '  • ' + s.userName + ' — ' + s.nowPlayingTitle
-                    + ' (sur ' + s.deviceName + ')';
-                }).join('\n');
-                var msg = sessions.length === 1
-                  ? '1 utilisateur est en train de streamer :\n\n' + lines
-                  : sessions.length + ' utilisateurs sont en train de streamer :\n\n' + lines;
-                msg += '\n\nActiver la maintenance va leur couper le flux.\nConfirmer ?';
-                return window.confirm(msg);
+                var items = sessions.map(function (s) {
+                  return s.userName + ' — ' + s.nowPlayingTitle + ' (sur ' + s.deviceName + ')';
+                });
+                return dangerConfirm({
+                  title: sessions.length === 1
+                    ? '1 utilisateur en train de streamer'
+                    : sessions.length + ' utilisateurs en train de streamer',
+                  message: 'Activer la maintenance maintenant va couper leur flux immédiatement.',
+                  items: items,
+                  detail: 'Tu peux attendre la fin de leurs sessions ou poursuivre.',
+                  confirmLabel: 'Activer quand même',
+                  delaySeconds: sessions.length > 3 ? 3 : 1
+                });
               })
               .catch(function () { return true; });
           }
@@ -3195,7 +3305,8 @@
             var esc = function (s) { return s.replace(/[&<>"']/g, function (c) {
               return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
             }); };
-            var safeUrl = /^(https?:\/\/|\/)/i;
+            // Mirror banner.js linkSafeUrl: reject protocol-relative `//host` to prevent phishing.
+            var safeUrl = /^(https?:\/\/[^\/]|\/(?!\/))/i;
             function inline(s) {
               return s
                 .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
@@ -3457,19 +3568,37 @@
             // Reset seen
             detail.querySelector('[data-ann-reset-seen]').addEventListener('click', function () {
               if (!a.id) { Dashboard.alert('Sauvegarde d\'abord cette annonce avant de réinitialiser le suivi.'); return; }
-              if (!confirm('Réinitialiser le suivi : tous les utilisateurs ciblés re-verront cette annonce ?')) return;
-              ApiClient.ajax({
-                type: 'POST',
-                url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin/' + encodeURIComponent(a.id) + '/reset-seen')
-              }).then(loadAnnouncements);
+              dangerConfirm({
+                title: 'Réinitialiser le suivi',
+                message: 'Cette action réinitialise le compteur \"vu par\" : tous les utilisateurs ciblés re-verront cette annonce à leur prochaine visite.',
+                detail: 'Annonce : ' + (a.title || '(sans titre)'),
+                confirmLabel: 'Réinitialiser',
+                delaySeconds: 2
+              }).then(function (ok) {
+                if (!ok) return;
+                ApiClient.ajax({
+                  type: 'POST',
+                  url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin/' + encodeURIComponent(a.id) + '/reset-seen')
+                }).then(loadAnnouncements);
+              });
             });
 
             // Delete
             detail.querySelector('[data-ann-delete]').addEventListener('click', function () {
-              if (!confirm('Supprimer définitivement cette annonce ?')) return;
-              _annData.items.splice(idx, 1);
-              renderAnnouncementsList();
-              saveAllAnnouncements();
+              var seenCount = (a.seenCount | 0);
+              dangerConfirm({
+                title: 'Supprimer cette annonce',
+                message: 'L\'annonce sera définitivement supprimée du serveur et de la liste de tous les utilisateurs.',
+                detail: (a.title ? 'Titre : ' + a.title : 'Sans titre')
+                     + (seenCount > 0 ? ' · Vue par ' + seenCount + ' utilisateur(s)' : ''),
+                confirmLabel: 'Supprimer définitivement',
+                delaySeconds: 3
+              }).then(function (ok) {
+                if (!ok) return;
+                _annData.items.splice(idx, 1);
+                renderAnnouncementsList();
+                saveAllAnnouncements();
+              });
             });
 
             return row;

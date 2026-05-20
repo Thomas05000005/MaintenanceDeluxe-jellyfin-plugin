@@ -4,6 +4,51 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1.0] — 2026-05-20
+
+Audit complet de revue de code après v0.4.0 (14 fixes : 1 sécurité + 13 qualité/perf/UX). Aucun changement de comportement pour les configs valides — toutes les améliorations sont défensives ou portent sur la performance et l'UX.
+
+### Sécurité
+
+- **🛡️ Faille XSS via URL protocol-relative bouchée** dans le rendu Markdown des annonces et des bannières. L'allowlist `^(https?:\/\/|\/)` acceptait `[click](//evil.com)` (un seul `/` en tête match le second alternant), qui générait `<a href="//evil.com">` et naviguait vers le host attaquant. Le regex passe à `^(https?:\/\/[^\/]|\/(?!\/))` (lookahead négatif sur `/`). **3 endroits patchés client** (`banner.js` ligne 510 `safeUrl`, ligne 797 `linkSafeUrl`, ligne 1848 `ctaUrl`) + **2 endroits patchés admin** (`admin.js` `isUrlSafe` ligne 1464, `annMdRender` ligne 3196) + **1 endroit patché serveur** (`BannerController.IsUrlSafe`). Pas de désync entre les whitelists. Nouveaux tests xUnit : `//evil.com`, `//evil.com/path`, `///triple-slash` tous rejetés.
+
+### Modifié — Validation renforcée
+
+- **🎨 Validation des couleurs CSS** dans `SaveConfig` : `ColorPresets[].bg|color`, `RotationMessages[].bg|color`, `PermanentOverride.Entries[].bg|color` — toutes les valeurs invalides (`red;position:fixed;top:0`) sont rebasées sur le défaut du type (`#1976d2` / `#2e7d32` / `#ffffff`) au lieu d'être persistées telles quelles. Nouvelle helper `NormaliseHexColorOrDefault(value, fallback)` testée par 7 cas.
+- **🚧 ValidateRoutes hygiène** : rejet explicite des séquences `..` et `//` consécutives dans les patterns de route (défense en profondeur — aucun exploit connu, mais les patterns Jellyfin réels n'en contiennent jamais). Méthode rendue `internal` pour test direct. 8 nouveaux tests.
+
+### Modifié — UX
+
+- **⚠️ Modale `dangerConfirm` custom** pour les actions destructives, remplace `window.confirm()` :
+  - **Suppression d'annonce** : affiche le titre + nombre d'utilisateurs ayant vu, délai 3s avant que le bouton danger devienne cliquable.
+  - **Reset seen** : affiche le titre de l'annonce, délai 2s.
+  - **Activation maintenance avec sessions actives** : affiche la liste des users en train de streamer, délai 1s (3s si > 3 users).
+  - Style dédié (`.jf-dconf-*`) avec backdrop blur, animation fade-in, ESC pour annuler, Enter pour confirmer (si non-bloqué), clic hors carte pour annuler.
+
+### Modifié — Performance
+
+- **⚡ `SelectDeliverableForUser` passe de O(announcements × seenEntries × usersPerEntry) à O(announcements + seenEntries)** via un `HashSet<string>` construit une seule fois pour le user concerné. Sur 1000 users × 50 annonces × 20 users par entry, ~50k comparaisons string → ~1k. Test stress xUnit sur 100 annonces / 50 entries.
+- **🎛️ Debounce 120ms sur la preview Markdown admin** (`updatePreview` était appelée à chaque keystroke et reparsait tout le markdown → re-parse 20×/s en saisie rapide).
+- **📡 Coalesce des bursts `md-preview-update`** côté `banner.js` via `setTimeout(33ms)` (~30 fps) : un parent floodant l'iframe ne peut plus pegger le CPU.
+
+### Corrigé — Robustesse
+
+- **🔐 Race condition token annonces** : `maybeShowAnnouncements` capturait le token au moment du déclenchement mais le `setTimeout(800ms)` pouvait toujours tirer même si l'user s'était déconnecté entre temps. Désormais le token est capturé dans une closure puis revalidé via `getToken()` après le délai — si mismatch, le fetch est abandonné.
+- **🔁 Overlay annonce dédupliqué** : si une modale est encore en transition de sortie quand la suivante est déclenchée, l'ancienne est explicitement retirée du DOM avant la création de la nouvelle (évite deux éléments avec `id="jf-ann-overlay"` simultanés).
+- **🎯 `postMessage` admin→preview pinned à `window.location.origin`** au lieu de `'*'` (l'iframe est same-origin, donc aucune raison de wildcarder le target).
+- **📅 Validation dates schedule** : `new Date('garbage')` retourne `Invalid Date`, et `NaN <= NaN` est `false` silencieux. Désormais les deux dates sont vérifiées avec `isNaN(d.getTime())` avant la comparaison.
+- **🔘 `togglePanel` admin résilient** : itère sur `childNodes` pour trouver le premier `nodeType === 3` (text node) au lieu de présumer `firstChild` (qui peut être une icône SVG selon le markup).
+
+### Tests
+
+- 136 tests v0.4.0 → **156 tests v0.4.1** (+20) : URL protocol-relative (3 cas), `NormaliseHexColorOrDefault` (7 cas), `ValidateRoutes` hygiène (7 cas + 1 fact longueur), perf stress `SelectDeliverableForUser`, regression guard `UserIds == null` sur seen entries.
+
+### Notes techniques
+
+- `ValidateRoutes` est devenue `internal` (était `private`) pour permettre le test direct via `InternalsVisibleTo`.
+- Aucune migration de config : tous les fixes sont rétrocompatibles, les configs persistées en v0.4.0 chargent telles quelles en v0.4.1.
+- Aucune nouvelle dépendance.
+
 ## [0.4.0.0] — 2026-05-14
 
 Première bump mineure : système de thèmes visuels pour les annonces avec 4 styles au choix, polices web premium embarquées, sélection globale + override par annonce, aperçu live thématisé.

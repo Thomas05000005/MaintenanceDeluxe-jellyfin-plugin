@@ -270,6 +270,34 @@ public class BannerController : ControllerBase
         if (!string.IsNullOrEmpty(config.TransitionSpeed) && !Array.Exists(validTransitionSpeed, v => v == config.TransitionSpeed))
             config.TransitionSpeed = "normal";
 
+        // Validate colours on every collection holding a Bg/Color string (presets + messages +
+        // permanent entries). Invalid values are silently rebased to the type default so a
+        // typo in admin doesn't bake arbitrary CSS (`"red;position:fixed"`) into the config.
+        if (config.ColorPresets is not null)
+        {
+            foreach (var p in config.ColorPresets)
+            {
+                p.Bg = NormaliseHexColorOrDefault(p.Bg, "#1976d2");
+                p.Color = NormaliseHexColorOrDefault(p.Color, "#ffffff");
+            }
+        }
+        if (config.RotationMessages is not null)
+        {
+            foreach (var m in config.RotationMessages)
+            {
+                m.Bg = NormaliseHexColorOrDefault(m.Bg, "#1976d2");
+                m.Color = NormaliseHexColorOrDefault(m.Color, "#ffffff");
+            }
+        }
+        if (config.PermanentOverride?.Entries is not null)
+        {
+            foreach (var e in config.PermanentOverride.Entries)
+            {
+                e.Bg = NormaliseHexColorOrDefault(e.Bg, "#2e7d32");
+                e.Color = NormaliseHexColorOrDefault(e.Color, "#ffffff");
+            }
+        }
+
         // Validate URL schemes — reject javascript: and other non-http(s) schemes
         if (config.PermanentOverride?.Entries is not null)
         {
@@ -842,8 +870,11 @@ public class BannerController : ControllerBase
             routes[i] = routes[i].Trim();
     }
 
-    /// <summary>Returns an error message if any route pattern in the collection is invalid, or null if all are valid.</summary>
-    private static string? ValidateRoutes(IEnumerable<List<string>?> routeLists, string context)
+    /// <summary>Returns an error message if any route pattern in the collection is invalid, or null if all are valid.
+    /// Patterns are matched against window.location.hash on the client, so they accept the same character set as
+    /// URL hashes plus `*` wildcards. We additionally reject `..` and consecutive `//` sequences to keep patterns
+    /// shaped like real Jellyfin routes (defence in depth — no known exploit, just hygiene).</summary>
+    internal static string? ValidateRoutes(IEnumerable<List<string>?> routeLists, string context)
     {
         foreach (var list in routeLists)
         {
@@ -853,6 +884,8 @@ public class BannerController : ControllerBase
                 if (string.IsNullOrWhiteSpace(pattern)) continue;
                 if (!Regex.IsMatch(pattern, @"^[A-Za-z0-9\-._/*?=&#+%]+$"))
                     return $"Invalid route pattern \"{pattern}\" in {context}.";
+                if (pattern.Contains("..", StringComparison.Ordinal) || pattern.Contains("//", StringComparison.Ordinal))
+                    return $"Invalid route pattern \"{pattern}\" in {context} (consecutive `..` or `//` are not allowed).";
                 if (pattern.Length > 512)
                     return $"Route pattern in {context} exceeds 512 characters.";
             }
@@ -870,13 +903,18 @@ public class BannerController : ControllerBase
             || host.Equals("hooks.slack.com", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Returns true for null/empty URLs and URLs starting with http://, https://, or /.</summary>
+    /// <summary>Returns true for null/empty URLs and URLs starting with http://, https://,
+    /// or a single-leading-slash path. Explicitly rejects protocol-relative URLs (`//evil.com`)
+    /// which would navigate to an arbitrary host when used in href attributes.</summary>
     internal static bool IsUrlSafe(string? url)
     {
         if (string.IsNullOrEmpty(url)) return true;
-        return url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            || url.StartsWith("/", StringComparison.Ordinal);
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return true;
+        // Single-leading-slash path: allow `/foo` but reject `//foo` (protocol-relative).
+        return url.StartsWith("/", StringComparison.Ordinal)
+            && !url.StartsWith("//", StringComparison.Ordinal);
     }
 
     // ── Rich overlay content normalisation ─────────────────────────────────────
@@ -937,6 +975,14 @@ public class BannerController : ControllerBase
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
         return _hexColorRegex.IsMatch(trimmed) ? trimmed : null;
+    }
+
+    /// <summary>Returns the input if it's a valid #RRGGBB hex colour, otherwise the fallback.
+    /// Used for fields that MUST hold a colour (presets / banner messages) — unlike
+    /// MaintenanceMode AccentColor which is nullable and means "no tint".</summary>
+    internal static string NormaliseHexColorOrDefault(string? value, string fallback)
+    {
+        return NormaliseHexColor(value) ?? fallback;
     }
 
     /// <summary>Caps the release notes list length and normalises each section's fields.</summary>

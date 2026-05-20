@@ -59,10 +59,19 @@ internal static class AnnouncementHelper
         string userId,
         bool isAdmin)
     {
-        var seenList = seenTracking.ToList(); // single materialisation for lookups below
+        // Build an O(1) lookup once: announcementId -> bool "has this user seen it".
+        // Without this, SelectDeliverableForUser was O(announcements × seenEntries × usersPerEntry),
+        // which got slow for instances with many announcements × many users (1000 users × 50
+        // announcements = 50k string comparisons per /announcements/active call).
+        var seenForUser = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var entry in seenTracking)
+        {
+            if (entry.UserIds is not null && entry.UserIds.Contains(userId))
+                seenForUser.Add(entry.AnnouncementId);
+        }
         return announcements
             .Where(a => IsTargetedAtUser(a, userId, isAdmin))
-            .Where(a => !HasUserSeen(seenList, a.Id, userId))
+            .Where(a => !seenForUser.Contains(a.Id))
             .OrderByDescending(a => a.PublishedAt ?? DateTimeOffset.MinValue)
             .ThenBy(a => a.Id, StringComparer.Ordinal) // tie-breaker for deterministic order
             .ToList();
