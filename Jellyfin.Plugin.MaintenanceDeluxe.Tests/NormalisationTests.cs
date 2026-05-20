@@ -38,12 +38,108 @@ public class NormalisationTests
     [InlineData("oled", "oled")]
     [InlineData("neon", "neon")]
     [InlineData("glass", "glass")]
+    [InlineData("custom", "custom")]  // v0.6.0: "custom" joins the whitelist
     [InlineData("UNKNOWN", "velours")]
     [InlineData("", "velours")]
     [InlineData(null, "velours")]
-    public void NormaliseAnnouncementTheme_AcceptsFourThemesElseVelours(string? input, string expected)
+    public void NormaliseAnnouncementTheme_AcceptsFiveThemesElseVelours(string? input, string expected)
     {
         Assert.Equal(expected, BannerController.NormaliseAnnouncementTheme(input));
+    }
+
+    // ── NormaliseCustomAnnouncementTheme (v0.6.0) ──────────────────────────────
+
+    [Fact]
+    public void NormaliseCustomAnnouncementTheme_NullInput_ReturnsNull()
+    {
+        Assert.Null(BannerController.NormaliseCustomAnnouncementTheme(null));
+    }
+
+    [Fact]
+    public void NormaliseCustomAnnouncementTheme_AllEmpty_ReturnsNull()
+    {
+        // Empty/whitespace fields collapse to null entries which then collapse the whole block.
+        var input = new CustomAnnouncementTheme
+        {
+            Label = "  ",
+            AccentColor = "",
+            BackdropColor = null,
+            CardBackground = "   ",
+            TextColor = "",
+            FontFamily = "",
+            BorderStyle = null
+        };
+        Assert.Null(BannerController.NormaliseCustomAnnouncementTheme(input));
+    }
+
+    [Fact]
+    public void NormaliseCustomAnnouncementTheme_PartialValidInput_KeepsValidFieldsDropsInvalidOnes()
+    {
+        var input = new CustomAnnouncementTheme
+        {
+            Label = "Mon thème",
+            AccentColor = "#C9A96E",
+            BackdropColor = "rgba(0,0,0,.5)",
+            CardBackground = "not-a-color",   // invalid -> nulled
+            TextColor = "#abcdef",
+            FontFamily = "inter",
+            BorderStyle = "glow"
+        };
+        var result = BannerController.NormaliseCustomAnnouncementTheme(input);
+        Assert.NotNull(result);
+        Assert.Equal("Mon thème", result!.Label);
+        Assert.Equal("#C9A96E", result.AccentColor);
+        Assert.Equal("rgba(0,0,0,.5)", result.BackdropColor);
+        Assert.Null(result.CardBackground); // dropped (invalid)
+        Assert.Equal("#abcdef", result.TextColor);
+        Assert.Equal("inter", result.FontFamily);
+        Assert.Equal("glow", result.BorderStyle);
+    }
+
+    [Theory]
+    [InlineData("inter", "inter")]
+    [InlineData("INTER", "inter")]           // case-insensitive
+    [InlineData("system", "system")]
+    [InlineData("jetbrains-mono", "jetbrains-mono")]
+    [InlineData("Comic Sans", null)]         // unknown -> dropped
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void NormaliseCustomAnnouncementTheme_FontFamilyWhitelist(string? font, string? expected)
+    {
+        var input = new CustomAnnouncementTheme { FontFamily = font, Label = "x" };
+        var result = BannerController.NormaliseCustomAnnouncementTheme(input);
+        Assert.Equal(expected, result?.FontFamily);
+    }
+
+    [Theory]
+    [InlineData("solid", "solid")]
+    [InlineData("glow", "glow")]
+    [InlineData("dashed", "dashed")]
+    [InlineData("none", "none")]
+    [InlineData("invisible", null)]
+    [InlineData("", null)]
+    public void NormaliseCustomAnnouncementTheme_BorderStyleWhitelist(string? border, string? expected)
+    {
+        var input = new CustomAnnouncementTheme { BorderStyle = border, Label = "x" };
+        var result = BannerController.NormaliseCustomAnnouncementTheme(input);
+        Assert.Equal(expected, result?.BorderStyle);
+    }
+
+    [Theory]
+    [InlineData("#C9A96E", "#C9A96E")]
+    [InlineData("#c9a96e", "#c9a96e")]
+    [InlineData("rgba(0,0,0,.68)", "rgba(0,0,0,.68)")]
+    [InlineData("rgb(255, 0, 0)", "rgb(255, 0, 0)")]
+    [InlineData("rgba(255, 100, 50, 0.5)", "rgba(255, 100, 50, 0.5)")]
+    [InlineData("red", null)]                                // CSS keyword not accepted
+    [InlineData("hsl(120,50%,50%)", null)]                   // HSL not accepted
+    [InlineData("var(--accent)", null)]                      // CSS var not accepted
+    [InlineData("rgba(0,0,0,.68);position:fixed", null)]    // CSS injection attempt
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void NormaliseCssColor_AcceptsHexAndRgba(string? input, string? expected)
+    {
+        Assert.Equal(expected, BannerController.NormaliseCssColor(input));
     }
 
     [Theory]

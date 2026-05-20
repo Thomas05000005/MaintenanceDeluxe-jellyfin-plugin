@@ -4,6 +4,58 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0.0] — 2026-05-20
+
+🎉 **Phase 2 annonces complète**. Cette release ajoute la dernière feature manquante : un éditeur de thème custom. Tu peux maintenant créer ton propre look d'annonce sans toucher au code.
+
+### Ajouté
+
+- **🎨 Éditeur de thème custom** dans l'onglet Annonces. Un bloc `<details>` repliable avec 7 champs :
+  - **Nom** (label affiché dans l'admin)
+  - **Couleur d'accent** (hex `#RRGGBB`)
+  - **Backdrop** (hex ou `rgba(...)` pour la transparence)
+  - **Fond carte** (hex ou rgba)
+  - **Couleur texte** (hex)
+  - **Police** (système / Inter / JetBrains Mono / Space Grotesk / Manrope)
+  - **Bordure** (solide / halo lumineux / pointillés / aucune)
+- **"Custom" devient le 5ème thème** dans le sélecteur global + le sélecteur par annonce. Si aucun custom n'est configuré, le client retombe sur Velours.
+- **Champs vides = défaut Velours** pour ce champ — partial customisation OK (ex. juste changer l'accent).
+- **Hot-reload dans la live preview** : modifier un champ du custom theme et l'aperçu se met à jour instantanément (la CSS est ré-injectée via signature JSON pour éviter le pile-up de `<style>` tags).
+
+### Modifié
+
+- **`Announcement`** indirect : nouveau champ `customTheme` joint à chaque item de `/announcements/active` qui a `theme = "custom"`. Le client reçoit la définition complète sans appel API supplémentaire. Items avec theme ≠ custom n'ont pas ce champ (économie de ~200 bytes/item).
+- **`PluginConfiguration.CustomAnnouncementTheme`** nouvelle propriété (`CustomAnnouncementTheme?` nullable). Persistée XML + JSON.
+- **`NormaliseAnnouncementTheme`** : `"custom"` joint la whitelist.
+- **`POST /announcements/admin`** : nouveau champ `customTheme` accepté à la racine du payload. Validation server-side dans `NormaliseCustomAnnouncementTheme`.
+
+### Nouveau côté serveur
+
+- **`NormaliseCustomAnnouncementTheme(input)`** — valide chaque champ indépendamment, retourne `null` si tout est vide (= drop le block persisté).
+- **`NormaliseCssColor(value)`** — accepte hex `#RRGGBB` ET `rgb()`/`rgba()` function notation. Regex strict anti-injection : rejette `red`, `hsl(...)`, `var(--x)`, ou toute concaténation CSS.
+
+### Nouveau côté client (`banner.js`)
+
+- **`buildCustomThemeCss(t)`** — génère les règles CSS dynamiquement à partir du DTO custom theme. Mirror les rules `.jf-ann-theme-velours` avec les valeurs admin substituées.
+- **`injectAnnTheme(themeKey, customTheme)`** — accepte le block custom et re-injecte le `<style>` à chaque changement (signature JSON pour dédupliquer).
+- **`resolveAnnTheme(a)`** — retourne `"custom"` tel quel quand `a.theme === "custom"` (au lieu de fallback velours).
+- Fonctionne dans **les 3 modes** : one-at-a-time, carousel (chaque slide peut avoir son custom), stack (toutes les cards utilisent le custom de la première).
+
+### Tests
+
+- **28 nouveaux cas xUnit** :
+  - `NormaliseAnnouncementTheme` whitelist mise à jour (5 thèmes au lieu de 4)
+  - `NormaliseCustomAnnouncementTheme` : null input, all-empty → null, partial valid kept-with-dropped-invalid
+  - `FontFamily` whitelist Theory (5 cas + case-insensitive)
+  - `BorderStyle` whitelist Theory (5 cas)
+  - `NormaliseCssColor` Theory (11 cas couvrant hex, rgba, rejet keyword/HSL/var/CSS injection)
+- 185 tests v0.5.4 → **213 tests v0.6.0** (+28).
+
+### Notes techniques
+
+- Pas de migration : `CustomAnnouncementTheme` est nullable, les configs v0.5.4 chargent avec `null` (= pas de custom configuré, le sélecteur global "Personnalisé" disponible mais fait un fallback Velours sur le rendu).
+- `BannerClientConfig` mirror le champ (exposé sur `/config`) pour cohérence avec `announcementTheme`, même si `banner.js` lit le custom theme uniquement via `/announcements/active`.
+
 ## [0.5.4.0] — 2026-05-20
 
 Phase 2 — **viewport simulator admin**. Tu peux maintenant prévisualiser l'overlay maintenance dans plusieurs tailles de devices sans changer de browser.

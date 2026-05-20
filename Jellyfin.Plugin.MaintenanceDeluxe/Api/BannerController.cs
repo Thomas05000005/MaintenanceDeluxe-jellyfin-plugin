@@ -605,23 +605,35 @@ public class BannerController : ControllerBase
         // Resolve the effective theme server-side: per-announcement override wins, otherwise
         // the global default. Saves the client a lookup and keeps the theme key on every item.
         var globalTheme = NormaliseAnnouncementTheme(config.AnnouncementTheme);
+        // v0.6.0: also ship the custom theme definition on each item that uses it, so
+        // banner.js can build the dynamic CSS without an extra API call.
+        var customTheme = config.CustomAnnouncementTheme;
 
         // Project to a stripped DTO — TargetRoles / TargetUserIds are admin-side metadata
         // that the end user doesn't need to see (and shouldn't, to avoid leaking the
         // existence of other targeted users in the same announcement).
-        var result = deliverable.Select(a => new
+        var result = deliverable.Select(a =>
         {
-            id = a.Id,
-            version = a.Version,
-            title = a.Title,
-            body = a.Body,
-            icon = a.Icon,
-            importance = a.Importance,
-            theme = string.IsNullOrEmpty(a.Theme) ? globalTheme : a.Theme,
-            publishedAt = a.PublishedAt,
-            comparisons = a.Comparisons,
-            ctaLabel = a.CtaLabel,
-            ctaUrl = a.CtaUrl
+            var effectiveTheme = string.IsNullOrEmpty(a.Theme) ? globalTheme : a.Theme;
+            return new
+            {
+                id = a.Id,
+                version = a.Version,
+                title = a.Title,
+                body = a.Body,
+                icon = a.Icon,
+                importance = a.Importance,
+                theme = effectiveTheme,
+                // Only attach customTheme when the effective theme actually needs it.
+                // Saves ~200 bytes per item when the user is on velours/oled/neon/glass.
+                customTheme = effectiveTheme == "custom" ? customTheme : null,
+                publishedAt = a.PublishedAt,
+                comparisons = a.Comparisons,
+                ctaLabel = a.CtaLabel,
+                ctaUrl = a.CtaUrl,
+                imageUrl = a.ImageUrl,
+                imageAlt = a.ImageAlt
+            };
         });
         return Ok(result);
     }
@@ -685,6 +697,7 @@ public class BannerController : ControllerBase
         {
             multiMode = config.AnnouncementMultiMode,
             theme = config.AnnouncementTheme,
+            customTheme = config.CustomAnnouncementTheme,
             items = result
         });
     }
@@ -762,6 +775,8 @@ public class BannerController : ControllerBase
         config.Announcements = incoming;
         config.AnnouncementMultiMode = AnnouncementHelper.NormaliseMultiMode(body.MultiMode);
         config.AnnouncementTheme = NormaliseAnnouncementTheme(body.Theme);
+        // v0.6.0: persist (or clear) the custom theme block.
+        config.CustomAnnouncementTheme = NormaliseCustomAnnouncementTheme(body.CustomTheme);
         // Drop tracking for announcements that no longer exist.
         AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
 
@@ -806,6 +821,12 @@ public class BannerController : ControllerBase
         /// <summary>Gets or sets the global announcement-modal theme key (whitelisted server-side).
         /// Applies to every announcement unless an entry has its own <see cref="Announcement.Theme"/> override.</summary>
         public string? Theme { get; set; }
+
+        /// <summary>Gets or sets the optional custom theme definition (v0.6.0). Persisted in
+        /// <see cref="PluginConfiguration.CustomAnnouncementTheme"/>. Pass null to delete the
+        /// custom theme entirely (the "custom" key in <see cref="Theme"/> will then fall back
+        /// to velours on the client).</summary>
+        public CustomAnnouncementTheme? CustomTheme { get; set; }
     }
 
     /// <summary>Resolves the current user from the Jellyfin auth context. Returns (null, false)
@@ -958,9 +979,12 @@ public class BannerController : ControllerBase
     // surface can evolve independently — maintenance is full-page and dramatic; annonces
     // are compact and need legibility-first variants.
     private static readonly HashSet<string> _validAnnouncementThemes =
-        new(StringComparer.Ordinal) { "velours", "oled", "neon", "glass" };
+        new(StringComparer.Ordinal) { "velours", "oled", "neon", "glass", "custom" };
 
-    /// <summary>Whitelists an announcement theme key. Fallback "velours".</summary>
+    /// <summary>Whitelists an announcement theme key. Fallback "velours".
+    /// "custom" is always in the whitelist; the client gracefully falls back to velours
+    /// if the customAnnouncementTheme block is missing/empty, so we don't have to know
+    /// about it at this normalisation level.</summary>
     internal static string NormaliseAnnouncementTheme(string? value)
     {
         if (!string.IsNullOrEmpty(value) && _validAnnouncementThemes.Contains(value)) return value;
@@ -974,6 +998,67 @@ public class BannerController : ControllerBase
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
         return _validAnnouncementThemes.Contains(trimmed) ? trimmed : null;
+    }
+
+    private static readonly HashSet<string> _validCustomThemeFonts =
+        new(StringComparer.Ordinal) { "inter", "jetbrains-mono", "space-grotesk", "manrope", "system" };
+
+    private static readonly HashSet<string> _validCustomThemeBorders =
+        new(StringComparer.Ordinal) { "solid", "glow", "dashed", "none" };
+
+    /// <summary>Validates a custom announcement theme block (v0.6.0). Invalid fields are
+    /// silently nulled out so the client falls back to the velours default for that field.
+    /// Returns null when the whole block is empty after normalisation (no point persisting
+    /// an all-null custom theme — the admin will see "no custom configured" in the UI).</summary>
+    internal static CustomAnnouncementTheme? NormaliseCustomAnnouncementTheme(CustomAnnouncementTheme? input)
+    {
+        if (input is null) return null;
+        var label = NormaliseOptionalString(input.Label, 40);
+        var accent = NormaliseHexColor(input.AccentColor);
+        var backdrop = NormaliseCssColor(input.BackdropColor);
+        var card = NormaliseCssColor(input.CardBackground);
+        var text = NormaliseHexColor(input.TextColor);
+        var font = !string.IsNullOrWhiteSpace(input.FontFamily)
+            && _validCustomThemeFonts.Contains(input.FontFamily.Trim().ToLowerInvariant())
+            ? input.FontFamily.Trim().ToLowerInvariant()
+            : null;
+        var border = !string.IsNullOrWhiteSpace(input.BorderStyle)
+            && _validCustomThemeBorders.Contains(input.BorderStyle.Trim().ToLowerInvariant())
+            ? input.BorderStyle.Trim().ToLowerInvariant()
+            : null;
+        // If nothing meaningful is set, drop the block entirely so the UI shows "not configured".
+        if (label is null && accent is null && backdrop is null && card is null
+            && text is null && font is null && border is null)
+        {
+            return null;
+        }
+        return new CustomAnnouncementTheme
+        {
+            Label = label,
+            AccentColor = accent,
+            BackdropColor = backdrop,
+            CardBackground = card,
+            TextColor = text,
+            FontFamily = font,
+            BorderStyle = border
+        };
+    }
+
+    private static readonly Regex _cssRgbaRegex = new(
+        @"^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)$",
+        RegexOptions.Compiled);
+
+    /// <summary>Looser variant of <see cref="NormaliseHexColor"/> that also accepts
+    /// rgb()/rgba() function notation, used for the custom theme backdrop / card background
+    /// which need alpha transparency (the velours default is rgba(0,0,0,.68)).
+    /// Validates lightly — does not allow expressions, CSS variables, or HSL.</summary>
+    internal static string? NormaliseCssColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var trimmed = value.Trim();
+        if (_hexColorRegex.IsMatch(trimmed)) return trimmed;
+        if (_cssRgbaRegex.IsMatch(trimmed)) return trimmed;
+        return null;
     }
 
     private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);

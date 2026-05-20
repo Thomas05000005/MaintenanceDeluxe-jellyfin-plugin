@@ -1709,7 +1709,24 @@
     // Lazy: only inject the theme CSS the first time it is needed in this DOM.
     // Each themed modal is scoped by an overlay class so multiple themes can
     // coexist on the same page (admin preview).
-    function injectAnnTheme(themeKey) {
+    function injectAnnTheme(themeKey, customTheme) {
+        // v0.6.0 custom theme path: re-inject every time the customTheme object changes
+        // (admin editing in the iframe preview hot-swaps values). Use a JSON signature so
+        // we don't pile up <style> tags but DO refresh when the admin tweaks a colour.
+        if (themeKey === "custom") {
+            injectAnnFontFaces();
+            var sig = customTheme ? JSON.stringify(customTheme) : "";
+            if (ANN_THEME_INJECTED["custom:" + sig]) return;
+            // Drop any previous custom theme style tag so the new one wins.
+            var prev = document.getElementById("jf-ann-theme-custom");
+            if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+            ANN_THEME_INJECTED["custom:" + sig] = true;
+            var sc = document.createElement("style");
+            sc.id = "jf-ann-theme-custom";
+            sc.textContent = buildCustomThemeCss(customTheme || {});
+            document.head.appendChild(sc);
+            return;
+        }
         var theme = ANN_THEMES[themeKey];
         if (!theme || ANN_THEME_INJECTED[themeKey]) return;
         ANN_THEME_INJECTED[themeKey] = true;
@@ -1723,8 +1740,52 @@
         document.head.appendChild(s);
     }
 
+    // Builds the CSS string for a custom theme. Mirrors the velours rules but with the
+    // admin-picked values substituted. Empty / null fields fall back to velours defaults
+    // so a partial customisation (e.g. just the accent) still produces a coherent look.
+    function buildCustomThemeCss(t) {
+        var accent = t.accentColor || "#C9A96E";
+        var backdrop = t.backdropColor || "rgba(0,0,0,.68)";
+        var card = t.cardBackground || "linear-gradient(180deg,rgba(40,28,22,.96) 0%,rgba(22,14,10,.97) 100%)";
+        var text = t.textColor || "#E6DBC9";
+        var fontMap = {
+            "inter": "'JFAnnInter',system-ui,sans-serif",
+            "jetbrains-mono": "'JFAnnJetBrains',ui-monospace,SFMono-Regular,Menlo,monospace",
+            "space-grotesk": "'JFAnnSpaceGrotesk',system-ui,sans-serif",
+            "manrope": "'JFAnnManrope',system-ui,sans-serif",
+            "system": "system-ui,sans-serif"
+        };
+        var font = fontMap[t.fontFamily] || fontMap["system"];
+        var border = t.borderStyle || "solid";
+        var borderCss = "";
+        if (border === "glow") {
+            borderCss = "box-shadow:0 0 32px -4px " + accent + ",0 18px 56px -16px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06) inset;border:0;";
+        } else if (border === "dashed") {
+            borderCss = "border:1px dashed " + accent + ";box-shadow:0 18px 56px -16px rgba(0,0,0,.6);";
+        } else if (border === "none") {
+            borderCss = "border:0;box-shadow:0 18px 56px -16px rgba(0,0,0,.6);";
+        } else {
+            borderCss = "border:1px solid " + accent + ";box-shadow:0 18px 56px -16px rgba(0,0,0,.6);";
+        }
+        return [
+            "#jf-ann-overlay.jf-ann-theme-custom{background:" + backdrop + ";backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-modal{",
+            "background:" + card + ";color:" + text + ";" + borderCss,
+            "}",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-title{color:" + text + ";font-weight:600;}",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-modal::before{",
+            "background:linear-gradient(90deg,transparent 0%," + accent + " 30%," + accent + " 70%,transparent 100%);}",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-btn-primary{background:" + accent + ";color:#000;border-color:transparent;}",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-compare-hl{background:" + accent + ";}",
+            "#jf-ann-overlay.jf-ann-theme-custom,",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-modal,",
+            "#jf-ann-overlay.jf-ann-theme-custom .jf-ann-btn{font-family:" + font + ";}"
+        ].join("");
+    }
+
     function resolveAnnTheme(a) {
         var key = a && a.theme;
+        if (key === "custom") return "custom"; // resolved with customTheme payload at inject time
         return (key && ANN_THEMES[key]) ? key : "velours";
     }
 
@@ -1917,9 +1978,10 @@
 
     // Creates the chromeless overlay (positioning, backdrop, theme class, accent var)
     // but leaves innerHTML empty. Caller fills it. Used by all three display modes.
-    function createAnnouncementOverlay(themeKey, accent) {
+    // customTheme is the v0.6.0 admin-defined theme block; used when themeKey === "custom".
+    function createAnnouncementOverlay(themeKey, accent, customTheme) {
         injectAnnouncementStyles();
-        injectAnnTheme(themeKey);
+        injectAnnTheme(themeKey, customTheme);
         // Defensive: if a previous overlay is still mid-transition (e.g. close() called
         // and showAnnouncementModal triggered for the next item before the CSS transition
         // completes), strip the stale node so the document never holds two #jf-ann-overlay
@@ -1952,7 +2014,7 @@
     function buildAnnouncementModal(a) {
         var themeKey = resolveAnnTheme(a);
         var accent = ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info;
-        var overlay = createAnnouncementOverlay(themeKey, accent);
+        var overlay = createAnnouncementOverlay(themeKey, accent, a.customTheme);
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
         overlay.innerHTML = buildAnnouncementCardHtml(a, /* withOk */ true);
         // Re-set aria-labelledby target since the card title no longer has an id by default.
@@ -2014,7 +2076,7 @@
         var first = list[0];
         var themeKey = resolveAnnTheme(first);
         var accent = ANN_IMPORTANCE_ACCENT[first.importance] || ANN_IMPORTANCE_ACCENT.info;
-        var overlay = createAnnouncementOverlay(themeKey, accent);
+        var overlay = createAnnouncementOverlay(themeKey, accent, first.customTheme);
         overlay.classList.add("jf-ann-carousel");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
 
@@ -2024,7 +2086,7 @@
             overlay.className = "jf-ann-theme-" + resolveAnnTheme(a) + " jf-ann-carousel";
             overlay.style.setProperty("--jf-ann-accent",
                 ANN_IMPORTANCE_ACCENT[a.importance] || ANN_IMPORTANCE_ACCENT.info);
-            injectAnnTheme(resolveAnnTheme(a));
+            injectAnnTheme(resolveAnnTheme(a), a.customTheme);
 
             var html = buildAnnouncementCardHtml(a, /* withOk */ true);
             // Append nav controls outside the card so they overlay backdrop, not card content.
@@ -2106,7 +2168,7 @@
         // so we just inherit the first card's accent for the stack. Each card still
         // gets its importance badge via its existing markup.
         var accent = ANN_IMPORTANCE_ACCENT[first.importance] || ANN_IMPORTANCE_ACCENT.info;
-        var overlay = createAnnouncementOverlay(themeKey, accent);
+        var overlay = createAnnouncementOverlay(themeKey, accent, first.customTheme);
         overlay.classList.add("jf-ann-stack");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
         // Override the default centering: in stack mode we want the scrollable column to

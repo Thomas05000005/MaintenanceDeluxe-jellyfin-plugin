@@ -944,11 +944,66 @@
                   <label><input type="radio" name="annThemeGlobal" value="oled" /> OLED Total Black</label>
                   <label><input type="radio" name="annThemeGlobal" value="neon" /> Glow Néon</label>
                   <label><input type="radio" name="annThemeGlobal" value="glass" /> Glassmorphism</label>
+                  <label><input type="radio" name="annThemeGlobal" value="custom" /> Personnalisé</label>
                 </div>
                 <div class="fieldDescription" style="margin-top:0.3em">
                   Style appliqué à toutes les annonces. Chaque annonce peut surcharger ce choix via son propre sélecteur dans l'éditeur ci-dessous.
                 </div>
               </div>
+
+              <!-- v0.6.0: Custom theme editor -->
+              <details id="annCustomThemeSection" style="margin-bottom: 1.2em; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 0.8em 1em">
+                <summary style="cursor:pointer;font-weight:500;font-size:0.95em">🎨 Éditeur de thème personnalisé</summary>
+                <div style="margin-top:0.8em">
+                  <div class="fieldDescription" style="margin-bottom:0.8em">
+                    Crée ton propre thème : palette, police, bordure. Active-le en choisissant "Personnalisé" ci-dessus, ou en le surchargeant pour une annonce spécifique. Champs vides = défaut Velours pour ce champ.
+                  </div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.8em">
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeLabel">Nom (affiché dans l'admin)</label>
+                      <input id="annCustomThemeLabel" is="emby-input" type="text" maxlength="40" placeholder="Mon thème" />
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeAccent">Couleur d'accent (#RRGGBB)</label>
+                      <input id="annCustomThemeAccent" is="emby-input" type="text" maxlength="7" placeholder="#C9A96E" />
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeBackdrop">Fond derrière la carte (hex ou rgba())</label>
+                      <input id="annCustomThemeBackdrop" is="emby-input" type="text" maxlength="64" placeholder="rgba(0,0,0,.68)" />
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeCard">Fond de la carte (hex ou rgba())</label>
+                      <input id="annCustomThemeCard" is="emby-input" type="text" maxlength="64" placeholder="#1c1810" />
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeText">Couleur du texte (#RRGGBB)</label>
+                      <input id="annCustomThemeText" is="emby-input" type="text" maxlength="7" placeholder="#E6DBC9" />
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeFont">Police</label>
+                      <select id="annCustomThemeFont" is="emby-select">
+                        <option value="system">Système (par défaut)</option>
+                        <option value="inter">Inter (SaaS)</option>
+                        <option value="jetbrains-mono">JetBrains Mono (tech)</option>
+                        <option value="space-grotesk">Space Grotesk (futuriste)</option>
+                        <option value="manrope">Manrope (rond)</option>
+                      </select>
+                    </div>
+                    <div class="inputContainer">
+                      <label class="inputLabel inputLabelUnfocused" for="annCustomThemeBorder">Bordure de la carte</label>
+                      <select id="annCustomThemeBorder" is="emby-select">
+                        <option value="solid">Solide</option>
+                        <option value="glow">Halo lumineux</option>
+                        <option value="dashed">Pointillés</option>
+                        <option value="none">Aucune</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="fieldDescription" style="margin-top:0.6em">
+                    Sauvegardé avec les autres réglages (bouton Enregistrer principal). Pour effacer le thème, vide tous les champs et enregistre.
+                  </div>
+                </div>
+              </details>
 
               <div style="margin-bottom: 1em">
                 <div class="inputLabel inputLabelUnfocused" style="display:block;margin-bottom:0.4em">Modèles rapides</div>

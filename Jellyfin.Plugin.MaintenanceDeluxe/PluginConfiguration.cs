@@ -613,6 +613,11 @@ public class BannerClientConfig
     public string AnnouncementMultiMode { get; set; } = "one-at-a-time";
     [JsonPropertyName("announcementTheme")]
     public string AnnouncementTheme { get; set; } = "velours";
+    // v0.6.0: exposed for parity with PluginConfiguration. banner.js doesn't read it
+    // directly (the custom theme block is delivered per-item via /announcements/active),
+    // but keeping the DTO mirror complete avoids drift between admin and client views.
+    [JsonPropertyName("customAnnouncementTheme")]
+    public CustomAnnouncementTheme? CustomAnnouncementTheme { get; set; }
 
     public static BannerClientConfig From(PluginConfiguration c) => new()
     {
@@ -640,7 +645,8 @@ public class BannerClientConfig
         UrlPopupHint = c.UrlPopupHint,
         LastModified = c.LastModified,
         AnnouncementMultiMode = c.AnnouncementMultiMode,
-        AnnouncementTheme = c.AnnouncementTheme
+        AnnouncementTheme = c.AnnouncementTheme,
+        CustomAnnouncementTheme = c.CustomAnnouncementTheme
     };
 #pragma warning restore CS1591
 }
@@ -802,7 +808,57 @@ public class PluginConfiguration : BasePluginConfiguration
 
     /// <summary>Gets or sets the global announcement-modal theme key. Default "velours".
     /// Each <see cref="Announcement"/> can override this via its own <see cref="Announcement.Theme"/>.
-    /// Whitelisted server-side against {"velours", "oled", "neon", "glass"}.</summary>
+    /// Whitelisted server-side against {"velours", "oled", "neon", "glass", "custom"} (the "custom"
+    /// key only accepted when <see cref="CustomAnnouncementTheme"/> is configured).</summary>
     [JsonPropertyName("announcementTheme")]
     public string AnnouncementTheme { get; set; } = "velours";
+
+    /// <summary>Gets or sets the optional custom announcement theme (v0.6.0). When set,
+    /// the admin can pick "custom" as a global theme or per-announcement override. Each
+    /// field is independently optional — unset fields fall back to the velours defaults
+    /// on the client, so partial customisation is fine (e.g. just change the accent colour).</summary>
+    [JsonPropertyName("customAnnouncementTheme")]
+    public CustomAnnouncementTheme? CustomAnnouncementTheme { get; set; }
+}
+
+/// <summary>
+/// Admin-defined custom announcement theme (v0.6.0). All fields are optional.
+/// Unset / invalid values cause the client to inherit the velours defaults for that field,
+/// so an admin can just override accent + body bg and keep the rest looking velours.
+/// </summary>
+public class CustomAnnouncementTheme
+{
+    /// <summary>Gets or sets the human-readable label shown in the admin theme picker.
+    /// Defaults to "Custom" if unset. Cap 40 chars.</summary>
+    [JsonPropertyName("label")]
+    public string? Label { get; set; }
+
+    /// <summary>Accent colour (#RRGGBB). Used for the top border, the primary button,
+    /// link colour and the comparison highlight pill. Null = velours default (#C9A96E).</summary>
+    [JsonPropertyName("accentColor")]
+    public string? AccentColor { get; set; }
+
+    /// <summary>Backdrop colour behind the card. Null = velours default (rgba(0,0,0,.68)).
+    /// Accepts any valid CSS colour (#RRGGBB or rgba(...)). Normalised server-side.</summary>
+    [JsonPropertyName("backdropColor")]
+    public string? BackdropColor { get; set; }
+
+    /// <summary>Card background colour. Null = velours default (rgba(28,24,22,.96)).</summary>
+    [JsonPropertyName("cardBackground")]
+    public string? CardBackground { get; set; }
+
+    /// <summary>Title / body text colour (#RRGGBB). Null = velours default (#E6DBC9).</summary>
+    [JsonPropertyName("textColor")]
+    public string? TextColor { get; set; }
+
+    /// <summary>Font family slug picked from the bundled webfont set, mirrors the keys of
+    /// the font dictionary in BannerController: "inter" | "jetbrains-mono" | "space-grotesk"
+    /// | "manrope" | null/"system" (system sans-serif). Server-side whitelist enforced.</summary>
+    [JsonPropertyName("fontFamily")]
+    public string? FontFamily { get; set; }
+
+    /// <summary>Border style hint. Whitelisted: "solid" (default, 1px solid accent) |
+    /// "glow" (box-shadow accent halo) | "dashed" | "none".</summary>
+    [JsonPropertyName("borderStyle")]
+    public string? BorderStyle { get; set; }
 }

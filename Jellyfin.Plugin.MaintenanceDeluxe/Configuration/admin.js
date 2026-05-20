@@ -3315,13 +3315,32 @@
             }
           ];
           var _annUsersCache = null;
-          var _annData = { items: [], multiMode: 'one-at-a-time', theme: 'velours' };
-          var ANN_THEME_OPTIONS = ['velours', 'oled', 'neon', 'glass'];
+          var _annData = { items: [], multiMode: 'one-at-a-time', theme: 'velours', customTheme: null };
+          // v0.6.0: 'custom' joins the 4 builtins. Available in the global picker
+          // AND the per-announcement override picker. UI surfaces it as disabled when
+          // _annData.customTheme is null (admin hasn't configured one yet).
+          var ANN_THEME_OPTIONS = ['velours', 'oled', 'neon', 'glass', 'custom'];
           var ANN_THEME_LABELS = {
             velours: 'Velours & Or',
             oled: 'OLED Total Black',
             neon: 'Glow Néon',
-            glass: 'Glassmorphism'
+            glass: 'Glassmorphism',
+            custom: 'Personnalisé'
+          };
+          var ANN_CUSTOM_FONT_OPTIONS = ['system', 'inter', 'jetbrains-mono', 'space-grotesk', 'manrope'];
+          var ANN_CUSTOM_FONT_LABELS = {
+            'system': 'Système (par défaut)',
+            'inter': 'Inter (SaaS)',
+            'jetbrains-mono': 'JetBrains Mono (tech)',
+            'space-grotesk': 'Space Grotesk (futuriste)',
+            'manrope': 'Manrope (rond)'
+          };
+          var ANN_CUSTOM_BORDER_OPTIONS = ['solid', 'glow', 'dashed', 'none'];
+          var ANN_CUSTOM_BORDER_LABELS = {
+            'solid': 'Solide',
+            'glow': 'Halo lumineux',
+            'dashed': 'Pointillés',
+            'none': 'Aucune'
           };
 
           function loadAnnouncements() {
@@ -3332,11 +3351,59 @@
                 }) : [];
                 _annData.multiMode = (resp && resp.multiMode) || 'one-at-a-time';
                 _annData.theme = (resp && resp.theme && ANN_THEME_OPTIONS.indexOf(resp.theme) >= 0) ? resp.theme : 'velours';
+                _annData.customTheme = (resp && resp.customTheme) || null;
                 setRadio('annMultiMode', _annData.multiMode);
                 setRadio('annThemeGlobal', _annData.theme);
+                populateCustomThemeEditor();
                 renderAnnouncementsList();
               })
               .catch(function () { _annData.items = []; renderAnnouncementsList(); });
+          }
+
+          // v0.6.0: read the custom-theme editor inputs and return a clean DTO
+          // (null fields wherever the input is empty so the server picks the velours fallback).
+          function collectCustomTheme() {
+            var get = function (id) {
+              var el = document.getElementById(id);
+              return el ? (el.value || '').trim() : '';
+            };
+            var label = get('annCustomThemeLabel');
+            var accent = get('annCustomThemeAccent');
+            var backdrop = get('annCustomThemeBackdrop');
+            var card = get('annCustomThemeCard');
+            var text = get('annCustomThemeText');
+            var fontEl = document.getElementById('annCustomThemeFont');
+            var font = fontEl ? fontEl.value : '';
+            var borderEl = document.getElementById('annCustomThemeBorder');
+            var border = borderEl ? borderEl.value : '';
+            var dto = {
+              label: label || null,
+              accentColor: accent || null,
+              backdropColor: backdrop || null,
+              cardBackground: card || null,
+              textColor: text || null,
+              fontFamily: (font && ANN_CUSTOM_FONT_OPTIONS.indexOf(font) >= 0 && font !== '') ? font : null,
+              borderStyle: (border && ANN_CUSTOM_BORDER_OPTIONS.indexOf(border) >= 0 && border !== '') ? border : null
+            };
+            // If everything is empty/null, return null (= delete the custom theme server-side).
+            var anySet = Object.keys(dto).some(function (k) { return dto[k] !== null; });
+            return anySet ? dto : null;
+          }
+
+          // v0.6.0: populates the custom-theme editor inputs from the persisted config.
+          function populateCustomThemeEditor() {
+            var ct = _annData.customTheme || {};
+            var setVal = function (id, v) {
+              var el = document.getElementById(id);
+              if (el) el.value = v || '';
+            };
+            setVal('annCustomThemeLabel', ct.label);
+            setVal('annCustomThemeAccent', ct.accentColor);
+            setVal('annCustomThemeBackdrop', ct.backdropColor);
+            setVal('annCustomThemeCard', ct.cardBackground);
+            setVal('annCustomThemeText', ct.textColor);
+            setVal('annCustomThemeFont', ct.fontFamily || 'system');
+            setVal('annCustomThemeBorder', ct.borderStyle || 'solid');
           }
 
           function loadAnnouncementUsers() {
@@ -3888,10 +3955,16 @@
             var items = collectAnnouncementsFromUi();
             var multiMode = pickRadio('annMultiMode', ANN_MULTIMODE_OPTIONS, 'one-at-a-time');
             var theme = pickRadio('annThemeGlobal', ANN_THEME_OPTIONS, 'velours');
+            var customTheme = collectCustomTheme(); // v0.6.0
             return ApiClient.ajax({
               type: 'POST',
               url: ApiClient.getUrl('MaintenanceDeluxe/announcements/admin'),
-              data: JSON.stringify({ announcements: items, multiMode: multiMode, theme: theme }),
+              data: JSON.stringify({
+                announcements: items,
+                multiMode: multiMode,
+                theme: theme,
+                customTheme: customTheme
+              }),
               contentType: 'application/json'
             }).then(loadAnnouncements);
           }
