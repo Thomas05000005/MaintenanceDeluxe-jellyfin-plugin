@@ -137,9 +137,115 @@ public class NormalisationTests
     [InlineData("rgba(0,0,0,.68);position:fixed", null)]    // CSS injection attempt
     [InlineData("", null)]
     [InlineData(null, null)]
+    // v0.6.1: tighter bounds + case-insensitive matching.
+    [InlineData("RGBA(255,0,0,.5)", "RGBA(255,0,0,.5)")]      // uppercase now accepted
+    [InlineData("Rgba(255,0,0,.5)", "Rgba(255,0,0,.5)")]      // mixed case OK
+    [InlineData("rgb(256, 0, 0)", null)]                      // R out of range
+    [InlineData("rgb(0, 256, 0)", null)]                      // G out of range
+    [InlineData("rgb(0, 0, 999)", null)]                      // B way out of range
+    [InlineData("rgba(255, 255, 255, 0.5)", "rgba(255, 255, 255, 0.5)")] // boundary OK
     public void NormaliseCssColor_AcceptsHexAndRgba(string? input, string? expected)
     {
         Assert.Equal(expected, BannerController.NormaliseCssColor(input));
+    }
+
+    // ── ValidateSchedules bounds (v0.6.1) ──────────────────────────────────────
+
+    [Fact]
+    public void ValidateSchedules_Fixed_InvertedDates_Rejected()
+    {
+        var sched = new List<BannerSchedule?>
+        {
+            new() { Type = "fixed", FixedStart = "2026-06-01T00:00:00Z", FixedEnd = "2026-05-01T00:00:00Z" }
+        };
+        var err = BannerController.ValidateSchedules(sched, "test");
+        Assert.NotNull(err);
+        Assert.Contains("fixedStart must be strictly before fixedEnd", err);
+    }
+
+    [Fact]
+    public void ValidateSchedules_Fixed_OpenEndedOk()
+    {
+        // Only one bound set = open-ended window, allowed.
+        var onlyStart = new List<BannerSchedule?>
+        {
+            new() { Type = "fixed", FixedStart = "2026-06-01T00:00:00Z" }
+        };
+        Assert.Null(BannerController.ValidateSchedules(onlyStart, "test"));
+    }
+
+    [Theory]
+    [InlineData(13, 1, 12, 31, "monthStart")]
+    [InlineData(1, 32, 12, 31, "dayStart")]
+    [InlineData(1, 1, 13, 31, "monthEnd")]
+    [InlineData(1, 1, 12, 32, "dayEnd")]
+    [InlineData(0, 1, 12, 31, "monthStart")]
+    [InlineData(1, 0, 12, 31, "dayStart")]
+    public void ValidateSchedules_Annual_OutOfRangeRejected(int ms, int ds, int me, int de, string expectedField)
+    {
+        var sched = new List<BannerSchedule?>
+        {
+            new() { Type = "annual", MonthStart = ms, DayStart = ds, MonthEnd = me, DayEnd = de }
+        };
+        var err = BannerController.ValidateSchedules(sched, "test");
+        Assert.NotNull(err);
+        Assert.Contains(expectedField, err);
+    }
+
+    [Fact]
+    public void ValidateSchedules_Annual_ValidWrapAccepted()
+    {
+        // Christmas range Dec 20 -> Jan 5 wraps the year, that's legal.
+        var sched = new List<BannerSchedule?>
+        {
+            new() { Type = "annual", MonthStart = 12, DayStart = 20, MonthEnd = 1, DayEnd = 5 }
+        };
+        Assert.Null(BannerController.ValidateSchedules(sched, "test"));
+    }
+
+    [Fact]
+    public void ValidateSchedules_Weekly_EmptyDaysRejected()
+    {
+        var sched = new List<BannerSchedule?> { new() { Type = "weekly", WeekDays = new() } };
+        var err = BannerController.ValidateSchedules(sched, "test");
+        Assert.NotNull(err);
+        Assert.Contains("at least one day", err);
+    }
+
+    [Fact]
+    public void ValidateSchedules_Weekly_NullDaysRejected()
+    {
+        var sched = new List<BannerSchedule?> { new() { Type = "weekly", WeekDays = null! } };
+        var err = BannerController.ValidateSchedules(sched, "test");
+        Assert.NotNull(err);
+        Assert.Contains("at least one day", err);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(7)]
+    [InlineData(99)]
+    public void ValidateSchedules_Weekly_OutOfRangeDayRejected(int badDay)
+    {
+        var sched = new List<BannerSchedule?>
+        {
+            new() { Type = "weekly", WeekDays = new() { 1, badDay, 3 } }
+        };
+        var err = BannerController.ValidateSchedules(sched, "test");
+        Assert.NotNull(err);
+        Assert.Contains("0..6", err);
+    }
+
+    [Fact]
+    public void ValidateSchedules_Daily_NoStructuralConstraint()
+    {
+        // Daily schedules don't have month/day bounds, so we just accept any time string.
+        var sched = new List<BannerSchedule?>
+        {
+            new() { Type = "daily", TimeStart = "09:00", TimeEnd = "17:00" },
+            new() { Type = "daily" } // no times set is fine too (matches everything)
+        };
+        Assert.Null(BannerController.ValidateSchedules(sched, "test"));
     }
 
     [Theory]

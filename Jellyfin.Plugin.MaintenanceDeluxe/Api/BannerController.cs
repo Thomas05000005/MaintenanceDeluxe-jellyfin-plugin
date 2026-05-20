@@ -894,14 +894,57 @@ public class BannerController : ControllerBase
     private static readonly HashSet<string> _validScheduleTypes =
         new(StringComparer.Ordinal) { "always", "fixed", "annual", "weekly", "daily" };
 
-    /// <summary>Returns an error message if any schedule in the collection has an invalid type, or null if all are valid.</summary>
-    private static string? ValidateSchedules(IEnumerable<BannerSchedule?> schedules, string context)
+    /// <summary>Returns an error message if any schedule in the collection has an invalid type
+    /// OR an inconsistent internal configuration, or null if all are valid.
+    /// v0.6.1: enforces bounds per type (fixed dates must be ordered, annual month/day in range,
+    /// weekly days non-empty and in [0,6]) so admins get an immediate error instead of an
+    /// announcement that silently never matches.</summary>
+    internal static string? ValidateSchedules(IEnumerable<BannerSchedule?> schedules, string context)
     {
         foreach (var sch in schedules)
         {
             if (sch is null) continue;
             if (!string.IsNullOrEmpty(sch.Type) && !_validScheduleTypes.Contains(sch.Type))
                 return $"Invalid schedule type \"{sch.Type}\" in {context}: must be one of always, fixed, annual, weekly, daily.";
+
+            switch (sch.Type)
+            {
+                case "fixed":
+                    // If both bounds are set and parseable, FixedStart must precede FixedEnd.
+                    if (!string.IsNullOrEmpty(sch.FixedStart) && !string.IsNullOrEmpty(sch.FixedEnd)
+                        && DateTimeOffset.TryParse(sch.FixedStart, out var fs)
+                        && DateTimeOffset.TryParse(sch.FixedEnd, out var fe)
+                        && fs >= fe)
+                    {
+                        return $"Invalid fixed schedule in {context}: fixedStart must be strictly before fixedEnd.";
+                    }
+                    break;
+
+                case "annual":
+                    // Bounds: 1..12 for months, 1..31 for days (allow Feb 30 etc. — calendar quirks
+                    // are admin's problem, but reject 13/32+ outright since the wrap logic would misbehave).
+                    if (sch.MonthStart is int ms && (ms < 1 || ms > 12))
+                        return $"Invalid annual schedule in {context}: monthStart must be in 1..12 (got {ms}).";
+                    if (sch.MonthEnd is int me && (me < 1 || me > 12))
+                        return $"Invalid annual schedule in {context}: monthEnd must be in 1..12 (got {me}).";
+                    if (sch.DayStart is int ds && (ds < 1 || ds > 31))
+                        return $"Invalid annual schedule in {context}: dayStart must be in 1..31 (got {ds}).";
+                    if (sch.DayEnd is int de && (de < 1 || de > 31))
+                        return $"Invalid annual schedule in {context}: dayEnd must be in 1..31 (got {de}).";
+                    break;
+
+                case "weekly":
+                    if (sch.WeekDays is null || sch.WeekDays.Count == 0)
+                        return $"Invalid weekly schedule in {context}: weekDays must contain at least one day (0=Sun..6=Sat).";
+                    foreach (var d in sch.WeekDays)
+                    {
+                        if (d < 0 || d > 6)
+                            return $"Invalid weekly schedule in {context}: weekDays must be in 0..6 (got {d}).";
+                    }
+                    break;
+
+                // "always" and "daily" have no extra structural constraints worth rejecting.
+            }
         }
         return null;
     }
@@ -1044,21 +1087,31 @@ public class BannerController : ControllerBase
         };
     }
 
+    // v0.6.1: tighter regex with named captures + IgnoreCase. The previous version accepted
+    // rgb(256,0,0) (out-of-range) and rejected "RGBA(...)" (case-sensitive). This one captures
+    // each component so we can validate the bounds in C# after the regex match.
     private static readonly Regex _cssRgbaRegex = new(
-        @"^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+)\s*)?\)$",
-        RegexOptions.Compiled);
+        @"^rgba?\(\s*(?<r>\d{1,3})\s*,\s*(?<g>\d{1,3})\s*,\s*(?<b>\d{1,3})\s*(,\s*(?<a>0|1|0?\.\d+)\s*)?\)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>Looser variant of <see cref="NormaliseHexColor"/> that also accepts
     /// rgb()/rgba() function notation, used for the custom theme backdrop / card background
     /// which need alpha transparency (the velours default is rgba(0,0,0,.68)).
-    /// Validates lightly — does not allow expressions, CSS variables, or HSL.</summary>
+    /// Validates lightly — does not allow expressions, CSS variables, or HSL.
+    /// v0.6.1: enforces R/G/B in [0,255] and case-insensitive matching.</summary>
     internal static string? NormaliseCssColor(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
         if (_hexColorRegex.IsMatch(trimmed)) return trimmed;
-        if (_cssRgbaRegex.IsMatch(trimmed)) return trimmed;
-        return null;
+        var m = _cssRgbaRegex.Match(trimmed);
+        if (!m.Success) return null;
+        // Reject out-of-range RGB components — the browser would silently drop the rule
+        // but the admin would have no feedback. Better to refuse at save time.
+        if (!int.TryParse(m.Groups["r"].Value, out var r) || r < 0 || r > 255) return null;
+        if (!int.TryParse(m.Groups["g"].Value, out var g) || g < 0 || g > 255) return null;
+        if (!int.TryParse(m.Groups["b"].Value, out var b) || b < 0 || b > 255) return null;
+        return trimmed;
     }
 
     private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);

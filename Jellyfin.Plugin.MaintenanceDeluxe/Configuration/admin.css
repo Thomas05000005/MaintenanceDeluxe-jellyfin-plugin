@@ -451,6 +451,12 @@
           text-transform: none; /* keep the label readable (mixed case + numbers) */
           margin-right: 4px;
         }
+        /* v0.6.1: incomplete-schedule variant — red dashed border + red text so the admin
+           knows the announcement is silently broken (will never be delivered). */
+        .jf-ann-summary-status.schedule-incomplete {
+          background: rgba(217, 83, 79, 0.16); color: #D9534F;
+          border: 1px dashed rgba(217, 83, 79, 0.5);
+        }
         .jf-ann-summary-chevron {
           opacity: 0.4; transition: transform 0.2s, opacity 0.2s;
           font-size: 18px; line-height: 1; flex-shrink: 0;
@@ -800,6 +806,30 @@
         }
         .jf-ann-preview-modal.theme-glass .pv-compare-row {
           border-bottom-color: rgba(255, 255, 255, 0.06);
+        }
+
+        /* v0.6.1: Custom theme preview - reads CSS variables set inline by
+           renderAnnouncementPreview when the announcement uses theme="custom".
+           The variables fallback to the velours defaults so a partially-configured
+           custom theme renders coherently. */
+        .jf-ann-preview-modal.theme-custom {
+          background: var(--jf-custom-card, linear-gradient(180deg, rgba(40,28,22,.96) 0%, rgba(22,14,10,.97) 100%));
+          color: var(--jf-custom-text, #E6DBC9);
+          font-family: var(--jf-custom-font, inherit);
+          border: var(--jf-custom-border, 1px solid var(--jf-ann-preview-accent, #C9A96E));
+        }
+        .jf-ann-preview-modal.theme-custom::before {
+          background: linear-gradient(90deg, transparent 0%, var(--jf-ann-preview-accent, #C9A96E) 30%, var(--jf-ann-preview-accent, #C9A96E) 70%, transparent 100%);
+        }
+        .jf-ann-preview-modal.theme-custom .pv-title {
+          color: var(--jf-custom-text, #F5EFE3);
+        }
+        .jf-ann-preview-modal.theme-custom .pv-btn.primary {
+          background: var(--jf-ann-preview-accent, #C9A96E);
+          color: #000;
+        }
+        .jf-ann-preview-modal.theme-custom .pv-compare-hl {
+          background: var(--jf-ann-preview-accent, #C9A96E);
         }
 
         /* Theme badge: shows which theme is currently active in the preview. */

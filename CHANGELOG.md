@@ -4,6 +4,59 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1.0] — 2026-05-20
+
+🩹 **Patch hotfix install + audit logique**. v0.6.0 ne pouvait pas être installé via le manifest Jellyfin à cause d'un typo `sourceUrl`. Cette release corrige ça + applique tous les fixes identifiés par l'audit logique pré-release.
+
+### Corrigé
+
+- **🔴 CRITIQUE — Install Jellyfin v0.6.0 cassée** : le `sourceUrl` du manifest utilisait `maintenance-deluxe-jellyfin-plugin` en minuscules. GitHub URLs sont case-sensitive sur les paths releases → `404 Not Found` → Jellyfin affichait "Une erreur s'est produite durant l'installation de l'extension". Tous les `sourceUrl` corrigés en `MaintenanceDeluxe-jellyfin-plugin`. Le hotfix initial a déjà été pushé sur main (commit `2a31e5f`) pour débloquer les installs v0.6.0 ; cette release le formalise.
+- **🟠 Custom theme invisible dans la preview admin** : `.theme-custom` n'existait pas dans `admin.css`, donc l'aperçu live d'une annonce custom affichait les styles velours par défaut. Ajouté `.jf-ann-preview-modal.theme-custom` avec vars CSS dynamiques injectées par `renderAnnouncementPreview` depuis `_annData.customTheme`.
+- **🟠 `ValidateSchedules` ne vérifiait que le `type`** : un admin pouvait sauvegarder un schedule `fixed` avec dates inversées, `annual` avec `monthStart=13`, ou `weekly` avec `weekDays=[]` — l'annonce devenait invisible en silence. La validation est étendue :
+  - `fixed` : rejet si `fixedStart >= fixedEnd`
+  - `annual` : rejet si `monthStart/monthEnd ∉ [1,12]` ou `dayStart/dayEnd ∉ [1,31]`
+  - `weekly` : rejet si `weekDays` null/vide ou jours `∉ [0,6]`
+- **🟠 `_pluginVersion: '0.3.2.0'`** hardcodée dans le payload d'export config — pas mise à jour depuis 7 releases. Extrait en constante `PLUGIN_VERSION` au top d'`admin.js`.
+- **🟠 Sélecteur "Personnalisé" cliquable sans config** : si `customAnnouncementTheme = null`, l'option du segmented control est maintenant **disabled** avec opacity 0.4 + tooltip explicatif. Auto-fallback velours si l'admin supprime sa config custom.
+- **🟠 Badge schedule trompeur** : `Fenêtre fixe`, `Annuel`, `Hebdo (aucun jour)` s'affichaient en bleu même quand le schedule était incomplet → annonce silencieusement jamais livrée. Nouveau badge rouge dashed `Fenêtre fixe (non configurée)` / `Annuel (non configuré)` / `Hebdo (aucun jour)` pour flagger les configs cassées.
+- **🟠 `expireAfterDays` pas clampé client** : taper `999` passait, serveur normalisait à `365`, admin pensait que `999` était persisté. Clamp client-side 1-365 + mise à jour de l'input pour refléter la valeur effective.
+- **🟠 `NormaliseCssColor` failles mineures** :
+  - `rgb(256, 0, 0)` accepté → CSS invalide silencieux. Bounds R/G/B in [0,255] enforced.
+  - `RGBA(...)` uppercase rejeté → admin perplexe. Regex passe en `IgnoreCase`.
+
+### Modifié
+
+- **`SAFE_URL_RE`** constante module-level dans `banner.js`. Remplace 4 regex protocol-relative-safe identiques dispersées (depuis v0.4.1). Plus de risque de divergence future.
+- **`ANN_TEMPLATES`** enrichis avec les champs v0.5.x :
+  - `🎃 Soirée Halloween` — schedule `annual` Oct 25 → Nov 1 préconfiguré
+  - `🎄 Fin d'année` — schedule `annual` Dec 20 → Jan 5 (wrap)
+  - `🎬 Nouveaux films` — `expireAfterDays: 14` pour que les "nouveaux contenus" disparaissent automatiquement après 2 semaines
+- **`docs/announcements.md`** complètement réécrit pour Phase 2 :
+  - Tableau du statut des 8 features Phase 2 (toutes ✅)
+  - Tableau complet des 19 champs `Announcement` avec types et defaults
+  - "Truth matrix" expliquant que les 6 filtres de livraison sont AND-combined
+  - Doc de la projection serveur `/announcements/active` (champs stripped + ajoutés)
+
+### Tests
+
+- 21 nouveaux cas xUnit :
+  - `ValidateSchedules_Fixed_InvertedDates_Rejected`
+  - `ValidateSchedules_Fixed_OpenEndedOk`
+  - `ValidateSchedules_Annual_OutOfRangeRejected` Theory (6 cas)
+  - `ValidateSchedules_Annual_ValidWrapAccepted`
+  - `ValidateSchedules_Weekly_EmptyDaysRejected`
+  - `ValidateSchedules_Weekly_NullDaysRejected`
+  - `ValidateSchedules_Weekly_OutOfRangeDayRejected` Theory (3 cas)
+  - `ValidateSchedules_Daily_NoStructuralConstraint`
+  - `NormaliseCssColor` étendu avec 6 nouveaux InlineData (case-insensitive RGBA, RGB out-of-range, boundary 255)
+- 213 tests v0.6.0 → **234 tests v0.6.1** (+21)
+
+### Notes techniques
+
+- Pas de migration : aucun champ ajouté, fixes défensifs uniquement.
+- `ValidateSchedules` est devenue `internal` (était `private`) pour permettre les tests directs.
+- Toutes les configs persistées v0.5.x / v0.6.0 chargent telles quelles.
+
 ## [0.6.0.0] — 2026-05-20
 
 🎉 **Phase 2 annonces complète**. Cette release ajoute la dernière feature manquante : un éditeur de thème custom. Tu peux maintenant créer ton propre look d'annonce sans toucher au code.

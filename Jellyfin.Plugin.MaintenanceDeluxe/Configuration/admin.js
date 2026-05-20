@@ -1,5 +1,11 @@
         /* global ApiClient, Dashboard */
         (function () {
+          // v0.6.1: bump this at every release. Used in the export payload's
+          // `_pluginVersion` so a config exported now is traceable to the version
+          // that produced it. The csproj <AssemblyVersion> remains the source of
+          // truth — keep this string aligned with it.
+          var PLUGIN_VERSION = '0.6.1.0';
+
           var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
             { label: '🔴 Alert', bg: '#d32f2f', color: '#ffffff' },
@@ -3043,7 +3049,7 @@
             return {
               _format: CONFIG_EXPORT_FORMAT,
               _exportedAt: new Date().toISOString(),
-              _pluginVersion: '0.3.2.0',
+              _pluginVersion: PLUGIN_VERSION,
               global: globalOut,
               maintenance: maintOut
             };
@@ -3256,7 +3262,33 @@
                 icon: '🎬', title: 'Nouveaux contenus ajoutés', version: '',
                 body: '**Cette semaine sur le serveur** :\n\n- \n- \n- \n\nBon visionnage !',
                 importance: 'info', isActive: true,
-                comparisons: [], targetRoles: ['user'], targetUserIds: []
+                comparisons: [], targetRoles: ['user'], targetUserIds: [],
+                // v0.6.1: auto-expire after 14 days so old "new" notices don't linger.
+                expireAfterDays: 14
+              }
+            },
+            {
+              key: 'halloween',
+              label: '🎃 Soirée Halloween (annuel)',
+              announcement: {
+                icon: '🎃', title: 'Soirée Halloween', version: '',
+                body: 'Le serveur a sa **collection horreur** prête pour Halloween.\n\n- \n- ',
+                importance: 'info', isActive: true,
+                comparisons: [], targetRoles: ['user'], targetUserIds: [],
+                // v0.6.1: pre-filled annual schedule Oct 25 -> Nov 1 every year.
+                schedule: { type: 'annual', monthStart: 10, dayStart: 25, monthEnd: 11, dayEnd: 1 }
+              }
+            },
+            {
+              key: 'christmas',
+              label: '🎄 Fin d\'année (annuel)',
+              announcement: {
+                icon: '🎄', title: 'Joyeuses fêtes', version: '',
+                body: 'Le serveur reste ouvert pendant toutes les vacances. **Bon visionnage en famille !**',
+                importance: 'info', isActive: true,
+                comparisons: [], targetRoles: [], targetUserIds: [],
+                // v0.6.1: annual Dec 20 -> Jan 5 (wraps year).
+                schedule: { type: 'annual', monthStart: 12, dayStart: 20, monthEnd: 1, dayEnd: 5 }
               }
             },
             {
@@ -3355,6 +3387,7 @@
                 setRadio('annMultiMode', _annData.multiMode);
                 setRadio('annThemeGlobal', _annData.theme);
                 populateCustomThemeEditor();
+                syncCustomThemeAvailability(); // v0.6.1: disable "Personnalisé" if not configured
                 renderAnnouncementsList();
               })
               .catch(function () { _annData.items = []; renderAnnouncementsList(); });
@@ -3388,6 +3421,37 @@
             // If everything is empty/null, return null (= delete the custom theme server-side).
             var anySet = Object.keys(dto).some(function (k) { return dto[k] !== null; });
             return anySet ? dto : null;
+          }
+
+          // v0.6.1: disable the "Personnalisé" radio in the global theme picker
+          // (and the per-announcement override select) when no custom theme is configured.
+          // Avoids the silent fallback-to-velours that confused admins picking "custom"
+          // without realising they had to configure it first.
+          function syncCustomThemeAvailability() {
+            var configured = !!_annData.customTheme;
+            // Global radio
+            var customRadio = document.querySelector('input[name="annThemeGlobal"][value="custom"]');
+            if (customRadio) {
+              customRadio.disabled = !configured;
+              var lbl = customRadio.closest('label');
+              if (lbl) lbl.style.opacity = configured ? '' : '0.4';
+              if (lbl) lbl.title = configured
+                ? ''
+                : 'Configure d\'abord ton thème personnalisé dans l\'éditeur ci-dessous.';
+              // If the global was set to "custom" but config dropped, fall back to velours.
+              if (!configured && customRadio.checked) {
+                _annData.theme = 'velours';
+                setRadio('annThemeGlobal', 'velours');
+              }
+            }
+            // Per-announcement override selects (one per row)
+            document.querySelectorAll('select[data-ann-field="theme"]').forEach(function (sel) {
+              var customOpt = sel.querySelector('option[value="custom"]');
+              if (customOpt) {
+                customOpt.disabled = !configured;
+                if (!configured && sel.value === 'custom') sel.value = '';
+              }
+            });
           }
 
           // v0.6.0: populates the custom-theme editor inputs from the persisted config.
@@ -3443,27 +3507,40 @@
             return Math.ceil(msLeft / 86400000);
           }
 
-          // Short label for a non-always schedule (e.g. "Planning fixe", "Annuel", "Lun-Mer-Ven 09:00-17:00").
-          // Returns null when the schedule is missing or type === 'always'.
+          // v0.6.1: schedule label + completeness flag. Returns { label, incomplete } so the
+          // badge can flag misconfigured schedules in red instead of silently lying with a
+          // "Fenêtre fixe" badge that points at an empty schedule.
           function summaryScheduleLabel(schedule) {
             if (!schedule || !schedule.type || schedule.type === 'always') return null;
             switch (schedule.type) {
-              case 'fixed': return 'Fenêtre fixe';
-              case 'annual': return 'Annuel';
+              case 'fixed': {
+                var hasStart = !!schedule.fixedStart;
+                var hasEnd = !!schedule.fixedEnd;
+                if (!hasStart && !hasEnd) return { label: 'Fenêtre fixe (non configurée)', incomplete: true };
+                return { label: 'Fenêtre fixe', incomplete: false };
+              }
+              case 'annual': {
+                var hasRange = schedule.monthStart && schedule.dayStart && schedule.monthEnd && schedule.dayEnd;
+                if (!hasRange) return { label: 'Annuel (non configuré)', incomplete: true };
+                return { label: 'Annuel', incomplete: false };
+              }
               case 'weekly': {
                 var days = schedule.weekDays || [];
-                if (days.length === 0) return 'Hebdo (aucun jour)';
-                if (days.length === 7) return 'Hebdo (chaque jour)';
+                if (days.length === 0) return { label: 'Hebdo (aucun jour)', incomplete: true };
+                if (days.length === 7) return { label: 'Hebdo (chaque jour)', incomplete: false };
                 var names = ['Di', 'Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa'];
-                return 'Hebdo: ' + days.map(function (d) { return names[d] || '?'; }).join(' ');
+                return {
+                  label: 'Hebdo: ' + days.map(function (d) { return names[d] || '?'; }).join(' '),
+                  incomplete: false
+                };
               }
               case 'daily': {
                 if (schedule.timeStart && schedule.timeEnd) {
-                  return 'Quotidien ' + schedule.timeStart + '-' + schedule.timeEnd;
+                  return { label: 'Quotidien ' + schedule.timeStart + '-' + schedule.timeEnd, incomplete: false };
                 }
-                return 'Quotidien';
+                return { label: 'Quotidien (sans plage horaire)', incomplete: false };
               }
-              default: return schedule.type;
+              default: return { label: schedule.type, incomplete: false };
             }
           }
 
@@ -3473,10 +3550,16 @@
           // the announcement has a non-always schedule, so the admin sees "Active + Annuel" at
           // a glance.
           function summaryLifecycleBadge(a) {
-            var scheduleLabel = summaryScheduleLabel(a.schedule);
-            var scheduleHtml = scheduleLabel
-              ? '<div class="jf-ann-summary-status schedule" title="Planning actif : ' + escAttr(scheduleLabel) + '">' + escHtml(scheduleLabel) + '</div>'
-              : '';
+            var scheduleInfo = summaryScheduleLabel(a.schedule);
+            var scheduleHtml = '';
+            if (scheduleInfo) {
+              var schedClass = scheduleInfo.incomplete ? 'schedule schedule-incomplete' : 'schedule';
+              var schedTitle = scheduleInfo.incomplete
+                ? 'Planning incomplet — l\'annonce ne sera jamais livrée tant que les champs ne sont pas remplis.'
+                : 'Planning actif : ' + scheduleInfo.label;
+              scheduleHtml = '<div class="jf-ann-summary-status ' + schedClass + '" title="' + escAttr(schedTitle) + '">'
+                           + escHtml(scheduleInfo.label) + '</div>';
+            }
             if (a.isDraft) {
               return scheduleHtml
                 + '<div class="jf-ann-summary-status draft" title="Cette annonce est en brouillon, elle n\'est pas livrée aux utilisateurs.">Brouillon</div>';
@@ -3544,6 +3627,39 @@
             });
           }
 
+          // v0.6.1: maps a font-family slug to a CSS font-family string for the admin preview.
+          // Mirrors the same mapping as buildCustomThemeCss in banner.js.
+          var ANN_CUSTOM_FONT_CSS = {
+            'inter': "'JFAnnInter', system-ui, sans-serif",
+            'jetbrains-mono': "'JFAnnJetBrains', ui-monospace, monospace",
+            'space-grotesk': "'JFAnnSpaceGrotesk', system-ui, sans-serif",
+            'manrope': "'JFAnnManrope', system-ui, sans-serif",
+            'system': 'system-ui, sans-serif'
+          };
+
+          // v0.6.1: builds the inline CSS-var declarations consumed by .theme-custom in admin.css.
+          // Reads from _annData.customTheme so the admin sees the actual custom theme he configured.
+          function buildCustomThemePreviewStyle() {
+            var ct = _annData.customTheme || {};
+            var parts = [];
+            if (ct.accentColor) parts.push('--jf-ann-preview-accent:' + ct.accentColor);
+            if (ct.cardBackground) parts.push('--jf-custom-card:' + ct.cardBackground);
+            if (ct.textColor) parts.push('--jf-custom-text:' + ct.textColor);
+            if (ct.fontFamily && ANN_CUSTOM_FONT_CSS[ct.fontFamily]) {
+              parts.push('--jf-custom-font:' + ANN_CUSTOM_FONT_CSS[ct.fontFamily]);
+            }
+            if (ct.borderStyle) {
+              var accent = ct.accentColor || '#C9A96E';
+              var border = ct.borderStyle === 'glow'
+                ? '0'
+                : ct.borderStyle === 'dashed' ? '1px dashed ' + accent
+                : ct.borderStyle === 'none' ? '0'
+                : '1px solid ' + accent;
+              parts.push('--jf-custom-border:' + border);
+            }
+            return parts.join(';');
+          }
+
           // Pure: builds the live-preview HTML matching what banner.js renders.
           function renderAnnouncementPreview(a) {
             var accent = ANN_ACCENT_BY_IMPORTANCE[a.importance] || ANN_ACCENT_BY_IMPORTANCE.info;
@@ -3554,7 +3670,14 @@
               : (_annData.theme || 'velours');
             var themeLabel = ANN_THEME_LABELS[effectiveTheme] || effectiveTheme;
             var inheriting = !a.theme;
-            var h = '<div class="jf-ann-preview-modal theme-' + effectiveTheme + '" style="--jf-ann-preview-accent:' + accent + '">';
+            // v0.6.1: when theme="custom", inject the custom theme CSS variables inline so
+            // the .theme-custom CSS rules in admin.css can read them.
+            var inlineStyle = '--jf-ann-preview-accent:' + accent;
+            if (effectiveTheme === 'custom') {
+              var customStyle = buildCustomThemePreviewStyle();
+              if (customStyle) inlineStyle = customStyle; // accent override included if set
+            }
+            var h = '<div class="jf-ann-preview-modal theme-' + effectiveTheme + '" style="' + inlineStyle + '">';
             h += '<div class="pv-head">';
             h += '<div class="pv-icon">' + escAnn(a.icon || '📣') + '</div>';
             h += '<h1 class="pv-title">' + escAnn(a.title || '(sans titre)') + '</h1>';
@@ -3908,10 +4031,16 @@
             var themeVal = themeSel ? themeSel.value : '';
             // v0.5.1: collect lifecycle fields. expireAfterDays as null when empty
             // (the server normalises 0/negative to null too, but cleaner to send null directly).
+            // v0.6.1: clamp client-side to 1..365 so the admin doesn't paste 999 and wonder
+            // why the server changed it back to 365.
             var expireInput = row.querySelector('[data-ann-field="expireAfterDays"]');
             var expireRaw = expireInput ? expireInput.value.trim() : '';
             var expireVal = expireRaw === '' ? null : parseInt(expireRaw, 10);
             if (expireVal !== null && (isNaN(expireVal) || expireVal <= 0)) expireVal = null;
+            else if (expireVal !== null && expireVal > 365) {
+              expireVal = 365;
+              if (expireInput) expireInput.value = '365'; // reflect the clamp in the UI
+            }
             // v0.5.2: collect schedule. "always" is the no-op default -- we send null instead
             // to keep the persisted config lean (the server treats null and {type:"always"} identically).
             var schedule = null;

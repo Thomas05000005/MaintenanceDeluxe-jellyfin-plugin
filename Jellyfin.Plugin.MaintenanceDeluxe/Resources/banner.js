@@ -13,6 +13,13 @@
     var POPUP_CLOSE_DELAY = 200; // ms to wait for fade-out before removing popup element
     var RESIZE_DEBOUNCE = 100;   // ms debounce on window resize before recomputing margin
     var NAV_DEBOUNCE = 50;       // ms debounce on SPA navigation events
+
+    // v0.6.1: centralised URL allowlist. Same regex previously duplicated 4x across
+    // the file (linkSafeUrl in mdToHtml, safeUrl in showBanner, ctaUrl in announcement
+    // builder, imageUrl in announcement builder). Allows http(s) absolute URLs and
+    // single-leading-slash paths. Explicitly rejects protocol-relative URLs (//evil.com)
+    // which would navigate to an arbitrary host when used in href/src attributes.
+    var SAFE_URL_RE = /^(https?:\/\/[^\/]|\/(?!\/))/i;
     var SEL_SKIN_HEADER = ".skinHeader";
     var SEL_SKIN_BODY_PAGE = ".skinBody .page";
 
@@ -508,8 +515,8 @@
             textSpan._urlHandler = null;
         }
         // Allowlist: absolute http(s) or single-leading-slash path (no `//host`).
-        var safeUrl = /^(https?:\/\/[^\/]|\/(?!\/))/i;
-        if (msg.url && safeUrl.test(msg.url)) {
+        // v0.6.1: see SAFE_URL_RE module-level constant.
+        if (msg.url && SAFE_URL_RE.test(msg.url)) {
             var targetUrl = msg.url;
             textSpan._urlHandler = function (e) {
                 e.preventDefault();
@@ -790,16 +797,11 @@
             return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
         }); };
         // safe-subset Markdown: bold, italic, lists, plus [text](url) links.
-        // URL allowlist: absolute http(s) OR a single-leading-slash path (not //...
-        // which is protocol-relative and would navigate to an arbitrary host).
-        // The (?!\/) lookahead rejects `//evil.com` while keeping `/foo`.
-        // encodeURI further escapes quote/angle that would break out of href.
-        // Match runs AFTER esc(), so [<script>](url) becomes [&lt;script&gt;](url).
-        var linkSafeUrl = /^(https?:\/\/[^\/]|\/(?!\/))/i;
+        // v0.6.1: uses module-level SAFE_URL_RE (see top of file).
         function renderInline(s) {
             return s
                 .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
-                    if (!linkSafeUrl.test(url)) return text; // strip the URL part but keep the visible text
+                    if (!SAFE_URL_RE.test(url)) return text; // strip the URL part but keep the visible text
                     return '<a href="' + encodeURI(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
                 })
                 .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
@@ -1940,7 +1942,7 @@
             html += "<div class=\"jf-ann-meta\">" + meta.join(" \u2022 ") + "</div>";
         }
         // v0.5.3: optional hero image between meta and body. Same allowlist as ctaUrl.
-        if (a.imageUrl && /^(https?:\/\/[^\/]|\/(?!\/))/i.test(a.imageUrl)) {
+        if (a.imageUrl && SAFE_URL_RE.test(a.imageUrl)) {
             var altText = a.imageAlt ? escAnn(a.imageAlt) : escAnn(a.title || "");
             html += "<img class=\"jf-ann-image\" src=\"" + encodeURI(a.imageUrl) + "\""
                  + " alt=\"" + altText + "\" loading=\"lazy\" />";
@@ -1962,8 +1964,8 @@
         }
         html += "<div class=\"jf-ann-footer\">";
         if (a.ctaLabel && a.ctaUrl) {
-            // Same safe-scheme allowlist as banner URLs (no protocol-relative //host).
-            if (/^(https?:\/\/[^\/]|\/(?!\/))/i.test(a.ctaUrl)) {
+            // v0.6.1: uses module-level SAFE_URL_RE.
+            if (SAFE_URL_RE.test(a.ctaUrl)) {
                 html += "<a class=\"jf-ann-btn\" href=\"" + encodeURI(a.ctaUrl) + "\" "
                      + "target=\"_blank\" rel=\"noopener noreferrer\">" + escAnn(a.ctaLabel) + "</a>";
             }

@@ -87,12 +87,67 @@ Testé sur Chrome / Firefox / Safari desktop, et sur les WebView mobiles Jellyfi
 
 Tu as corrigé une faute, ajouté une comparaison oubliée, ou simplement veux que tout le monde voie une annonce passée — bouton **Réinitialiser 'vue par'** dans l'éditeur de chaque annonce. Confirme et le tracking serveur est vidé pour cette annonce — au prochain login, tous les utilisateurs ciblés la re-voient.
 
-## Limites Phase 1 (v0.3.9)
+## Évolution : Phase 1 (v0.3.9) → Phase 2 (v0.5.x / v0.6.x)
 
-- **Mode d'affichage** : seul `one-at-a-time` est implémenté côté client. Les modes `carousel` (flèches navigation) et `stack` (toutes empilées) sont stockés mais retombent sur `one-at-a-time` à l'affichage. Implémentation prévue Phase 2.
-- **Viewport simulator dans l'admin** : pas de preview avec presets "mobile portrait / paysage / tablet / TV". Pour tester un rendu, créer l'annonce, l'activer pour ton compte uniquement, et ouvrir Jellyfin dans la fenêtre de la taille voulue. Phase 2.
-- **Image / screenshot** : non supporté pour l'instant. Phase 2.
-- **Schedule fixed/annual/weekly/daily** : non supporté (utilise juste `isActive`). Si tu as besoin de schedule, considère un toggle manuel ou attends Phase 2.
+Toute la Phase 2 est implémentée depuis v0.6.0. Les limites historiques sont closes :
+
+| Feature | Statut | Release |
+|---|---|---|
+| Mode `carousel` (chevrons + compteur 1/N) | ✅ | v0.5.0 |
+| Mode `stack` (toutes empilées scrollable) | ✅ | v0.5.0 |
+| Brouillon (`isDraft`) | ✅ | v0.5.1 |
+| Auto-expire (`expireAfterDays`, 1-365) | ✅ | v0.5.1 |
+| Schedule `fixed` / `annual` / `weekly` / `daily` | ✅ | v0.5.2 |
+| Image hero (`imageUrl` + `imageAlt`) | ✅ | v0.5.3 |
+| Viewport simulator admin (6 presets) | ✅ | v0.5.4 |
+| Éditeur de thème custom | ✅ | v0.6.0 |
+
+## Champs d'une annonce (v0.6.x complet)
+
+| Champ | Type | Default | Notes |
+|---|---|---|---|
+| `id` | string | server GUID | Stable, généré au premier save |
+| `title` | string | `""` | Cap 200 chars |
+| `body` | string (markdown safe-subset) | `""` | Cap 8000 chars |
+| `icon` | string | `📣` | Emoji single-char |
+| `version` | string | `""` | Cap 64 chars |
+| `importance` | enum | `"info"` | `info` / `update` / `warning` / `critical` |
+| `isActive` | bool | `true` | Toggle "publié" |
+| `isDraft` | bool | `false` | v0.5.1 — never delivered si `true` |
+| `expireAfterDays` | int? | `null` | v0.5.1 — 1-365, ou null = jamais |
+| `publishedAt` | ISO datetime | server now | Sort order |
+| `schedule` | object? | `null` | v0.5.2 — 5 types (always/fixed/annual/weekly/daily) |
+| `theme` | enum? | `null` (inherit) | v0.4.0 — override par annonce, 5 valeurs |
+| `imageUrl` | string? | `null` | v0.5.3 — `http(s)` ou `/path`, cap 2000 chars |
+| `imageAlt` | string? | `null` | v0.5.3 — a11y, cap 200 chars |
+| `ctaLabel` / `ctaUrl` | string? | `null` | Bouton CTA optionnel |
+| `comparisons` | array | `[]` | Avant/après, cap 20 entrées |
+| `targetRoles` | array | `[]` (= tous) | `user` / `admin` |
+| `targetUserIds` | array | `[]` (= tous) | UUIDs ciblés |
+
+## Truth matrix de livraison
+
+Une annonce est livrée à un user si **TOUTES** ces conditions sont vraies (AND-combined dans `IsTargetedAtUser`) :
+
+1. `IsActive == true` (admin l'a publiée)
+2. `IsDraft == false` (pas en préparation)
+3. **Pas expirée** (`PublishedAt + ExpireAfterDays >= now` si renseigné)
+4. **Schedule actif** (`IsScheduleActive(schedule, now)` — toujours `true` si `schedule.type == "always"` ou `null`)
+5. **Role match** (`TargetRoles` empty OU user role ∈ TargetRoles)
+6. **UserId match** (`TargetUserIds` empty OU user UUID ∈ TargetUserIds)
+
+Tu peux donc avoir une annonce **`isActive=true` mais qui n'apparaît jamais** parce qu'elle est `isDraft`, ou expirée, ou hors fenêtre schedule, ou ciblée sur d'autres users. Les badges admin reflètent cette logique (priorité affichage `draft > expired > inactive > schedule incomplet > active`).
+
+## Endpoint `GET /announcements/active` — projection serveur
+
+Le client ne reçoit **pas** les champs admin-side pour des raisons de privacy + perf :
+
+**Stripped de la réponse** :
+- `targetRoles`, `targetUserIds` — un user ne doit pas savoir qui d'autre est ciblé
+- `isActive`, `isDraft`, `expireAfterDays`, `schedule` — déjà filtrés serveur, inutile au client
+
+**Ajouté à la réponse** :
+- `customTheme` — joint uniquement aux items qui ont `theme == "custom"`, économise ~200 bytes par item sinon
 
 ## Endpoints API
 
