@@ -135,7 +135,8 @@ internal static class MaintenanceHelper
             var maint = config.MaintenanceMode;
             if (maint.IsActive) return;
 
-            var allUsers = userManager.Users.ToList();
+            // Jellyfin 10.11.x removed the IUserManager.Users property. Use GetUsers().
+            var allUsers = userManager.GetUsers().ToList();
             var preDisabled = SelectPreDisabledIds(allUsers);
             var whitelist = maint.WhitelistedUserIds ?? new List<string>();
             var toDisable = SelectUsersToDisable(allUsers, whitelist);

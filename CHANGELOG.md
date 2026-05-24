@@ -4,6 +4,51 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1.0] — 2026-05-21
+
+🔴 **HOTFIX CRITIQUE — Compatibilité Jellyfin 10.11.9**. Le plugin v0.8.0 crashait sur les serveurs Jellyfin ≥ 10.11.x avec un `MissingMethodException: IUserManager.get_Users()`, cascadant dans les handlers `ItemAdded`/`Updated`/`Removed` (via la stack DI partagée) et **cassant des fonctionnalités core de Jellyfin**.
+
+### Cause
+
+`IUserManager.Users` (propriété `IEnumerable<User>`) a été supprimée dans Jellyfin 10.11.x au profit de la **méthode** `GetUsers()`. Breaking change introduit en patch (entre 10.11.6 et 10.11.9), pas en minor — exceptionnel mais ça arrive. Notre csproj pinnait 10.11.6, l'utilisateur tourne sur 10.11.9.
+
+### Symptômes
+
+```
+System.MissingMethodException: Method not found:
+'System.Collections.Generic.IEnumerable`1<...User> 
+ MediaBrowser.Controller.Library.IUserManager.get_Users()'
+```
+
+3 routes/sites cassés :
+- `GET /MaintenanceDeluxe/users-summary` (widget whitelist admin)
+- `GET /MaintenanceDeluxe/announcements/admin` (totalUsers count)
+- `MaintenanceHelper.ActivateAsync` (boucle disable users à l'activation maintenance)
+
+### Fix
+
+- **SDK bump** : `Jellyfin.Controller` + `Jellyfin.Model` de `10.11.6` → `10.11.9`. Csproj plugin **et** csproj tests.
+- **3 substitutions** : `_userManager.Users` → `_userManager.GetUsers()` (sites listés ci-dessus). API substitution mécanique, aucune logique modifiée.
+- **`targetAbi: 10.11.9.0`** dans manifest.json.
+
+### Compatibilité
+
+| Jellyfin server | Plugin version |
+|---|---|
+| 10.11.6 → 10.11.8 | v0.8.0 (dernière compatible) |
+| 10.11.9+ | **v0.8.1+** |
+
+Le downgrade SDK n'est pas backward-compatible — un plugin build contre 10.11.9 ne tournera pas sur 10.11.6. Si tu es bloqué sur Jellyfin ≤ 10.11.8, reste sur v0.8.0.
+
+### Tests
+
+- 279/279 tests verts sur le nouveau SDK 10.11.9 (aucun test modifié, l'API change est dans `IUserManager` qui n'est pas mocké dans nos tests purs).
+- `node --check` + ASCII check toujours OK.
+
+### Note
+
+Pas de feature change. Strictement un hotfix ABI. Si tu utilises **JellyfinEnhanced** (autre plugin) qui crashe avec la même `MissingMethodException` dans `WatchlistMonitor`, c'est le même type de breaking change — à signaler à son auteur (n'a rien à voir avec MaintenanceDeluxe).
+
 ## [0.8.0.0] — 2026-05-21
 
 ♿ **Tour de fixes a11y + UX + CI robustesse** (4 agents en parallèle, +13 tests = 279 verts). Aucun nouveau champ — uniquement des améliorations défensives.

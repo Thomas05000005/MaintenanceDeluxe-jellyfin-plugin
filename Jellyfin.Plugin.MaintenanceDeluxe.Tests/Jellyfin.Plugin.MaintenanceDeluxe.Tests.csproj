@@ -19,8 +19,8 @@
       assembly. The plugin itself relies on Jellyfin server providing this DLL
       at runtime; the test process has to ship its own copy.
     -->
-    <PackageReference Include="Jellyfin.Model" Version="10.11.6" />
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.6" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
   </ItemGroup>
 
   <ItemGroup>

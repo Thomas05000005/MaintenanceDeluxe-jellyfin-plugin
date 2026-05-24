@@ -546,7 +546,10 @@ public class BannerController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetUsersSummary()
     {
-        var users = _userManager.Users
+        // Jellyfin 10.11.x removed the IUserManager.Users property in favour of GetUsers().
+        // Calling the missing property throws MissingMethodException at runtime on 10.11.9+
+        // and cascades into ItemAdded/Updated/Removed handlers, breaking core Jellyfin.
+        var users = _userManager.GetUsers()
             .Select(u => new
             {
                 id = u.Id.ToString(),
@@ -701,7 +704,7 @@ public class BannerController : ControllerBase
         var config = Plugin.Instance.Configuration;
         var seenLookup = config.AnnouncementsSeen.ToDictionary(e => e.AnnouncementId, e => e.UserIds.Count);
 
-        var totalUsers = _userManager.Users.Count();
+        var totalUsers = _userManager.GetUsers().Count();
         var result = config.Announcements.Select(a => new
         {
             announcement = a,

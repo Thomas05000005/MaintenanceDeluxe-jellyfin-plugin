@@ -2052,17 +2052,48 @@
         }).catch(function () { /* fire-and-forget, the next fetch will retry showing if not marked */ });
     }
 
-    function showAnnouncementModal(a, token, onDismissed) {
-        var overlay = buildAnnouncementModal(a);
-        // a11y v0.8.0: capture focus + scroll state BEFORE attaching the overlay so
-        // we can restore both at close time. Lock body+html scroll to prevent the
-        // background from scrolling under the modal (especially on iOS / overlays
-        // with backdrop-filter, where scroll bleed-through is the default).
+    // Captures the previously-focused element + body/html overflow before showing an
+    // announcement modal, then exposes a restore() that undoes both. Used by the three
+    // modal flavours (one-at-a-time, carousel, stack) which all need the same a11y
+    // hygiene: scroll lock so the page underneath does not scroll behind the modal,
+    // and focus restore so keyboard users land back where they were on close.
+    function captureModalA11yState() {
         var prevActive = document.activeElement;
         var prevHtmlOverflow = document.documentElement.style.overflow;
         var prevBodyOverflow = document.body ? document.body.style.overflow : "";
         document.documentElement.style.overflow = "hidden";
         if (document.body) document.body.style.overflow = "hidden";
+        return function restore() {
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            if (document.body) document.body.style.overflow = prevBodyOverflow;
+            if (prevActive && typeof prevActive.focus === "function") {
+                try { prevActive.focus(); } catch (e) {}
+            }
+        };
+    }
+
+    // Cycle focus inside a modal on Tab/Shift+Tab. getFocusables is called each Tab
+    // press so the cycle stays correct when buttons enable/disable mid-flow (e.g. the
+    // carousel disables the prev/next chevrons at the edges of the list).
+    function cycleModalFocus(getFocusables, ev) {
+        if (ev.key !== "Tab") return;
+        var focusables = getFocusables();
+        if (!focusables.length) { ev.preventDefault(); return; }
+        var firstEl = focusables[0];
+        var lastEl = focusables[focusables.length - 1];
+        var active = document.activeElement;
+        if (ev.shiftKey && active === firstEl) {
+            ev.preventDefault();
+            try { lastEl.focus(); } catch (e) {}
+        } else if (!ev.shiftKey && active === lastEl) {
+            ev.preventDefault();
+            try { firstEl.focus(); } catch (e) {}
+        }
+    }
+
+    function showAnnouncementModal(a, token, onDismissed) {
+        var overlay = buildAnnouncementModal(a);
+        var restoreA11y = captureModalA11yState();
         // Attach to documentElement (html), not body. Jellyfin sometimes sets a transform
         // or will-change on the body or its main wrapper, which would re-anchor our
         // position:fixed to that ancestor and break centering (modal would land in a
@@ -2080,41 +2111,23 @@
             if (okBtn) { try { okBtn.focus(); } catch (e) {} }
         });
 
+        function getFocusables() {
+            return overlay.querySelectorAll(
+                "a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
+        }
         function close() {
             overlay.classList.remove("visible");
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
-            // a11y v0.8.0: restore scroll lock + previous focus on close.
-            document.documentElement.style.overflow = prevHtmlOverflow;
-            if (document.body) document.body.style.overflow = prevBodyOverflow;
-            if (prevActive && typeof prevActive.focus === "function") {
-                try { prevActive.focus(); } catch (e) {}
-            }
+            restoreA11y();
             dismissAnnouncementOnServer(a.id, token).then(function () {
                 if (typeof onDismissed === "function") onDismissed();
             });
         }
         function onKey(ev) {
             if (ev.key === "Escape") { close(); return; }
-            // a11y v0.8.0: focus trap. The single-card modal has only one focusable
-            // (the OK button) plus an optional CTA link. We cycle through whatever is
-            // currently focusable inside the overlay so Tab never escapes the dialog.
-            if (ev.key === "Tab") {
-                var focusables = overlay.querySelectorAll(
-                    "a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
-                if (!focusables.length) { ev.preventDefault(); return; }
-                var firstEl = focusables[0];
-                var lastEl = focusables[focusables.length - 1];
-                var active = document.activeElement;
-                if (ev.shiftKey && active === firstEl) {
-                    ev.preventDefault();
-                    try { lastEl.focus(); } catch (e) {}
-                } else if (!ev.shiftKey && active === lastEl) {
-                    ev.preventDefault();
-                    try { firstEl.focus(); } catch (e) {}
-                }
-            }
+            cycleModalFocus(getFocusables, ev);
         }
         document.addEventListener("keydown", onKey);
 
@@ -2140,12 +2153,7 @@
         overlay.classList.add("jf-ann-carousel");
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
 
-        // a11y v0.8.0: capture focus + scroll state before opening so we can restore.
-        var prevActive = document.activeElement;
-        var prevHtmlOverflow = document.documentElement.style.overflow;
-        var prevBodyOverflow = document.body ? document.body.style.overflow : "";
-        document.documentElement.style.overflow = "hidden";
-        if (document.body) document.body.style.overflow = "hidden";
+        var restoreA11y = captureModalA11yState();
 
         // a11y v0.8.0: counter element is created ONCE and updated via textContent on
         // each navigation. Previously the counter was re-injected via innerHTML in
@@ -2197,12 +2205,7 @@
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
-            // a11y v0.8.0: restore scroll lock + previous focus.
-            document.documentElement.style.overflow = prevHtmlOverflow;
-            if (document.body) document.body.style.overflow = prevBodyOverflow;
-            if (prevActive && typeof prevActive.focus === "function") {
-                try { prevActive.focus(); } catch (e) {}
-            }
+            restoreA11y();
             if (typeof onAllDismissed === "function") onAllDismissed();
         }
 
@@ -2235,20 +2238,7 @@
             if (ev.key === "Escape") { close(); return; }
             if (ev.key === "ArrowLeft") { goTo(idx - 1); return; }
             if (ev.key === "ArrowRight") { goTo(idx + 1); return; }
-            if (ev.key === "Tab") {
-                var focusables = getCarouselFocusables();
-                if (!focusables.length) { ev.preventDefault(); return; }
-                var firstEl = focusables[0];
-                var lastEl = focusables[focusables.length - 1];
-                var active = document.activeElement;
-                if (ev.shiftKey && active === firstEl) {
-                    ev.preventDefault();
-                    try { lastEl.focus(); } catch (e) {}
-                } else if (!ev.shiftKey && active === lastEl) {
-                    ev.preventDefault();
-                    try { firstEl.focus(); } catch (e) {}
-                }
-            }
+            cycleModalFocus(getCarouselFocusables, ev);
         }
 
         function wire() {
@@ -2315,12 +2305,7 @@
         var firstTitle = overlay.querySelector(".jf-ann-title");
         if (firstTitle) firstTitle.id = "jf-ann-title";
 
-        // a11y v0.8.0: capture focus + scroll state before opening so we can restore.
-        var prevActive = document.activeElement;
-        var prevHtmlOverflow = document.documentElement.style.overflow;
-        var prevBodyOverflow = document.body ? document.body.style.overflow : "";
-        document.documentElement.style.overflow = "hidden";
-        if (document.body) document.body.style.overflow = "hidden";
+        var restoreA11y = captureModalA11yState();
 
         function close() {
             // Mark every announcement as seen on the server. Fire-and-forget is fine --
@@ -2332,35 +2317,20 @@
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
             document.removeEventListener("keydown", onKey);
-            // a11y v0.8.0: restore scroll lock + previous focus.
-            document.documentElement.style.overflow = prevHtmlOverflow;
-            if (document.body) document.body.style.overflow = prevBodyOverflow;
-            if (prevActive && typeof prevActive.focus === "function") {
-                try { prevActive.focus(); } catch (e) {}
-            }
+            restoreA11y();
             if (typeof onAllDismissed === "function") onAllDismissed();
+        }
+
+        // Primary focusable is data-jf-ann-close-all; we also include any CTA links
+        // the stacked cards may have rendered so Tab cycles through every action.
+        function getStackFocusables() {
+            return overlay.querySelectorAll(
+                "[data-jf-ann-close-all],a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
         }
 
         function onKey(ev) {
             if (ev.key === "Escape") { close(); return; }
-            // a11y v0.8.0: focus trap. Primary focusable is data-jf-ann-close-all.
-            // If multiple matches (defensive; we only render one), cycle through them.
-            // We also include any CTA links the stacked cards may have rendered.
-            if (ev.key === "Tab") {
-                var focusables = overlay.querySelectorAll(
-                    "[data-jf-ann-close-all],a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
-                if (!focusables.length) { ev.preventDefault(); return; }
-                var firstEl = focusables[0];
-                var lastEl = focusables[focusables.length - 1];
-                var active = document.activeElement;
-                if (ev.shiftKey && active === firstEl) {
-                    ev.preventDefault();
-                    try { lastEl.focus(); } catch (e) {}
-                } else if (!ev.shiftKey && active === lastEl) {
-                    ev.preventDefault();
-                    try { firstEl.focus(); } catch (e) {}
-                }
-            }
+            cycleModalFocus(getStackFocusables, ev);
         }
 
         var closeBtn = overlay.querySelector("[data-jf-ann-close-all]");
