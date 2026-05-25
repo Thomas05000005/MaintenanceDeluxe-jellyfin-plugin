@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.8.2.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "checksum": "F1285AF0576D9951291221247C9B27AC",
         "changelog": "v0.8.2 - Compat refresh Jellyfin 10.11.10. Aucun changement de code, aucun changement de feature : juste un rebuild contre le SDK Jellyfin 10.11.10 (release patch sortie cote serveur) + bump targetAbi de 10.11.9.0 a 10.11.10.0 pour que Jellyfin 10.11.10+ accepte l'install sans warning. AUDIT API : diff complet de IUserManager + ISessionManager entre 10.11.9 et 10.11.10 = 0 difference, toutes les methodes utilisees (GetUsers, GetUserById, GetUserByName, GetUserDto, UpdatePolicyAsync, Sessions) ont signature identique. v0.8.1 (build 10.11.9) marche aussi sur 10.11.10 grace a la forward-compat Jellyfin meme-minor, mais ce binaire v0.8.2 est strictement aligne sur la derniere API. TESTS : 279/279 verts sur SDK 10.11.10. PAS DE MIGRATION. Si tu es sur Jellyfin <= 10.11.8, reste sur v0.8.0. Si tu es sur 10.11.9, v0.8.1 ou v0.8.2 marchent les deux. Si tu es sur 10.11.10+, v0.8.2 recommande.",
         "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.8.2/MaintenanceDeluxe-v0.8.2.zip",
-        "timestamp": "2026-05-24T00:00:00"
+        "timestamp": "2026-05-25T07:35:50"
       },
       {
         "version": "0.8.1.0",
