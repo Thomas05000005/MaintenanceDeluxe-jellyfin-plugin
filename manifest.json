@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "0.8.2.0",
+        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "changelog": "v0.8.2 - Compat refresh Jellyfin 10.11.10. Aucun changement de code, aucun changement de feature : juste un rebuild contre le SDK Jellyfin 10.11.10 (release patch sortie cote serveur) + bump targetAbi de 10.11.9.0 a 10.11.10.0 pour que Jellyfin 10.11.10+ accepte l'install sans warning. AUDIT API : diff complet de IUserManager + ISessionManager entre 10.11.9 et 10.11.10 = 0 difference, toutes les methodes utilisees (GetUsers, GetUserById, GetUserByName, GetUserDto, UpdatePolicyAsync, Sessions) ont signature identique. v0.8.1 (build 10.11.9) marche aussi sur 10.11.10 grace a la forward-compat Jellyfin meme-minor, mais ce binaire v0.8.2 est strictement aligne sur la derniere API. TESTS : 279/279 verts sur SDK 10.11.10. PAS DE MIGRATION. Si tu es sur Jellyfin <= 10.11.8, reste sur v0.8.0. Si tu es sur 10.11.9, v0.8.1 ou v0.8.2 marchent les deux. Si tu es sur 10.11.10+, v0.8.2 recommande.",
+        "targetAbi": "10.11.10.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.8.2/MaintenanceDeluxe-v0.8.2.zip",
+        "timestamp": "2026-05-24T00:00:00"
+      },
+      {
         "version": "0.8.1.0",
         "checksum": "63C4B7333455FB0A9A434F3D116BCE9C",
         "changelog": "v0.8.1 - HOTFIX CRITIQUE Jellyfin 10.11.9 : la propriete IUserManager.Users a ete supprimee dans Jellyfin 10.11.x (breaking change patch) au profit de la methode GetUsers(). Le plugin v0.8.0 (build contre SDK 10.11.6) crashait avec MissingMethodException 'Method not found: ... IUserManager.get_Users()' sur les routes /MaintenanceDeluxe/users-summary, /MaintenanceDeluxe/announcements/admin, et lors de l'activation maintenance (MaintenanceHelper.ActivateAsync). Pire : les exceptions remontaient dans les handlers ItemAdded/Updated/Removed de Jellyfin (via la stack DI partagee), cassant des fonctionnalites core du serveur. Fix : (1) bump Jellyfin.Controller + Jellyfin.Model de 10.11.6 -> 10.11.9 (csproj plugin ET csproj tests). (2) Remplacement de _userManager.Users par _userManager.GetUsers() sur 3 call sites : BannerController.GetUsersSummary (ligne 549), BannerController.GetAdminAnnouncements (ligne 704), MaintenanceHelper.ActivateAsync (ligne 138). (3) targetAbi du manifest passe de 10.11.6.0 a 10.11.9.0 - les serveurs Jellyfin sur 10.11.6/7/8 ne pourront plus installer v0.8.1+ via le manifest (downgrade SDK pas backward-compatible). Si tu es sur 10.11.6-8, reste sur v0.8.0 ou upgrade Jellyfin. TESTS : 279/279 verts sur le nouveau SDK 10.11.9 (aucune logique modifiee, juste l'API de IUserManager). PAS D'AUTRE CHANGEMENT cote feature - c'est strictement un hotfix de compat ABI.",

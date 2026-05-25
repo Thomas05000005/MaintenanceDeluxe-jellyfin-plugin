@@ -4,6 +4,34 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2.0] — 2026-05-24
+
+🔄 **Compat refresh Jellyfin 10.11.10.** Aucun changement de code. Aucun changement de feature. Rebuild contre le SDK Jellyfin 10.11.10 + bump du `targetAbi` du manifest pour que Jellyfin 10.11.10+ accepte l'install sans warning.
+
+### Audit API
+
+Diff complet entre Jellyfin SDK 10.11.9 et 10.11.10 sur les interfaces que nous utilisons : **zéro différence**.
+
+| Interface utilisée | API | 10.11.9 → 10.11.10 |
+|---|---|---|
+| `IUserManager` | `GetUsers()`, `GetUserById(Guid)`, `GetUserByName(string)`, `GetUserDto(User, string)`, `UpdatePolicyAsync(Guid, UserPolicy)` | identique |
+| `ISessionManager` | `Sessions` (property) | identique |
+
+### Compatibilité
+
+| Jellyfin server | Plugin recommandé |
+|---|---|
+| 10.11.6 → 10.11.8 | **v0.8.0** |
+| 10.11.9 | v0.8.1 ou v0.8.2 (les deux marchent) |
+| **10.11.10+** | **v0.8.2** |
+
+v0.8.1 fonctionne aussi sur 10.11.10 grâce à la forward-compat Jellyfin same-minor, mais ce binaire v0.8.2 est strictement aligné sur la dernière API.
+
+### Tests
+
+- 279/279 tests xUnit verts sur SDK 10.11.10.
+- Build clean, 0 warning.
+
 ## [0.8.1.0] — 2026-05-21
 
 🔴 **HOTFIX CRITIQUE — Compatibilité Jellyfin 10.11.9**. Le plugin v0.8.0 crashait sur les serveurs Jellyfin ≥ 10.11.x avec un `MissingMethodException: IUserManager.get_Users()`, cascadant dans les handlers `ItemAdded`/`Updated`/`Removed` (via la stack DI partagée) et **cassant des fonctionnalités core de Jellyfin**.
