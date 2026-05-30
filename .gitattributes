@@ -1,0 +1,6 @@
+# Shell scripts MUST stay LF — they run on Linux CI runners, and a CRLF shebang
+# (`#!/usr/bin/env bash\r`) fails with a confusing "bad interpreter" error.
+*.sh text eol=lf
+
+# Python CI scripts likewise run on Linux runners.
+*.py text eol=lf
