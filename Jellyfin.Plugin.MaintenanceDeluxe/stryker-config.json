@@ -1,0 +1,14 @@
+{
+  "stryker-config": {
+    "project": "MaintenanceDeluxe.csproj",
+    "test-projects": [
+      "../Jellyfin.Plugin.MaintenanceDeluxe.Tests/Jellyfin.Plugin.MaintenanceDeluxe.Tests.csproj"
+    ],
+    "mutate": [
+      "**/AnnouncementHelper.cs",
+      "**/MaintenanceHelper.cs"
+    ],
+    "reporters": ["progress", "json", "html", "cleartext"],
+    "thresholds": { "high": 85, "low": 70, "break": 55 }
+  }
+}

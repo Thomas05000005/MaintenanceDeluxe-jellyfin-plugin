@@ -15,5 +15,9 @@ docker/config/
 # deployment bundles (built artefacts, don't commit)
 deploy/
 
+# Stryker.NET mutation testing output
+StrykerOutput/
+.stryker-tmp/
+
 # Macos
 .DS_Store

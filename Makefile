@@ -1,4 +1,4 @@
-.PHONY: build deploy update up down restart logs setup clean bump \
+.PHONY: build deploy update up down restart logs setup clean bump test mutation \
         _jsinjector _filetransform _meta
 
 PLUGIN_DLL := Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll
@@ -87,6 +87,20 @@ endif
 	@sed -i '' 's|<AssemblyVersion>.*</AssemblyVersion>|<AssemblyVersion>$(V).0</AssemblyVersion>|' $(CSPROJ)
 	@sed -i '' 's|<FileVersion>.*</FileVersion>|<FileVersion>$(V).0</FileVersion>|' $(CSPROJ)
 	@echo "→ Version bumped to $(V).0 — commit, push, then create tag v$(V) on GitHub."
+
+# ── tests ──────────────────────────────────────────────────────────────────────
+
+## run the xUnit suite (Release)
+test:
+	dotnet test Jellyfin.Plugin.MaintenanceDeluxe.Tests/Jellyfin.Plugin.MaintenanceDeluxe.Tests.csproj --configuration Release
+
+## mutation testing on the pure-logic helpers (anti-vacuous-test gate).
+## Requires: dotnet tool install -g dotnet-stryker. Reads stryker-config.json.
+## Breaks (exit 1) if the mutation score drops below the configured threshold.
+mutation:
+	@command -v dotnet-stryker >/dev/null 2>&1 \
+		|| (echo "dotnet-stryker not found — run: dotnet tool install -g dotnet-stryker"; exit 1)
+	cd Jellyfin.Plugin.MaintenanceDeluxe && dotnet-stryker
 
 # ── clean ──────────────────────────────────────────────────────────────────────
 

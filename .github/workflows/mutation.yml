@@ -1,0 +1,45 @@
+name: Mutation testing
+
+# Anti-vacuous-test gate. Runs Stryker.NET against the pure-logic helpers
+# (AnnouncementHelper, MaintenanceHelper) to prove the unit tests would actually
+# FAIL if the implementation regressed — a high line-coverage number alone can hide
+# tests that assert nothing. Kept OFF the PR-blocking CI on purpose: equivalent
+# mutants make a tight per-PR gate noisy. Instead it runs on demand and weekly, and
+# breaks (exit 1) only if the score drops below the threshold in stryker-config.json
+# (currently break: 55, observed score ~63%).
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    name: Stryker.NET (pure-logic helpers)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Install Stryker.NET
+        run: dotnet tool install -g dotnet-stryker
+
+      - name: Run mutation tests
+        working-directory: Jellyfin.Plugin.MaintenanceDeluxe
+        run: dotnet-stryker
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: Jellyfin.Plugin.MaintenanceDeluxe/StrykerOutput/**/reports/mutation-report.html
+          if-no-files-found: ignore
