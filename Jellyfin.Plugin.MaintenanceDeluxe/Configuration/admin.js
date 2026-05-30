@@ -4,7 +4,7 @@
           // `_pluginVersion` so a config exported now is traceable to the version
           // that produced it. The csproj <AssemblyVersion> remains the source of
           // truth — keep this string aligned with it.
-          var PLUGIN_VERSION = '0.8.2.0';
+          var PLUGIN_VERSION = '0.8.3.0';
 
           var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },

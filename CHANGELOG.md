@@ -4,6 +4,38 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3.0] — 2026-05-30
+
+🛡️ **Release de durcissement qualité — réponse à un audit adverse.** Aucun changement de feature, aucun changement de comportement du plugin. Le DLL livré est **fonctionnellement identique à v0.8.2**. L'essentiel de cette version est de l'infrastructure de test/CI qui ne part **pas** dans le zip installé, plus un refactor interne sans effet observable.
+
+### Code livré (DLL)
+
+- **Refactor behavior-preserving** : extraction de `MaintenanceHelper.SetUserDisabledAsync` — la glue Jellyfin (`GetUserDto` + `UpdatePolicyAsync`) qui était dupliquée dans les 3 boucles `Activate` / `Deactivate` / drift-check. Une seule implémentation testée, dépendant de délégués (interface segregation) plutôt que de tout `IUserManager`. C'est exactement le type de glue qui avait cassé sur le SDK 10.11.9. **Équivalence vérifiée par mutation testing**, pas seulement par lecture.
+
+### Infrastructure (repo, hors zip)
+
+- **Garde anti-tests-vacuous (Stryker.NET)** : mutation testing sur les helpers de logique pure (`AnnouncementHelper`, `MaintenanceHelper`). Workflow dédié (manuel + hebdomadaire), seuil de non-régression. Prouve que les tests échoueraient réellement si l'implémentation régressait — un score de couverture élevé peut masquer des tests qui n'assertent rien.
+- **+21 tests xUnit (295 → 316)** : durcissement `HasUserSeen`/`MarkSeen`, round-trip XML de `PluginConfiguration` (compat XML legacy + listes non-null), builders de payload webhook Discord/Slack/Generic, vecteurs XSS sur `SAFE_URL_RE`, et **15 tests d'intégration HTTP** qui pilotent `SaveConfig` / `SaveMaintenance` / `SaveAdminAnnouncements` à travers un **vrai** `Plugin` (`BasePlugin` sur dossier temp + `XmlSerializer` réel) avec preuve de persistance sur disque.
+- **Smoke test de déploiement réel qui gate les releases** : démarre un vrai serveur Jellyfin (matrix `10.11.6` plancher du `targetAbi` + `10.11.10` prod) avec le DLL monté, complète le wizard, s'authentifie en admin, puis appelle `/users-summary` et `/announcements/admin` — les endpoints qui appellent `IUserManager.GetUsers()`, **exactement la méthode** qui crashait en `MissingMethodException` sur 10.11.9 — et scanne les logs serveur. **Ce gate aurait attrapé le bug v0.8.0 avant publication.**
+
+### Compatibilité
+
+| Jellyfin server | Plugin recommandé |
+|---|---|
+| 10.11.6 → 10.11.8 | **v0.8.0** |
+| 10.11.9 | v0.8.1 ou v0.8.2 |
+| **10.11.10+** | **v0.8.3** (équivalent fonctionnel à v0.8.2) |
+
+### Tests
+
+- 316/316 tests xUnit verts sur SDK 10.11.10 (était 279 en v0.8.2).
+- Refactor `SetUserDisabledAsync` mutation-vérifié (toutes mutations KILLED).
+- Build clean, 0 warning.
+
+### Pas de migration
+
+Aucun nouveau champ de configuration, aucune action requise. Mise à jour transparente depuis v0.8.2.
+
 ## [0.8.2.0] — 2026-05-24
 
 🔄 **Compat refresh Jellyfin 10.11.10.** Aucun changement de code. Aucun changement de feature. Rebuild contre le SDK Jellyfin 10.11.10 + bump du `targetAbi` du manifest pour que Jellyfin 10.11.10+ accepte l'install sans warning.
