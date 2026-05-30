@@ -23,8 +23,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 10.11.6 = manifest targetAbi floor; 10.11.10 = current production server.
-        jellyfin: ["10.11.6", "10.11.10"]
+        # The build's targetAbi (manifest versions[0].targetAbi) is the FLOOR: a server
+        # older than it legitimately refuses the plugin ("Skipping disabled plugin").
+        # So we smoke only on servers >= targetAbi. Current targetAbi 10.11.10.0 -> 10.11.10.
+        # Add newer Jellyfin patch tags here as they ship to widen forward-compat coverage.
+        jellyfin: ["10.11.10"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -68,15 +71,21 @@ jobs:
       - name: Run smoke assertions
         run: bash scripts/smoke_test.sh http://localhost:8096
 
-      - name: Assert no plugin load / method-resolution errors in server log
+      - name: Assert plugin loaded cleanly (no load / method-resolution errors)
         run: |
           LOG=$(docker logs jf 2>&1 || true)
           echo "$LOG" | grep -i "MaintenanceDeluxe" || echo "(no MaintenanceDeluxe log lines)"
-          if echo "$LOG" | grep -iE "MissingMethodException|MethodAccessException|Failed to load plugin|Error loading|Could not load file or assembly"; then
+          # Positive: the assembly must actually be loaded on this server version.
+          if ! echo "$LOG" | grep -q "Loaded assembly Jellyfin.Plugin.MaintenanceDeluxe"; then
+            echo "::error::Plugin assembly was NOT loaded on Jellyfin ${{ matrix.jellyfin }} (targetAbi mismatch? plugin disabled?)"
+            exit 1
+          fi
+          # Negative: none of the known failure signatures may appear.
+          if echo "$LOG" | grep -iE "MissingMethodException|MethodAccessException|Failed to load plugin|Skipping disabled plugin.*MaintenanceDeluxe|Error loading|Could not load file or assembly"; then
             echo "::error::Plugin load / method-resolution error detected in Jellyfin ${{ matrix.jellyfin }} log"
             exit 1
           fi
-          echo "No load/method errors in log."
+          echo "Plugin loaded cleanly on Jellyfin ${{ matrix.jellyfin }}; no load/method errors."
 
       - name: Dump Jellyfin log (always)
         if: always()
