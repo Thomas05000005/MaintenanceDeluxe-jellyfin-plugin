@@ -579,4 +579,42 @@ public class AnnouncementHelperTests
         Assert.Equal(2, result.Count);
         Assert.Contains(validGuid, result);
     }
+
+    // ── Hardening (mutation testing showed kill-count == 1 for these) ─────────
+    // Each InlineData row is an independent test case, so a value mutation on
+    // HasUserSeen is now caught by several cases, not one fragile assertion block.
+
+    [Theory]
+    [InlineData("a1", "alice", true)]
+    [InlineData("a1", "bob", true)]
+    [InlineData("a1", "carol", false)]   // known announce, unknown user
+    [InlineData("a2", "alice", true)]
+    [InlineData("a2", "bob", false)]     // user saw a1 but not a2
+    [InlineData("zzz", "alice", false)]  // unknown announce entirely
+    public void HasUserSeen_Theory_MatchesPerEntryUserSet(string announceId, string userId, bool expected)
+    {
+        var tracking = new List<AnnouncementsSeenEntry>
+        {
+            new() { AnnouncementId = "a1", UserIds = new() { "alice", "bob" } },
+            new() { AnnouncementId = "a2", UserIds = new() { "alice" } }
+        };
+        Assert.Equal(expected, AnnouncementHelper.HasUserSeen(tracking, announceId, userId));
+    }
+
+    [Fact]
+    public void MarkSeen_TracksAcrossEntriesAndDedupes()
+    {
+        var tracking = new List<AnnouncementsSeenEntry>();
+        Assert.True(AnnouncementHelper.MarkSeen(tracking, "a1", "u1"));   // new entry + new user
+        Assert.True(AnnouncementHelper.MarkSeen(tracking, "a1", "u2"));   // same entry, new user
+        Assert.False(AnnouncementHelper.MarkSeen(tracking, "a1", "u2"));  // duplicate -> no-op
+        Assert.True(AnnouncementHelper.MarkSeen(tracking, "a2", "u1"));   // second entry
+        Assert.Equal(2, tracking.Count);
+        Assert.Equal(2, tracking.First(e => e.AnnouncementId == "a1").UserIds.Count);
+        Assert.Single(tracking.First(e => e.AnnouncementId == "a2").UserIds);
+        // After marking, HasUserSeen must agree (cross-method consistency).
+        Assert.True(AnnouncementHelper.HasUserSeen(tracking, "a1", "u1"));
+        Assert.True(AnnouncementHelper.HasUserSeen(tracking, "a2", "u1"));
+        Assert.False(AnnouncementHelper.HasUserSeen(tracking, "a2", "u2"));
+    }
 }

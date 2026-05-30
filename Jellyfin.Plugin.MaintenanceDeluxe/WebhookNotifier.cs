@@ -217,7 +217,9 @@ internal static class WebhookNotifier
 
     // ─────────── Payload builders ───────────
 
-    private static object BuildPayload(WebhookFormat format, WebhookEvent evt, MaintenanceSetting m) => format switch
+    // internal (was private) so tests can assert the serialised JSON shape per provider —
+    // catches a regression if Discord/Slack ever change their expected schema.
+    internal static object BuildPayload(WebhookFormat format, WebhookEvent evt, MaintenanceSetting m) => format switch
     {
         WebhookFormat.Discord => BuildDiscordPayload(evt, m),
         WebhookFormat.Slack => BuildSlackPayload(evt, m),

@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Jellyfin.Plugin.MaintenanceDeluxe.Api;
+using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
 using Xunit;
 
 namespace Jellyfin.Plugin.MaintenanceDeluxe.Tests;
@@ -143,5 +144,72 @@ public class WebhookNotifierTests
         using var resp = new HttpResponseMessage();
         resp.Headers.RetryAfter = new RetryConditionHeaderValue(DateTimeOffset.UtcNow.AddMinutes(-5));
         Assert.Equal(0, WebhookNotifier.TryGetRetryAfterSeconds(resp));
+    }
+
+    // ── Payload builders (were untested — a Discord/Slack schema regression used
+    //    to ship silently). We serialise the built payload and assert the provider
+    //    contract: Discord uses `embeds`, Slack uses `blocks`, generic uses `event`. ──
+
+    private static MaintenanceSetting SampleMaintenance() => new()
+    {
+        IsActive = true,
+        CustomTitle = "Mise a jour",
+        CustomSubtitle = "Retour dans 30 min",
+        Message = "fallback message",
+        StatusUrl = "https://status.example.com",
+        ScheduledEnd = new DateTime(2026, 5, 25, 20, 0, 0, DateTimeKind.Utc),
+        MaintenanceDisabledUserIds = new System.Collections.Generic.List<string> { "u1", "u2", "u3" },
+        WhitelistedUserIds = new System.Collections.Generic.List<string> { "admin1" }
+    };
+
+    private static string SerializePayload(WebhookFormat fmt, WebhookEvent evt) =>
+        System.Text.Json.JsonSerializer.Serialize(
+            WebhookNotifier.BuildPayload(fmt, evt, SampleMaintenance()));
+
+    [Fact]
+    public void BuildPayload_Discord_UsesEmbedsSchema()
+    {
+        var json = SerializePayload(WebhookFormat.Discord, WebhookEvent.Activated);
+        Assert.Contains("\"embeds\"", json);
+        Assert.Contains("\"title\"", json);
+        Assert.Contains("\"fields\"", json);
+        Assert.Contains("Mise a jour", json);          // CustomTitle surfaced
+        Assert.Contains("status.example.com", json);    // StatusUrl field
+        Assert.DoesNotContain("\"blocks\"", json);       // not the Slack schema
+    }
+
+    [Fact]
+    public void BuildPayload_Slack_UsesBlocksSchema()
+    {
+        var json = SerializePayload(WebhookFormat.Slack, WebhookEvent.Activated);
+        Assert.Contains("\"blocks\"", json);
+        Assert.Contains("\"type\"", json);
+        Assert.Contains("mrkdwn", json);
+        Assert.DoesNotContain("\"embeds\"", json);       // not the Discord schema
+    }
+
+    [Fact]
+    public void BuildPayload_Generic_UsesEventCodeSchema()
+    {
+        var json = SerializePayload(WebhookFormat.Generic, WebhookEvent.Activated);
+        Assert.Contains("\"event\"", json);
+        Assert.Contains("maintenance_activated", json);  // event code from GetEventMeta
+        Assert.Contains("\"disabledUserCount\":3", json); // count surfaced correctly
+        Assert.DoesNotContain("\"embeds\"", json);
+        Assert.DoesNotContain("\"blocks\"", json);
+    }
+
+    // WebhookEvent is internal, so it cannot appear in a public [Theory] signature
+    // (CS0051). Reference it only in the method body.
+    [Fact]
+    public void BuildPayload_Generic_DeactivatedEventCode()
+    {
+        Assert.Contains("maintenance_deactivated", SerializePayload(WebhookFormat.Generic, WebhookEvent.Deactivated));
+    }
+
+    [Fact]
+    public void BuildPayload_Generic_RestartingEventCode()
+    {
+        Assert.Contains("server_restarting", SerializePayload(WebhookFormat.Generic, WebhookEvent.Restarting));
     }
 }

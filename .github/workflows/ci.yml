@@ -47,6 +47,9 @@ jobs:
       - name: Syntax check admin.js
         run: node --check Jellyfin.Plugin.MaintenanceDeluxe/Configuration/admin.js
 
+      - name: XSS URL-allowlist vectors (SAFE_URL_RE in banner.js)
+        run: node scripts/test_banner_regex.js
+
       - name: Verify configPage.html no longer has inline script (extracted to admin.js since v0.3.7)
         run: |
           if grep -qE '<script[^>]*>[^<]' Jellyfin.Plugin.MaintenanceDeluxe/Configuration/configPage.html; then
