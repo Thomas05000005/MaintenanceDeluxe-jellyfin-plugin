@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using MediaBrowser.Model.Dto;
+using MediaBrowser.Model.Users;
 using Xunit;
 
 namespace Jellyfin.Plugin.MaintenanceDeluxe.Tests;
@@ -279,5 +282,84 @@ public class MaintenanceHelperTests
             id => byId.TryGetValue(id, out var u) ? u : null);
 
         Assert.Empty(drifted);
+    }
+
+    // ── SetUserDisabledAsync: the Jellyfin API glue shared by activate/deactivate/drift ──
+    // This is exactly the code path that broke on the 10.11.9 SDK (IUserManager change).
+    // Tested via two delegates (interface segregation) so no full IUserManager fake is needed.
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SetUserDisabledAsync_Success_SetsFlagAndReturnsTrue(bool disabled)
+    {
+        var user = MakeUser("alice");
+        UserPolicy? captured = null;
+        var capturedId = Guid.Empty;
+
+        var ok = await MaintenanceHelper.SetUserDisabledAsync(
+            _ => new UserDto { Policy = new UserPolicy { IsDisabled = !disabled } },
+            (id, p) => { capturedId = id; captured = p; return Task.CompletedTask; },
+            user.Id, user, disabled);
+
+        Assert.True(ok);
+        Assert.NotNull(captured);
+        Assert.Equal(disabled, captured!.IsDisabled);
+        Assert.Equal(user.Id, capturedId);
+    }
+
+    [Fact]
+    public async Task SetUserDisabledAsync_NullPolicyOnDto_UsesFreshPolicy()
+    {
+        var user = MakeUser("bob");
+        UserPolicy? captured = null;
+
+        var ok = await MaintenanceHelper.SetUserDisabledAsync(
+            _ => new UserDto { Policy = null },
+            (id, p) => { captured = p; return Task.CompletedTask; },
+            user.Id, user, disabled: true);
+
+        Assert.True(ok);
+        Assert.NotNull(captured);
+        Assert.True(captured!.IsDisabled);
+    }
+
+    [Fact]
+    public async Task SetUserDisabledAsync_UpdateThrows_ReturnsFalseAndDoesNotPropagate()
+    {
+        var user = MakeUser("carol");
+        var ok = await MaintenanceHelper.SetUserDisabledAsync(
+            _ => new UserDto { Policy = new UserPolicy() },
+            (id, p) => throw new InvalidOperationException("update boom"),
+            user.Id, user, disabled: true);
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task SetUserDisabledAsync_GetDtoThrows_ReturnsFalseAndDoesNotPropagate()
+    {
+        var user = MakeUser("dave");
+        var ok = await MaintenanceHelper.SetUserDisabledAsync(
+            _ => throw new InvalidOperationException("getdto boom"),
+            (id, p) => Task.CompletedTask,
+            user.Id, user, disabled: true);
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task SetUserDisabledAsync_BatchWithOneFailure_OthersStillProcessed()
+    {
+        // Mirrors the activate loop: one bad user must NOT block the rest of the batch.
+        var users = new[] { MakeUser("u1"), MakeUser("u2"), MakeUser("u3") };
+        var succeeded = 0;
+        foreach (var u in users)
+        {
+            var ok = await MaintenanceHelper.SetUserDisabledAsync(
+                _ => new UserDto { Policy = new UserPolicy() },
+                (id, p) => u.Username == "u2" ? throw new Exception("boom") : Task.CompletedTask,
+                u.Id, u, disabled: true);
+            if (ok) succeeded++;
+        }
+        Assert.Equal(2, succeeded); // u1 + u3 disabled, u2 skipped
     }
 }

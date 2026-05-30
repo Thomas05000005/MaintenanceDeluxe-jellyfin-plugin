@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Users;
 using Microsoft.Extensions.Logging;
 
@@ -122,6 +123,35 @@ internal static class MaintenanceHelper
     /// Only users successfully disabled are recorded in <c>maintenanceDisabledUserIds</c>;
     /// a per-user failure is logged and skipped rather than aborting the whole activation.
     /// </summary>
+    /// <summary>Sets a single user's IsDisabled policy flag through the Jellyfin user manager.
+    /// Returns true on success, false if the update threw (logged + swallowed so one bad record
+    /// never blocks the batch). Depends on two delegates rather than the full IUserManager
+    /// (interface segregation) so the activate / deactivate / drift-check loops share one tested
+    /// implementation of the Jellyfin API glue — the exact glue that broke on the 10.11.9 SDK.</summary>
+    internal static async Task<bool> SetUserDisabledAsync(
+        Func<User, UserDto> getUserDto,
+        Func<Guid, UserPolicy, Task> updatePolicyAsync,
+        Guid userId,
+        User user,
+        bool disabled,
+        ILogger? logger = null)
+    {
+        try
+        {
+            var dto = getUserDto(user);
+            var policy = dto.Policy ?? new UserPolicy();
+            policy.IsDisabled = disabled;
+            await updatePolicyAsync(userId, policy).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "Failed to set IsDisabled={Disabled} on user {UserName} ({UserId}) — skipping.",
+                disabled, user.Username ?? "?", userId);
+            return false;
+        }
+    }
+
     internal static async Task ActivateAsync(IUserManager userManager, ILogger? logger = null)
     {
         using var _scope = logger?.BeginScope("Activate");
@@ -144,18 +174,10 @@ internal static class MaintenanceHelper
             var successfullyDisabled = new List<string>();
             foreach (var user in toDisable)
             {
-                try
-                {
-                    var dto = userManager.GetUserDto(user, string.Empty);
-                    var policy = dto.Policy ?? new UserPolicy();
-                    policy.IsDisabled = true;
-                    await userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
+                if (await SetUserDisabledAsync(
+                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
+                        user.Id, user, disabled: true, logger).ConfigureAwait(false))
                     successfullyDisabled.Add(user.Id.ToString());
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogWarning(ex, "Failed to disable user {UserId} during maintenance activation — skipping.", user.Id);
-                }
             }
 
             maint.IsActive = true;
@@ -201,18 +223,10 @@ internal static class MaintenanceHelper
             int reenabled = 0;
             foreach (var (guid, user) in plan.ToReEnable)
             {
-                try
-                {
-                    var dto = userManager.GetUserDto(user, string.Empty);
-                    var policy = dto.Policy ?? new UserPolicy();
-                    policy.IsDisabled = false;
-                    await userManager.UpdatePolicyAsync(guid, policy).ConfigureAwait(false);
+                if (await SetUserDisabledAsync(
+                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
+                        guid, user, disabled: false, logger).ConfigureAwait(false))
                     reenabled++;
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogWarning(ex, "Failed to re-enable user {UserId} during deactivation — skipping.", guid);
-                }
             }
 
             maint.IsActive = false;
@@ -252,18 +266,12 @@ internal static class MaintenanceHelper
             var restoredNames = new List<string>();
             foreach (var (guid, user) in driftedUsers)
             {
-                try
+                if (await SetUserDisabledAsync(
+                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
+                        guid, user, disabled: true, logger).ConfigureAwait(false))
                 {
-                    var dto = userManager.GetUserDto(user, string.Empty);
-                    var policy = dto.Policy ?? new UserPolicy();
-                    policy.IsDisabled = true;
-                    await userManager.UpdatePolicyAsync(guid, policy).ConfigureAwait(false);
                     restored++;
                     restoredNames.Add(user.Username ?? guid.ToString());
-                }
-                catch (Exception ex)
-                {
-                    logger?.LogWarning(ex, "Failed to re-disable user {UserName} ({UserId}) during drift check.", user.Username ?? "?", guid);
                 }
             }
 
