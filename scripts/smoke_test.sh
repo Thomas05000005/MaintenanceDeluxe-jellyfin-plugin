@@ -56,11 +56,16 @@ wait_for "first-run wizard" "$BASE/Startup/Configuration" 200 70
 
 say "2. Complete the first-run startup wizard"
 c=$(code POST "$BASE/Startup/Configuration" -H 'Content-Type: application/json' \
-  -d '{"UICulture":"en-US","MetadataCountryCode":"US","PreferredMetadataLanguage":"en"}')
+  -d '{"ServerName":"smoke","UICulture":"en-US","MetadataCountryCode":"US","PreferredMetadataLanguage":"en"}')
 echo "POST /Startup/Configuration -> $c"
+# GET /Startup/User (GetFirstUser) materialises the first-user record that the POST
+# below updates. Without it, UpdateStartupUser returns 404 (no user to update).
+c=$(code GET "$BASE/Startup/User")
+echo "GET /Startup/User -> $c"
 c=$(code POST "$BASE/Startup/User" -H 'Content-Type: application/json' \
   -d "{\"Name\":\"$ADMIN_USER\",\"Password\":\"$ADMIN_PASS\"}")
 echo "POST /Startup/User -> $c"
+[ "$c" = "204" ] || [ "$c" = "200" ] || { echo "  body:"; head -c 400 /tmp/body; echo; }
 c=$(code POST "$BASE/Startup/Complete")
 echo "POST /Startup/Complete -> $c"
 
