@@ -4,13 +4,88 @@ on:
   push:
     tags:
       - "v*"
+  # Manual trigger so the smoke job can be validated against a real Jellyfin
+  # WITHOUT cutting a tag. On a manual run github.ref_type is 'branch', so the
+  # release job below is skipped (its `if`) and only `smoke` runs.
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # ─── gate: prove the built DLL actually loads + its endpoints resolve on a real
+  #     Jellyfin server, across the targetAbi floor and the current prod version.
+  #     Catches the runtime API-incompatibility bug class (MissingMethodException on
+  #     IUserManager.GetUsers() that shipped in v0.8.0) that no unit test can see.
+  smoke:
+    name: smoke (${{ matrix.jellyfin }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 10.11.6 = manifest targetAbi floor; 10.11.10 = current production server.
+        jellyfin: ["10.11.6", "10.11.10"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build Release DLL
+        run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+
+      - name: Stage plugin + meta.json into a Jellyfin config volume
+        run: |
+          PLUGDIR="$PWD/jf-config/plugins/MaintenanceDeluxe"
+          mkdir -p "$PLUGDIR"
+          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll "$PLUGDIR/"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m = json.loads(Path("manifest.json").read_text(encoding="utf-8"))[0]
+          v = m["versions"][0]
+          meta = {
+              "category": m["category"], "changelog": v["changelog"],
+              "description": m["description"], "guid": m["guid"], "name": m["name"],
+              "overview": m["overview"], "owner": m["owner"],
+              "targetAbi": v["targetAbi"], "timestamp": v["timestamp"],
+              "version": v["version"], "status": "Active", "autoUpdate": True, "assemblies": [],
+          }
+          Path("jf-config/plugins/MaintenanceDeluxe/meta.json").write_text(
+              json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+          print("staged meta.json for", m["name"], v["version"])
+          PY
+
+      - name: Run Jellyfin ${{ matrix.jellyfin }} with the plugin mounted
+        run: |
+          docker run -d --name jf -p 8096:8096 \
+            -v "$PWD/jf-config:/config" \
+            jellyfin/jellyfin:${{ matrix.jellyfin }}
+
+      - name: Run smoke assertions
+        run: bash scripts/smoke_test.sh http://localhost:8096
+
+      - name: Assert no plugin load / method-resolution errors in server log
+        run: |
+          LOG=$(docker logs jf 2>&1 || true)
+          echo "$LOG" | grep -i "MaintenanceDeluxe" || echo "(no MaintenanceDeluxe log lines)"
+          if echo "$LOG" | grep -iE "MissingMethodException|MethodAccessException|Failed to load plugin|Error loading|Could not load file or assembly"; then
+            echo "::error::Plugin load / method-resolution error detected in Jellyfin ${{ matrix.jellyfin }} log"
+            exit 1
+          fi
+          echo "No load/method errors in log."
+
+      - name: Dump Jellyfin log (always)
+        if: always()
+        run: docker logs jf 2>&1 | tail -200 || true
+
   release:
     name: build, package, release, update manifest
+    needs: smoke
+    if: ${{ github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (tag)
