@@ -170,6 +170,11 @@ jobs:
             exit 1
           fi
 
+      # ─── gate: full unit suite (ci.yml has no tag trigger, so the only thing that runs on a
+      #     tag is this workflow — without this step a C#-only regression could ship). ──────────
+      - name: Run xUnit tests
+        run: dotnet test Jellyfin.Plugin.MaintenanceDeluxe.Tests/Jellyfin.Plugin.MaintenanceDeluxe.Tests.csproj --configuration Release --logger "console;verbosity=normal"
+
       # ─── build + package ────────────────────────────────────────────────────
       - name: Build Release
         run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
@@ -233,14 +238,23 @@ jobs:
           fi
           echo "path=/tmp/changelog.txt" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release (idempotent)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            "${{ steps.zip.outputs.path }}" \
-            --title "${{ steps.version.outputs.tag }}" \
-            --notes-file "${{ steps.changelog.outputs.path }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          ZIP="${{ steps.zip.outputs.path }}"
+          NOTES="${{ steps.changelog.outputs.path }}"
+          # Idempotent: if the release already exists (e.g. a prior run created it but the
+          # downstream manifest patch failed and we're re-running the tag), update it and
+          # re-upload the asset with --clobber instead of dead-ending on "already exists".
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — updating notes and re-uploading asset."
+            gh release edit "$TAG" --title "$TAG" --notes-file "$NOTES"
+            gh release upload "$TAG" "$ZIP" --clobber
+          else
+            gh release create "$TAG" "$ZIP" --title "$TAG" --notes-file "$NOTES"
+          fi
 
       # ─── patch manifest.json on main, commit back ──────────────────────────
       - name: Switch to main and patch manifest.json

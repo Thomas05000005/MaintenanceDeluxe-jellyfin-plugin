@@ -20,8 +20,21 @@ internal static class AnnouncementHelper
     /// (5) if <c>TargetUserIds</c> is non-empty, the user's UUID must be in the list.
     /// An empty list at (4) or (5) means "no filter on that dimension". All filters are AND-combined.</summary>
     internal static bool IsTargetedAtUser(Announcement a, string userId, bool isAdmin)
+        => IsTargetedAtUser(a, userId, isAdmin, DateTimeOffset.Now);
+
+    /// <summary>Overload with an explicit evaluation moment (for tests). Production callers use the
+    /// no-<paramref name="now"/> overload, which passes <see cref="DateTimeOffset.Now"/> — the
+    /// SERVER's LOCAL time. This matters for recurring schedules (daily/weekly/annual + time
+    /// windows): the admin types wall-clock times meaning their local clock, and the visually
+    /// identical banner schedules in banner.js are evaluated in the VIEWER's browser-local time.
+    /// Evaluating announcements in UTC (the pre-v0.8.4 bug) made recurring announcements fire at
+    /// the wrong hours/days on any non-UTC server and diverge from the banners. Server-local time
+    /// is the closest single reference frame we can use server-side (we don't know each viewer's
+    /// timezone here); set the container's TZ env var to your timezone. Absolute checks
+    /// (<see cref="IsExpired"/> and the "fixed" schedule) use offset-aware DateTimeOffset
+    /// comparisons, so they are unaffected by the local-vs-UTC choice.</summary>
+    internal static bool IsTargetedAtUser(Announcement a, string userId, bool isAdmin, DateTimeOffset now)
     {
-        var now = DateTimeOffset.UtcNow;
         if (!a.IsActive) return false;
         if (a.IsDraft) return false;
         if (IsExpired(a, now)) return false;

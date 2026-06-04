@@ -359,8 +359,11 @@ public class BannerController : ControllerBase
         // regress, only stall briefly until real time catches up.
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         config.LastModified = Math.Max(config.LastModified, now);
-        Plugin.Instance.UpdateConfiguration(config);
-        Plugin.Instance.SaveConfiguration();
+        MaintenanceHelper.WithConfigLock(() =>
+        {
+            Plugin.Instance!.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+        });
         return NoContent();
     }
 
@@ -471,12 +474,9 @@ public class BannerController : ControllerBase
 
         if (!wasActive && maintenance.IsActive)
         {
-            // In-memory pointer update only — the helper does a single SaveConfiguration
-            // at the end of its critical section, after also writing IsActive/ActivatedAt
-            // and the disabled-user lists. Doing two saves here was a benign race window
-            // where a concurrent GET /config-admin could see post-controller-fields but
-            // pre-helper-state.
-            Plugin.Instance.UpdateConfiguration(config);
+            // The field mutations above are on the SAME object ActivateAsync persists, so we let
+            // the helper do the single, LOCKED SaveConfiguration — no separate out-of-lock write
+            // here (that prior write was the lost-update / torn-XML window the audit flagged).
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(
                 Plugin.Instance.Configuration.MaintenanceMode.Webhook,
@@ -487,9 +487,9 @@ public class BannerController : ControllerBase
         }
         else if (wasActive && !maintenance.IsActive)
         {
-            // Snapshot counts BEFORE deactivation clears the lists.
+            // Snapshot counts BEFORE deactivation clears the lists. DeactivateAsync persists the
+            // field mutations under the lock (same object), so no out-of-lock write here either.
             var snapshotForNotif = ClonePublicFields(Plugin.Instance.Configuration.MaintenanceMode);
-            Plugin.Instance.UpdateConfiguration(config);
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(
                 Plugin.Instance.Configuration.MaintenanceMode.Webhook,
@@ -500,9 +500,21 @@ public class BannerController : ControllerBase
         }
         else
         {
-            // No state transition → no helper involved → save here.
-            Plugin.Instance.UpdateConfiguration(config);
-            Plugin.Instance.SaveConfiguration();
+            // No state transition → no helper involved → save here, under the shared config lock.
+            // SaveMaintenance is async, so use the AWAITing lock (don't park a request thread on
+            // a synchronous _mutex.Wait while a drift tick / ActivateAsync holds it).
+            await MaintenanceHelper.WithConfigLockAsync(() =>
+            {
+                Plugin.Instance!.UpdateConfiguration(config);
+                Plugin.Instance.SaveConfiguration();
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
+
+            // If maintenance is active and the admin just edited the whitelist, re-enable any
+            // tracked-disabled user that is now whitelisted (runs AFTER the save above — and after
+            // the lock is released — so ReconcileWhitelistAsync can take the lock itself).
+            if (config.MaintenanceMode.IsActive)
+                await MaintenanceHelper.ReconcileWhitelistAsync(_userManager, _logger).ConfigureAwait(false);
         }
 
         return NoContent();
@@ -680,12 +692,18 @@ public class BannerController : ControllerBase
         var match = config.Announcements.FirstOrDefault(a => a.Id == id);
         if (match is null) return NoContent(); // unknown id: silent no-op (announcement may have been deleted)
 
-        var changed = AnnouncementHelper.MarkSeen(config.AnnouncementsSeen, id, userId);
-        if (changed)
+        // This endpoint is [Authorize] (ANY authenticated user) and called by every client at
+        // login, so concurrent calls race on the shared AnnouncementsSeen List<T>. The whole
+        // read-mutate-save must run under the single config lock (the in-place List.Add in
+        // MarkSeen is not thread-safe, and an unlocked SaveConfiguration could tear config.xml).
+        MaintenanceHelper.WithConfigLock(() =>
         {
-            Plugin.Instance.UpdateConfiguration(config);
-            Plugin.Instance.SaveConfiguration();
-        }
+            if (AnnouncementHelper.MarkSeen(config.AnnouncementsSeen, id, userId))
+            {
+                Plugin.Instance!.UpdateConfiguration(config);
+                Plugin.Instance.SaveConfiguration();
+            }
+        });
         return NoContent();
     }
 
@@ -795,11 +813,14 @@ public class BannerController : ControllerBase
         config.AnnouncementTheme = NormaliseAnnouncementTheme(body.Theme);
         // v0.6.0: persist (or clear) the custom theme block.
         config.CustomAnnouncementTheme = NormaliseCustomAnnouncementTheme(body.CustomTheme);
-        // Drop tracking for announcements that no longer exist.
-        AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
-
-        Plugin.Instance.UpdateConfiguration(config);
-        Plugin.Instance.SaveConfiguration();
+        // Drop tracking for announcements that no longer exist, then persist — both under the
+        // single config lock (PruneOrphanedSeenEntries mutates the shared AnnouncementsSeen list).
+        MaintenanceHelper.WithConfigLock(() =>
+        {
+            AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
+            Plugin.Instance!.UpdateConfiguration(config);
+            Plugin.Instance.SaveConfiguration();
+        });
         return NoContent();
     }
 
@@ -818,12 +839,14 @@ public class BannerController : ControllerBase
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
 
         var config = Plugin.Instance.Configuration;
-        var changed = AnnouncementHelper.ResetSeen(config.AnnouncementsSeen, id);
-        if (changed)
+        MaintenanceHelper.WithConfigLock(() =>
         {
-            Plugin.Instance.UpdateConfiguration(config);
-            Plugin.Instance.SaveConfiguration();
-        }
+            if (AnnouncementHelper.ResetSeen(config.AnnouncementsSeen, id))
+            {
+                Plugin.Instance!.UpdateConfiguration(config);
+                Plugin.Instance.SaveConfiguration();
+            }
+        });
         return NoContent();
     }
 
@@ -1039,11 +1062,14 @@ public class BannerController : ControllerBase
     /// - loopback IPv4/IPv6 (127.0.0.0/8, ::1)
     /// - link-local (169.254.0.0/16, fe80::/10) — includes AWS/Azure/GCP metadata endpoints
     /// - private RFC1918 ranges (10/8, 172.16/12, 192.168/16) and IPv6 ULA (fc00::/7)
-    /// - hostnames that resolve to any of the above
-    /// Localhost-by-name resolution is NOT performed here (DNS round-trip would add latency
-    /// and a TOCTOU window); we block the literal strings "localhost" / "localhost.localdomain"
-    /// as a coarse defense. Production users that need to reach the LAN can disable webhooks
-    /// or use a public reverse proxy.</summary>
+    /// - IPv4-mapped IPv6 literals of all the above (collapsed via MapToIPv4 first)
+    /// - a single trailing dot ("127.0.0.1." / "x.internal.") is normalised away first.
+    /// This is the ENTRY-TIME check on the literal host string (no DNS lookup, so it is fast and
+    /// gives the admin immediate feedback). The authoritative, rebinding-proof defence is the
+    /// ConnectCallback registered in <see cref="PluginServiceRegistrator"/>, which resolves and
+    /// re-validates the ACTUAL connection IP via <see cref="IsIpAddressSafeToCall"/> and disables
+    /// HTTP redirect following — so a public hostname that later resolves (or 30x-redirects) to an
+    /// internal address is still refused at connect time.</summary>
     internal static (bool Safe, string? Reason) IsWebhookHostSafe(string url)
     {
         if (string.IsNullOrWhiteSpace(url)) return (false, "Empty URL.");
@@ -1053,8 +1079,15 @@ public class BannerController : ControllerBase
         var host = uri.Host;
         if (string.IsNullOrEmpty(host)) return (false, "URL has no host.");
 
-        // Coarse hostname blocklist (no DNS lookup).
-        var hostLower = host.ToLowerInvariant();
+        // Normalise a single trailing dot: "127.0.0.1." / "metadata.google.internal." are treated
+        // as equivalent by the OS resolver, but a trailing dot would otherwise dodge BOTH the IP
+        // parse and the suffix blocklist below. Also strip IPv6 literal brackets.
+        var normHost = host.Trim('[', ']').TrimEnd('.');
+
+        // Coarse hostname blocklist (no DNS lookup here — DNS rebinding is defeated at connection
+        // time by the ConnectCallback in PluginServiceRegistrator, which re-validates the resolved
+        // IP. This static check is fast-fail UX + defence in depth).
+        var hostLower = normHost.ToLowerInvariant();
         if (hostLower == "localhost" || hostLower == "localhost.localdomain"
             || hostLower.EndsWith(".localhost", StringComparison.Ordinal)
             || hostLower.EndsWith(".internal", StringComparison.Ordinal)
@@ -1064,41 +1097,69 @@ public class BannerController : ControllerBase
         }
 
         // IP literal blocklist.
-        if (System.Net.IPAddress.TryParse(host.Trim('[', ']'), out var ip))
+        if (System.Net.IPAddress.TryParse(normHost, out var ip)
+            && !IsIpAddressSafeToCall(ip, out var reason))
         {
-            if (System.Net.IPAddress.IsLoopback(ip))
-                return (false, $"Webhook host '{host}' is loopback — refusing to call.");
-            if (ip.IsIPv6LinkLocal)
-                return (false, $"Webhook host '{host}' is IPv6 link-local — refusing to call.");
-            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            {
-                var bytes = ip.GetAddressBytes();
-                // 169.254.0.0/16 — link-local (incl. AWS/Azure/GCP metadata)
-                if (bytes[0] == 169 && bytes[1] == 254)
-                    return (false, $"Webhook host '{host}' is link-local (cloud metadata range) — refusing to call.");
-                // 10.0.0.0/8
-                if (bytes[0] == 10)
-                    return (false, $"Webhook host '{host}' is private (10.0.0.0/8) — refusing to call.");
-                // 172.16.0.0/12
-                if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-                    return (false, $"Webhook host '{host}' is private (172.16.0.0/12) — refusing to call.");
-                // 192.168.0.0/16
-                if (bytes[0] == 192 && bytes[1] == 168)
-                    return (false, $"Webhook host '{host}' is private (192.168.0.0/16) — refusing to call.");
-                // 0.0.0.0/8 — invalid source/dest in normal traffic
-                if (bytes[0] == 0)
-                    return (false, $"Webhook host '{host}' uses the 0.0.0.0/8 reserved range — refusing to call.");
-            }
-            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-            {
-                var bytes = ip.GetAddressBytes();
-                // fc00::/7 — Unique Local Address (IPv6 RFC1918 equivalent)
-                if ((bytes[0] & 0xFE) == 0xFC)
-                    return (false, $"Webhook host '{host}' is IPv6 ULA (fc00::/7) — refusing to call.");
-            }
+            return (false, $"Webhook host '{host}' {reason} — refusing to call.");
         }
 
         return (true, null);
+    }
+
+    /// <summary>Classifies an IP as safe (publicly routable) or unsafe for an outbound,
+    /// server-context call. Rejects loopback, IPv6 link-local, link-local 169.254.0.0/16
+    /// (incl. AWS/Azure/GCP metadata), RFC1918 (10/8, 172.16/12, 192.168/16), 0.0.0.0/8 and
+    /// IPv6 ULA (fc00::/7). IPv4-mapped IPv6 (::ffff:a.b.c.d) is collapsed to IPv4 FIRST so a
+    /// mapped literal like ::ffff:169.254.169.254 cannot dodge the IPv4 ranges. Shared by
+    /// <see cref="IsWebhookHostSafe"/> (entry-time UX check on the literal host) and the webhook
+    /// HttpClient ConnectCallback (connection-time re-validation of the RESOLVED IP, which is what
+    /// actually defeats DNS rebinding and redirect-to-internal).</summary>
+    internal static bool IsIpAddressSafeToCall(System.Net.IPAddress ip, out string? reason)
+    {
+        ArgumentNullException.ThrowIfNull(ip);
+
+        // Collapse IPv4-mapped IPv6 (::ffff:169.254.169.254 / ::ffff:10.0.0.1) so the IPv4 ranges
+        // below apply. (::ffff:127.0.0.1 is already caught by IsLoopback, but the mapped private /
+        // link-local forms are NOT, which is the bypass this guards against.)
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+
+        if (System.Net.IPAddress.IsLoopback(ip)) { reason = "is loopback"; return false; }
+        if (ip.IsIPv6LinkLocal) { reason = "is IPv6 link-local"; return false; }
+
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            var bytes = ip.GetAddressBytes();
+            // 169.254.0.0/16 — link-local (incl. AWS/Azure/GCP metadata)
+            if (bytes[0] == 169 && bytes[1] == 254) { reason = "is link-local (cloud metadata range)"; return false; }
+            // 10.0.0.0/8
+            if (bytes[0] == 10) { reason = "is private (10.0.0.0/8)"; return false; }
+            // 172.16.0.0/12
+            if (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) { reason = "is private (172.16.0.0/12)"; return false; }
+            // 192.168.0.0/16
+            if (bytes[0] == 192 && bytes[1] == 168) { reason = "is private (192.168.0.0/16)"; return false; }
+            // 100.64.0.0/10 — RFC6598 carrier-grade NAT shared space (reachable internal infra
+            // behind ISP CGNAT / some container overlay networks).
+            if (bytes[0] == 100 && (bytes[1] & 0xC0) == 0x40) { reason = "is CGNAT (100.64.0.0/10)"; return false; }
+            // 0.0.0.0/8 — invalid source/dest in normal traffic
+            if (bytes[0] == 0) { reason = "uses the 0.0.0.0/8 reserved range"; return false; }
+            // 255.255.255.255 — limited broadcast
+            if (bytes[0] == 255 && bytes[1] == 255 && bytes[2] == 255 && bytes[3] == 255) { reason = "is the broadcast address"; return false; }
+        }
+        else if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            var bytes = ip.GetAddressBytes();
+            // :: — IPv6 unspecified. Not loopback/link-local/ULA, but connecting to it commonly
+            // routes to this-host / loopback on the local stack, so it must be refused (residual
+            // bypass found in the v0.8.4 self-review).
+            if (ip.Equals(System.Net.IPAddress.IPv6Any)) { reason = "is the IPv6 unspecified address (::)"; return false; }
+            // fc00::/7 — Unique Local Address (IPv6 RFC1918 equivalent)
+            if ((bytes[0] & 0xFE) == 0xFC) { reason = "is IPv6 ULA (fc00::/7)"; return false; }
+            // fec0::/10 — deprecated IPv6 site-local (still reachable on some networks)
+            if (bytes[0] == 0xFE && (bytes[1] & 0xC0) == 0xC0) { reason = "is IPv6 site-local (fec0::/10)"; return false; }
+        }
+
+        reason = null;
+        return true;
     }
 
     // ── Rich overlay content normalisation ─────────────────────────────────────

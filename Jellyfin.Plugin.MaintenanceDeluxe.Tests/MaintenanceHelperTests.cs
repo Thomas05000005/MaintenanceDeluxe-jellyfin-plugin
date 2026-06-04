@@ -284,6 +284,84 @@ public class MaintenanceHelperTests
         Assert.Empty(drifted);
     }
 
+    // ─── v0.8.4 audit: drift check must respect the LIVE whitelist ───
+
+    [Fact]
+    public void SelectUsersNeedingReDisable_SkipsWhitelistedUsersEvenIfEnabled()
+    {
+        // bob was disabled by maintenance, then whitelisted + re-enabled by the admin.
+        // The drift check must NOT re-disable him (the bug: it did, every minute).
+        var alice = MakeUser("alice", isDisabled: false); // drifted, not whitelisted -> re-disable
+        var bob = MakeUser("bob", isDisabled: false);      // drifted BUT whitelisted -> leave alone
+        var users = new[] { alice, bob };
+        var byId = users.ToDictionary(u => u.Id, u => u);
+        var whitelist = new List<string> { bob.Id.ToString() };
+
+        var drifted = MaintenanceHelper.SelectUsersNeedingReDisable(
+            users.Select(u => u.Id.ToString()),
+            id => byId.TryGetValue(id, out var u) ? u : null,
+            whitelist);
+
+        Assert.Single(drifted);
+        Assert.Equal("alice", drifted[0].User.Username);
+    }
+
+    [Fact]
+    public void SelectUsersNeedingReDisable_WhitelistMatchIsCaseInsensitiveOnGuid()
+    {
+        // Tracked ids are lowercase Guid.ToString(); the whitelist preserves admin input casing.
+        var bob = MakeUser("bob", isDisabled: false);
+        var byId = new Dictionary<Guid, User> { [bob.Id] = bob };
+        var whitelistUpper = new List<string> { bob.Id.ToString().ToUpperInvariant() };
+
+        var drifted = MaintenanceHelper.SelectUsersNeedingReDisable(
+            new[] { bob.Id.ToString() },
+            id => byId.TryGetValue(id, out var u) ? u : null,
+            whitelistUpper);
+
+        Assert.Empty(drifted); // matched despite case difference
+    }
+
+    [Fact]
+    public void SelectWhitelistedToReEnable_PartitionsTrackedByWhitelist()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var c = Guid.NewGuid();
+        var tracked = new[] { a.ToString(), b.ToString(), c.ToString(), "not-a-guid" };
+        var whitelist = new List<string> { b.ToString().ToUpperInvariant(), Guid.NewGuid().ToString() };
+
+        var (toReEnable, stillTracked) = MaintenanceHelper.SelectWhitelistedToReEnable(tracked, whitelist);
+
+        Assert.Single(toReEnable);
+        Assert.Equal(b, toReEnable[0]);
+        Assert.Contains(a.ToString(), stillTracked);
+        Assert.Contains(c.ToString(), stillTracked);
+        Assert.Contains("not-a-guid", stillTracked); // malformed stays tracked, not re-enabled
+    }
+
+    [Fact]
+    public void SelectWhitelistedToReEnable_EmptyWhitelist_KeepsAllTracked()
+    {
+        var tracked = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
+        var (toReEnable, stillTracked) = MaintenanceHelper.SelectWhitelistedToReEnable(tracked, new List<string>());
+        Assert.Empty(toReEnable);
+        Assert.Equal(2, stillTracked.Count);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BuildGuidSet_ParsesValidSkipsInvalid(bool withNull)
+    {
+        var g1 = Guid.NewGuid();
+        var ids = withNull ? null : new[] { g1.ToString(), "garbage", g1.ToString().ToUpperInvariant() };
+        var set = MaintenanceHelper.BuildGuidSet(ids);
+        if (withNull) { Assert.Empty(set); return; }
+        Assert.Single(set);               // duplicate (case-different) collapses, garbage skipped
+        Assert.Contains(g1, set);
+    }
+
     // ── SetUserDisabledAsync: the Jellyfin API glue shared by activate/deactivate/drift ──
     // This is exactly the code path that broke on the 10.11.9 SDK (IUserManager change).
     // Tested via two delegates (interface segregation) so no full IUserManager fake is needed.

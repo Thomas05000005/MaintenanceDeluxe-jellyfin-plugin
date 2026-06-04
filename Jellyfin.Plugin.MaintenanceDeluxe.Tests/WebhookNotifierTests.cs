@@ -61,11 +61,72 @@ public class WebhookNotifierTests
     [InlineData("https://my-server.local/")]       // .local TLD
     [InlineData("https://something.internal/")]    // .internal TLD
     [InlineData("https://something.localhost/")]   // .localhost TLD
+    // v0.8.4 audit: bypasses that previously slipped through.
+    [InlineData("https://[::ffff:169.254.169.254]/")] // IPv4-mapped IPv6 -> cloud metadata
+    [InlineData("https://[::ffff:10.0.0.1]/")]         // IPv4-mapped IPv6 -> RFC1918
+    [InlineData("https://[::ffff:127.0.0.1]/")]        // IPv4-mapped IPv6 -> loopback
+    [InlineData("https://127.0.0.1./hook")]            // trailing-dot loopback
+    [InlineData("https://10.0.0.1./")]                 // trailing-dot RFC1918
+    [InlineData("https://metadata.google.internal./")] // trailing-dot internal name
+    [InlineData("https://localhost./")]                // trailing-dot localhost
+    // v0.8.4 self-review: residual IPv6 unspecified bypass + extra reserved ranges.
+    [InlineData("https://[::]/hook")]                  // IPv6 unspecified -> routes to this-host
+    [InlineData("https://100.64.0.1/")]                // CGNAT 100.64.0.0/10
     public void IsWebhookHostSafe_BlocksPrivateAndLoopbackHosts(string url)
     {
         var (safe, reason) = BannerController.IsWebhookHostSafe(url);
         Assert.False(safe, $"Expected '{url}' to be refused but was accepted.");
         Assert.NotNull(reason);
+    }
+
+    [Theory]
+    // v0.8.4 audit: ::ffff:public maps to a public IPv4 and must remain callable.
+    [InlineData("https://[::ffff:8.8.8.8]/hook", true)]
+    [InlineData("https://example.com./webhook", true)] // trailing dot on a public name is harmless
+    public void IsWebhookHostSafe_AcceptsMappedAndTrailingDotPublicHosts(string url, bool expectedSafe)
+    {
+        var (safe, _) = BannerController.IsWebhookHostSafe(url);
+        Assert.Equal(expectedSafe, safe);
+    }
+
+    // ── IsIpAddressSafeToCall (v0.8.4): the shared classifier used by the host check
+    //    AND the webhook HttpClient ConnectCallback (connection-time IP re-validation). ──
+    [Theory]
+    [InlineData("::", false)]                         // IPv6 unspecified (v0.8.4 self-review)
+    [InlineData("100.64.0.1", false)]                 // CGNAT 100.64.0.0/10
+    [InlineData("100.127.255.255", false)]            // CGNAT upper bound
+    [InlineData("fec0::1", false)]                    // IPv6 site-local
+    [InlineData("255.255.255.255", false)]            // broadcast
+    [InlineData("100.128.0.1", true)]                 // just ABOVE CGNAT -> public
+    [InlineData("100.63.0.1", true)]                  // just BELOW CGNAT -> public
+    [InlineData("127.0.0.1", false)]                 // loopback
+    [InlineData("::1", false)]                        // IPv6 loopback
+    [InlineData("169.254.169.254", false)]            // cloud metadata link-local
+    [InlineData("10.1.2.3", false)]                   // RFC1918 10/8
+    [InlineData("172.16.0.1", false)]                 // RFC1918 172.16/12
+    [InlineData("172.31.255.255", false)]             // RFC1918 172.16/12 upper
+    [InlineData("192.168.1.1", false)]                // RFC1918 192.168/16
+    [InlineData("0.0.0.0", false)]                     // 0.0.0.0/8
+    [InlineData("fe80::1", false)]                     // IPv6 link-local
+    [InlineData("fc00::1", false)]                     // IPv6 ULA
+    [InlineData("fd12:3456::1", false)]                // IPv6 ULA (fd00::/8 within fc00::/7)
+    [InlineData("::ffff:169.254.169.254", false)]      // mapped metadata
+    [InlineData("::ffff:10.0.0.1", false)]             // mapped RFC1918
+    [InlineData("::ffff:127.0.0.1", false)]            // mapped loopback
+    [InlineData("8.8.8.8", true)]                      // public
+    [InlineData("1.1.1.1", true)]                      // public
+    [InlineData("172.15.0.1", true)]                   // NOT private (boundary)
+    [InlineData("172.32.0.1", true)]                   // NOT private (boundary)
+    [InlineData("11.0.0.1", true)]                     // NOT private (boundary)
+    [InlineData("192.169.0.1", true)]                  // NOT private (boundary)
+    [InlineData("::ffff:8.8.8.8", true)]               // mapped public stays callable
+    [InlineData("2001:4860:4860::8888", true)]         // public IPv6 (Google DNS)
+    public void IsIpAddressSafeToCall_ClassifiesCorrectly(string ip, bool expectedSafe)
+    {
+        var safe = BannerController.IsIpAddressSafeToCall(System.Net.IPAddress.Parse(ip), out var reason);
+        Assert.Equal(expectedSafe, safe);
+        if (!expectedSafe) Assert.NotNull(reason);
+        else Assert.Null(reason);
     }
 
     [Theory]

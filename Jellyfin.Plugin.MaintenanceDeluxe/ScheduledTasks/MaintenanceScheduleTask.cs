@@ -70,15 +70,35 @@ public class MaintenanceScheduleTask : IScheduledTask
     /// <inheritdoc />
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        // Single Plugin.Instance read for the whole tick. The plugin singleton is
-        // initialised once at process startup and lives until shutdown, so this
-        // reference cannot become null partway through. plugin.Configuration is
-        // an object reference whose fields the helpers mutate in place, so we
-        // re-read plugin.Configuration.MaintenanceMode at each branch boundary
-        // to see the post-helper state without re-fetching the singleton.
         var plugin = Plugin.Instance;
         if (plugin is null) return;
 
+        try
+        {
+            await RunScheduleTickAsync(plugin, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw; // honour task cancellation / shutdown
+        }
+        catch (Exception ex)
+        {
+            // Resilience: a transient fault in ONE tick must not propagate out of the scheduled
+            // task and skip every FUTURE tick (which would suspend scheduled deactivation/restart
+            // indefinitely). Log and let the next interval retry.
+            _logger.LogError(ex, "MaintenanceDeluxe schedule tick failed; will retry on the next interval.");
+        }
+
+        progress.Report(100);
+    }
+
+    // Single Plugin.Instance read for the whole tick. The plugin singleton is initialised once at
+    // process startup and lives until shutdown, so this reference cannot become null partway
+    // through. plugin.Configuration is an object reference whose fields the helpers mutate in
+    // place, so we re-read plugin.Configuration.MaintenanceMode at each branch boundary to see the
+    // post-helper state without re-fetching the singleton.
+    private async Task RunScheduleTickAsync(Plugin plugin, CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
 
         // ── Startup log (once per process lifetime) ────────────────────────────────
@@ -100,16 +120,34 @@ public class MaintenanceScheduleTask : IScheduledTask
             await MaintenanceHelper.EnsureUsersDisabledAsync(_userManager, _logger).ConfigureAwait(false);
 
         // ── Schedule: auto-activate ────────────────────────────────────────────────
+        // Guard with ScheduledEnd: if the whole window already elapsed (e.g. server was down for
+        // it and starts up afterwards), don't activate a maintenance that should be over.
         var maint = plugin.Configuration.MaintenanceMode;
         if (maint.ScheduleEnabled
             && maint.ScheduledStart.HasValue
             && now >= maint.ScheduledStart.Value
+            && (!maint.ScheduledEnd.HasValue || now < maint.ScheduledEnd.Value)
             && !maint.IsActive)
         {
             _logger.LogInformation("Scheduled maintenance activation triggered at {Time}.", now);
             await MaintenanceHelper.ActivateAsync(_userManager, _logger).ConfigureAwait(false);
             var freshMaint = plugin.Configuration.MaintenanceMode;
             await WebhookNotifier.NotifyAsync(freshMaint.Webhook, WebhookEvent.Activated, freshMaint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
+
+            // Consume the one-shot ScheduledStart so a subsequent MANUAL deactivation isn't undone
+            // on the next tick (a past ScheduledStart used to re-trigger activation forever).
+            // ScheduleEnabled + ScheduledEnd stay set so the scheduled END still fires normally.
+            var cfg = plugin.Configuration;
+            if (cfg.MaintenanceMode.ScheduledStart.HasValue)
+            {
+                await MaintenanceHelper.WithConfigLockAsync(() =>
+                {
+                    cfg.MaintenanceMode.ScheduledStart = null;
+                    plugin.UpdateConfiguration(cfg);
+                    plugin.SaveConfiguration();
+                    return Task.CompletedTask;
+                }).ConfigureAwait(false);
+            }
         }
 
         // ── Schedule: auto-deactivate ──────────────────────────────────────────────
@@ -132,16 +170,20 @@ public class MaintenanceScheduleTask : IScheduledTask
             // Also clear ScheduledRestart if it was inside the window (admin's intent was likely
             // "restart as part of this maintenance"); preserve it if it was set after ScheduledEnd
             // (admin's intent was likely "schedule a restart later, independent of this window").
-            var config = plugin.Configuration;
-            var endValue = config.MaintenanceMode.ScheduledEnd;
-            var restartValue = config.MaintenanceMode.ScheduledRestart;
-            config.MaintenanceMode.ScheduleEnabled = false;
-            config.MaintenanceMode.ScheduledStart = null;
-            config.MaintenanceMode.ScheduledEnd = null;
-            if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
-                config.MaintenanceMode.ScheduledRestart = null;
-            plugin.UpdateConfiguration(config);
-            plugin.SaveConfiguration();
+            await MaintenanceHelper.WithConfigLockAsync(() =>
+            {
+                var config = plugin.Configuration;
+                var endValue = config.MaintenanceMode.ScheduledEnd;
+                var restartValue = config.MaintenanceMode.ScheduledRestart;
+                config.MaintenanceMode.ScheduleEnabled = false;
+                config.MaintenanceMode.ScheduledStart = null;
+                config.MaintenanceMode.ScheduledEnd = null;
+                if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
+                    config.MaintenanceMode.ScheduledRestart = null;
+                plugin.UpdateConfiguration(config);
+                plugin.SaveConfiguration();
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
         }
 
         // ── Scheduled restart ──────────────────────────────────────────────────────
@@ -156,13 +198,15 @@ public class MaintenanceScheduleTask : IScheduledTask
             // never throws, so a webhook failure cannot prevent the restart.
             await WebhookNotifier.NotifyAsync(maint.Webhook, WebhookEvent.Restarting, maint, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
 
-            var config = plugin.Configuration;
-            config.MaintenanceMode.ScheduledRestart = null;
-            plugin.UpdateConfiguration(config);
-            plugin.SaveConfiguration();
+            await MaintenanceHelper.WithConfigLockAsync(() =>
+            {
+                var config = plugin.Configuration;
+                config.MaintenanceMode.ScheduledRestart = null;
+                plugin.UpdateConfiguration(config);
+                plugin.SaveConfiguration();
+                return Task.CompletedTask;
+            }).ConfigureAwait(false);
             _systemManager.Restart();
         }
-
-        progress.Report(100);
     }
 }

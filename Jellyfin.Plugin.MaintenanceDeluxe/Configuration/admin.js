@@ -4,7 +4,7 @@
           // `_pluginVersion` so a config exported now is traceable to the version
           // that produced it. The csproj <AssemblyVersion> remains the source of
           // truth — keep this string aligned with it.
-          var PLUGIN_VERSION = '0.8.3.0';
+          var PLUGIN_VERSION = '0.8.4.0';
 
           var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
@@ -4254,7 +4254,17 @@
             if (rows.length) rows[rows.length - 1].classList.add('expanded');
           }
 
+          // Guard like initDom: the Jellyfin web client fires `pageshow` on this view every time
+          // it is shown (navigation back, bfcache restore), and there is no pagehide teardown. Re-
+          // running the listener wiring below on each pageshow leaked handlers and made a single
+          // click on Add create multiple announcements / fire competing saves. Wire exactly once;
+          // the per-pageshow data refresh stays in loadAnnouncements() (which is idempotent).
+          var _annUiInitialized = false;
+
           function initAnnouncementsUi() {
+            if (_annUiInitialized) return;
+            _annUiInitialized = true;
+
             var addBtn = document.getElementById('addAnnouncement');
             if (addBtn) addBtn.addEventListener('click', function () {
               addAnnouncementFromTemplate(null); // blank announcement

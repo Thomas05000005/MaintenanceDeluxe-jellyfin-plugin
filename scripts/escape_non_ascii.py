@@ -47,12 +47,27 @@ def escape_text(text: str) -> tuple[str, int]:
 
 
 def find_non_ascii(text: str) -> list[tuple[int, int, str]]:
-    """Return list of (line_no, col_no, char) for each non-ASCII char."""
+    """Return list of (line_no, col_no, char) for each non-ASCII char.
+
+    Scans the RAW text rather than ``str.splitlines()``: splitlines() also breaks on
+    U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR), U+0085 (NEL), U+000B, U+000C
+    and U+001C-001E — so those non-ASCII code points would be CONSUMED as delimiters and
+    never checked, letting them ship in banner.js and break latin1-decoding clients (the
+    exact silent breakage this gate exists to prevent). Must match escape_text's character
+    set exactly (any ``ord(ch) > 127``). Line/col are derived by counting only the ASCII
+    newline '\\n'.
+    """
     hits: list[tuple[int, int, str]] = []
-    for i, line in enumerate(text.splitlines(), 1):
-        for j, ch in enumerate(line, 1):
-            if ord(ch) > 127:
-                hits.append((i, j, ch))
+    line_no = 1
+    col_no = 0
+    for ch in text:
+        if ch == "\n":
+            line_no += 1
+            col_no = 0
+            continue
+        col_no += 1
+        if ord(ch) > 127:
+            hits.append((line_no, col_no, ch))
     return hits
 
 

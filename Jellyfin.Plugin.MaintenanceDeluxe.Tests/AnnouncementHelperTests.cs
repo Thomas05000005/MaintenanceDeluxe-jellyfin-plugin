@@ -270,15 +270,32 @@ public class AnnouncementHelperTests
     [Fact]
     public void IsTargetedAtUser_RespectsSchedule()
     {
-        // Annual schedule active only in June -> May 20 should hide the announcement.
-        var inJuneOnly = MakeAnnouncement(publishedAt: DateTimeOffset.UtcNow.AddDays(-1));
+        // v0.8.4: actually drives IsTargetedAtUser (the now-injectable overload) so the schedule
+        // branch INSIDE IsTargetedAtUser is exercised — not just IsScheduleActive in isolation.
+        var inJuneOnly = MakeAnnouncement(publishedAt: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         inJuneOnly.Schedule = new BannerSchedule { Type = "annual", MonthStart = 6, DayStart = 1, MonthEnd = 6, DayEnd = 30 };
-        // Force "now" check by relying on actual UTC now: only meaningful if we control time.
-        // Use IsScheduleActive directly to keep this deterministic:
+
         var may20 = new DateTimeOffset(2026, 5, 20, 12, 0, 0, TimeSpan.Zero);
-        Assert.False(AnnouncementHelper.IsScheduleActive(inJuneOnly.Schedule, may20));
         var june15 = new DateTimeOffset(2026, 6, 15, 12, 0, 0, TimeSpan.Zero);
-        Assert.True(AnnouncementHelper.IsScheduleActive(inJuneOnly.Schedule, june15));
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(inJuneOnly, "uuid-1", false, may20));
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(inJuneOnly, "uuid-1", false, june15));
+    }
+
+    [Fact]
+    public void IsTargetedAtUser_RecurringSchedule_UsesProvidedNowWallClockFrame()
+    {
+        // v0.8.4 timezone fix: recurring windows are evaluated against the wall-clock of the
+        // PROVIDED `now` (server-local in production), NOT UTC. A daily 20:00-22:00 window is
+        // active at local 21:00 and inactive at local 10:00 regardless of the UTC offset — proving
+        // the frame is taken from `now`, not converted to UTC (which would read hour 16 / 05).
+        var a = MakeAnnouncement();
+        a.Schedule = new BannerSchedule { Type = "daily", TimeStart = "20:00", TimeEnd = "22:00" };
+
+        var insideLocal = new DateTimeOffset(2030, 6, 1, 21, 0, 0, TimeSpan.FromHours(5));
+        var outsideLocal = new DateTimeOffset(2030, 6, 1, 10, 0, 0, TimeSpan.FromHours(5));
+
+        Assert.True(AnnouncementHelper.IsTargetedAtUser(a, "uuid-1", false, insideLocal));
+        Assert.False(AnnouncementHelper.IsTargetedAtUser(a, "uuid-1", false, outsideLocal));
     }
 
     // ── ImageUrl allowlist via shared IsUrlSafe (v0.5.3) ──────────────────────

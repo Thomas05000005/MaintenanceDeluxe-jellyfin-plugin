@@ -136,6 +136,28 @@ internal static class WebhookNotifier
     // (40000 chars block limit) and generic webhooks (~64KB common reverse-proxy cap).
     private const int MaxPayloadBytes = 32 * 1024; // 32KB — safely below Discord/Slack/proxy limits
 
+    // Hard cap on the response body we read back from a webhook endpoint. A hostile endpoint
+    // could otherwise return an unbounded stream and exhaust server memory; we only surface the
+    // first slice to the admin UI / logs anyway.
+    private const int MaxResponseBytes = 64 * 1024;
+
+    /// <summary>Reads at most <paramref name="maxBytes"/> bytes of the response body as UTF-8,
+    /// so a malicious/huge response can't OOM the server. Extra bytes are discarded.</summary>
+    private static async Task<string> ReadBodyCappedAsync(HttpContent content, int maxBytes, CancellationToken ct)
+    {
+        using var stream = await content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        var buffer = new byte[maxBytes];
+        var total = 0;
+        int read;
+        while (total < maxBytes
+            && (read = await stream.ReadAsync(buffer.AsMemory(total, maxBytes - total), ct).ConfigureAwait(false)) > 0)
+        {
+            total += read;
+        }
+
+        return Encoding.UTF8.GetString(buffer, 0, total);
+    }
+
     private static async Task<(int StatusCode, string Body)> SendAsync(
         string url,
         object payload,
@@ -156,13 +178,19 @@ internal static class WebhookNotifier
         {
             try
             {
-                using var client = httpFactory.CreateClient("MaintenanceDeluxe.Webhook");
+                // Named client is configured in PluginServiceRegistrator with AllowAutoRedirect=false
+                // + a ConnectCallback that re-validates the resolved IP (SSRF defence). If that
+                // registration is ever lost, the default handler would follow redirects — keep them in sync.
+                using var client = httpFactory.CreateClient(PluginServiceRegistrator.WebhookClientName);
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 cts.CancelAfter(_httpTimeout);
 
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
                 using var resp = await client.PostAsync(url, content, cts.Token).ConfigureAwait(false);
-                var body = await resp.Content.ReadAsStringAsync(cts.Token).ConfigureAwait(false);
+                // Cap the response read: a hostile/buggy endpoint could otherwise stream an
+                // unbounded body and OOM the server (the 5s timeout only bounds slow reads, not
+                // size). We only show the first 64KB to the admin anyway.
+                var body = await ReadBodyCappedAsync(resp.Content, MaxResponseBytes, cts.Token).ConfigureAwait(false);
                 var status = (int)resp.StatusCode;
 
                 // v0.7.0: respect 429 Retry-After header per Discord/Slack docs.
@@ -185,6 +213,10 @@ internal static class WebhookNotifier
                     logger?.LogDebug("Webhook returned {Status}, retrying once.", status);
                     continue;
                 }
+                // Redirects are deliberately NOT followed (SSRF safety — see PluginServiceRegistrator),
+                // so a 3xx is a terminal result here. Hint the admin to point at the final URL.
+                if (status is >= 300 and < 400)
+                    logger?.LogWarning("Webhook endpoint returned HTTP {Status} (a redirect). Redirects are not followed for SSRF safety — configure the webhook with the final URL directly.", status);
                 return (status, body);
             }
             catch (TaskCanceledException) when (attempt == 1)
