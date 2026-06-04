@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.8.4.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "checksum": "84E44D18B50F08CC5A7D894AC9156AD5",
         "changelog": "v0.8.4 - Release de SECURITE + corrections (suite a un audit adverse multi-agents). Recommande pour tous. SECURITE (webhook SSRF, durci sur 3 couches) : la defense SSRF de v0.7.0 etait contournable. Corrige : (1) le HttpClient webhook suivait les redirections HTTP -> un hote public autorise pouvait renvoyer un 302 vers 169.254.169.254 (metadata cloud) / loopback / LAN ; desormais AllowAutoRedirect=false + un ConnectCallback qui re-valide l'IP REELLE de chaque connexion (bat aussi le DNS rebinding). (2) les litteraux IPv6-mappes (::ffff:169.254.169.254) et les hotes a point final (127.0.0.1.) contournaient la blocklist -> normalisation MapToIPv4 + trailing-dot. (3) ajout des plages ::, CGNAT 100.64/10, fec0::/10, broadcast. NB : configurer un webhook reste admin-only (RequiresElevation), donc l'attaque exige un admin malveillant ou piege. CORRECTIONS (audit) : (a) la desactivation manuelle de la maintenance n'est plus annulee par le planificateur (consommation du ScheduledStart passe + garde ScheduledEnd) ; (b) ajouter un user a la whitelist PENDANT la maintenance le reactive immediatement, le drift-check respecte la whitelist live ; (c) modele de concurrence APPLIQUE : tous les writers de config (SaveConfig/SaveMaintenance/SaveAdminAnnouncements/MarkSeen/ResetSeen + tache planifiee) passent par un verrou unique -> fin des pertes d'ecriture et du config.xml corrompu ; (d) les annonces recurrentes (daily/weekly/annual) sont evaluees en heure LOCALE serveur (etait UTC) -> elles s'affichent aux bonnes heures, alignees sur les bannieres (positionne le TZ du conteneur) ; (e) cap sur la taille de reponse webhook (anti-OOM) + try/catch global sur la tache planifiee ; (f) admin.js : fix d'une fuite de listeners (double-binding a chaque pageshow). CI : la garde ASCII attrape desormais U+2028/2029/0085 ; release.yml lance dotnet test avant de publier ; creation de release idempotente. TESTS : 363/363 verts (etait 316), correctifs SSRF mutation-verifies, revue adversariale multi-agents (aucune regression critique/elevee). PAS DE MIGRATION.",
         "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.8.4/MaintenanceDeluxe-v0.8.4.zip",
-        "timestamp": "2026-06-04T00:00:00"
+        "timestamp": "2026-06-04T11:22:35"
       },
       {
         "version": "0.8.3.0",
