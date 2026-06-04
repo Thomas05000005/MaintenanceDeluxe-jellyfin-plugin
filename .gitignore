@@ -21,3 +21,6 @@ StrykerOutput/
 
 # Macos
 .DS_Store
+
+# Local-only audit report (contains unpatched-vuln details — keep out of the public repo)
+AUDIT_2026-05-30.md

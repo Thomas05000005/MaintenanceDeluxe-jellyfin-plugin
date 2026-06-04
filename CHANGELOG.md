@@ -4,6 +4,38 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4.0] — 2026-06-04
+
+🛡️ **Release de sécurité + corrections**, suite à un audit adverse multi-agents de tout le plugin (67 défauts confirmés). **Recommandée pour tous.** Aucune migration.
+
+### Sécurité — défense SSRF des webhooks (durcie sur 3 couches)
+
+La protection SSRF de v0.7.0 était contournable. Corrigé :
+
+- **Suivi de redirection** — le `HttpClient` des webhooks suivait les redirections HTTP : un hôte public autorisé pouvait répondre `302 → http://169.254.169.254/…` (métadonnées cloud) / loopback / LAN, et le serveur suivait. Désormais `AllowAutoRedirect=false` **et** un `ConnectCallback` (nouveau `PluginServiceRegistrator`) qui **re-valide l'IP réelle de chaque connexion** — ce qui bat aussi le **DNS rebinding**.
+- **Littéraux IPv6-mappés** (`::ffff:169.254.169.254`) et **hôtes à point final** (`127.0.0.1.`) contournaient la blocklist → normalisation `MapToIPv4()` + `TrimEnd('.')`.
+- Plages supplémentaires bloquées : `::` (IPv6 unspecified), CGNAT `100.64.0.0/10`, `fec0::/10`, broadcast.
+
+> Configurer un webhook reste **admin-only** (`RequiresElevation`) : l'exploitation exige un admin malveillant ou piégé. La sévérité reste néanmoins élevée (vol de credentials cloud en contexte serveur).
+
+### Corrections (audit)
+
+- **Désactivation manuelle non annulée** — sortir de maintenance manuellement n'est plus ré-activé par le planificateur dans les 60 s (consommation du `ScheduledStart` passé + garde `ScheduledEnd`).
+- **Whitelist en cours de maintenance** — ajouter un utilisateur à la whitelist pendant la maintenance le **réactive immédiatement** ; le drift-check respecte désormais la whitelist live (ne re-désactive plus un user whitelisté chaque minute).
+- **Modèle de concurrence appliqué** — tous les écrivains de config (`SaveConfig` / `SaveMaintenance` / `SaveAdminAnnouncements` / `MarkAnnouncementSeen` / `ResetAnnouncementSeen` + la tâche planifiée) passent par **un verrou unique** → fin des pertes d'écriture et du risque de `config.xml` corrompu, et fin de la course sur la liste « vu » des annonces.
+- **Fuseau horaire des annonces récurrentes** — les plannings `daily`/`weekly`/`annual` sont évalués en **heure locale du serveur** (était UTC) → ils s'affichent aux bonnes heures et s'alignent sur les bannières. (Positionne la variable `TZ` du conteneur.)
+- **Robustesse** — cap sur la taille de réponse webhook (anti-OOM), `try/catch` global sur la tâche planifiée (un incident transitoire ne saute plus les ticks suivants).
+- **admin.js** — correction d'une fuite de listeners (re-binding à chaque `pageshow` → clics/sauvegardes dupliqués).
+
+### CI / release
+
+- La garde ASCII (`escape_non_ascii.py --check`) attrape désormais U+2028 / U+2029 / U+0085 (étaient ignorés).
+- `release.yml` lance `dotnet test` (toute la suite) avant de publier ; création de release **idempotente**.
+
+### Tests
+
+- **363/363** tests xUnit verts (était 316). Correctifs SSRF **mutation-vérifiés** (8 tests passent au rouge sous mutation). Revue adversariale multi-agents : aucune régression critique/élevée.
+
 ## [0.8.3.0] — 2026-05-30
 
 🛡️ **Release de durcissement qualité — réponse à un audit adverse.** Aucun changement de feature, aucun changement de comportement du plugin. Le DLL livré est **fonctionnellement identique à v0.8.2**. L'essentiel de cette version est de l'infrastructure de test/CI qui ne part **pas** dans le zip installé, plus un refactor interne sans effet observable.
