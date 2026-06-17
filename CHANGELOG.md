@@ -4,6 +4,31 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.5.0] — 2026-06-17
+
+🩹 **Corrections UX / accessibilité / fonctionnel**, issues d'un 2ᵉ audit ultra-complet de toutes les couches (UX, design, perf, code, a11y, docs — 0 critique restant). **Recommandée.** Aucune migration. Compatible Jellyfin **10.11.10 et 10.11.11**.
+
+### Corrigé (HIGH)
+
+- **Modèles rapides d'annonce** — les modèles (ex. Halloween/Noël « annuel ») perdaient silencieusement leur **planning / auto-expiration / thème / image** : l'annonce s'affichait toute l'année au lieu de sa fenêtre. Tous les champs sont désormais copiés.
+- **Accessibilité de l'overlay de maintenance** — la prise plein écran a enfin la même a11y que les modales d'annonce : `role=dialog` + `aria-modal`, **focus piégé** à l'intérieur, **scroll de la page verrouillé**, focus restitué à la fermeture. Avant, un utilisateur clavier / lecteur d'écran pouvait tabuler derrière l'overlay.
+- **Mode carousel** — les cartes non visitées n'étaient jamais marquées « vues » → le carousel **réapparaissait à chaque connexion**. Toutes les cartes sont maintenant marquées à la fermeture.
+- **Redémarrage programmé** — un redémarrage planifié à la fin d'une fenêtre de maintenance était **annulé silencieusement** par la désactivation automatique du même tick. Il se déclenche désormais correctement.
+- **`make bump`** (outil de dev) était cassé sur GNU sed (Git Bash / CI Linux) → forme portable `sed -i.bak` + contrôle post-bump.
+- **README** — exigence Jellyfin corrigée **10.11.6 → 10.11.10** (vérifié jusqu'à 10.11.11).
+
+### Corrigé (MEDIUM)
+
+- **Cap sur le nombre d'éléments** des collections (annonces 200 / messages 100 / entrées permanentes 100 / presets 100 / UUID ciblés 2000) — anti-bloat de `config.xml`, troncature + log.
+- **Image hero d'annonce** masquée si l'URL est morte/bloquée (plus d'icône cassée), via `onerror` programmatique (compatible CSP).
+- **Pluralisation** « 1 annonce » / « N annonces » dans l'en-tête du mode stack.
+
+### Tests
+
+- **366/366** tests xUnit verts (+3 pour les caps). Build 0 warning, banner.js ASCII-safe.
+- Revue adversariale multi-agents du diff : aucune régression critique/élevée (1 LOW corrigée : teardown a11y du flux de reconnexion).
+- Compatibilité re-vérifiée : build + tests contre le SDK 10.11.11 + smoke sur serveurs réels 10.11.10 **et** 10.11.11.
+
 ## [0.8.4.0] — 2026-06-04
 
 🛡️ **Release de sécurité + corrections**, suite à un audit adverse multi-agents de tout le plugin (67 défauts confirmés). **Recommandée pour tous.** Aucune migration.
