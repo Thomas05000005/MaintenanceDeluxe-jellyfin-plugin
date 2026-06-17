@@ -165,20 +165,18 @@ public class MaintenanceScheduleTask : IScheduledTask
             await MaintenanceHelper.DeactivateAsync(_userManager, _logger).ConfigureAwait(false);
             await WebhookNotifier.NotifyAsync(hookSettings, WebhookEvent.Deactivated, snapshot, _httpFactory, _logger, cancellationToken).ConfigureAwait(false);
 
-            // Clear the schedule so the activation check doesn't immediately re-trigger.
-            // Also clear ScheduledRestart if it was inside the window (admin's intent was likely
-            // "restart as part of this maintenance"); preserve it if it was set after ScheduledEnd
-            // (admin's intent was likely "schedule a restart later, independent of this window").
+            // Clear the schedule window so the activation check doesn't immediately re-trigger.
+            // Do NOT clear ScheduledRestart here: a restart scheduled at/before the window end is
+            // due THIS same tick (end <= now and restart <= end => restart <= now), so the
+            // "Scheduled restart" branch below must still see it and fire. Clearing it here used to
+            // silently cancel the most common "restart at the end of maintenance" case; the restart
+            // branch is the sole owner that nulls ScheduledRestart, after it actually fires.
             await MaintenanceHelper.WithConfigLockAsync(() =>
             {
                 var config = plugin.Configuration;
-                var endValue = config.MaintenanceMode.ScheduledEnd;
-                var restartValue = config.MaintenanceMode.ScheduledRestart;
                 config.MaintenanceMode.ScheduleEnabled = false;
                 config.MaintenanceMode.ScheduledStart = null;
                 config.MaintenanceMode.ScheduledEnd = null;
-                if (restartValue.HasValue && endValue.HasValue && restartValue.Value <= endValue.Value)
-                    config.MaintenanceMode.ScheduledRestart = null;
                 plugin.UpdateConfiguration(config);
                 plugin.SaveConfiguration();
             }).ConfigureAwait(false);

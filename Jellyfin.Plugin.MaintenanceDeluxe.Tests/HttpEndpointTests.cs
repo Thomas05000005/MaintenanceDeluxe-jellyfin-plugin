@@ -260,6 +260,39 @@ public sealed class HttpEndpointTests : IDisposable
         Assert.DoesNotContain(Plugin.Instance.Configuration.AnnouncementsSeen, e => e.AnnouncementId == "old-id");
     }
 
+    // ── v0.8.5: collection count caps (anti-bloat) ─────────────────────────────────
+
+    [Fact]
+    public void SaveConfig_CapsRotationMessagesAt100()
+    {
+        var msgs = new List<BannerMessage>();
+        for (int i = 0; i < 250; i++) msgs.Add(new BannerMessage { Text = "m" + i });
+        var cfg = new PluginConfiguration { RotationMessages = msgs };
+        Assert.IsType<NoContentResult>(NewController().SaveConfig(cfg));
+        Assert.Equal(100, Plugin.Instance!.Configuration.RotationMessages.Count);
+        Assert.Equal(100, ReloadFromDisk().RotationMessages.Count); // survived persistence
+    }
+
+    [Fact]
+    public void SaveAdminAnnouncements_CapsAnnouncementsAt200()
+    {
+        var anns = new List<Announcement>();
+        for (int i = 0; i < 500; i++) anns.Add(new Announcement { Id = "a" + i, Title = "T" + i });
+        var body = new SaveAnnouncementsRequest { Announcements = anns };
+        Assert.IsType<NoContentResult>(NewController().SaveAdminAnnouncements(body));
+        Assert.Equal(200, Plugin.Instance!.Configuration.Announcements.Count);
+    }
+
+    [Fact]
+    public void SaveConfig_UnderCap_KeepsAllRotationMessages()
+    {
+        var msgs = new List<BannerMessage>();
+        for (int i = 0; i < 5; i++) msgs.Add(new BannerMessage { Text = "m" + i });
+        var cfg = new PluginConfiguration { RotationMessages = msgs };
+        Assert.IsType<NoContentResult>(NewController().SaveConfig(cfg));
+        Assert.Equal(5, Plugin.Instance!.Configuration.RotationMessages.Count); // not truncated
+    }
+
     // ── Fakes ──────────────────────────────────────────────────────────────────────
 
     /// <summary>Minimal <see cref="IApplicationPaths"/> backed by a throwaway temp directory.

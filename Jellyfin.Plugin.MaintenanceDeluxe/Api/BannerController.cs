@@ -256,6 +256,16 @@ public class BannerController : ControllerBase
         if (Plugin.Instance is null)
             return NotFound();
 
+        // Cap collection lengths before any per-item processing so a runaway/imported config
+        // can't bloat config.xml (and every poll). Per-item validation happens below. The `!` is
+        // safe: CapList only returns null when its input is null, which the guards exclude.
+        if (config.RotationMessages is not null)
+            config.RotationMessages = CapList(config.RotationMessages, MaxRotationMessages, "RotationMessages")!;
+        if (config.ColorPresets is not null)
+            config.ColorPresets = CapList(config.ColorPresets, MaxColorPresets, "ColorPresets")!;
+        if (config.PermanentOverride?.Entries is not null)
+            config.PermanentOverride.Entries = CapList(config.PermanentOverride.Entries, MaxPermanentEntries, "PermanentOverride.Entries")!;
+
         // Clamp numeric fields to valid ranges
         config.DisplayDuration = Math.Max(1, config.DisplayDuration);
         config.PauseDuration = Math.Max(0, config.PauseDuration);
@@ -751,7 +761,7 @@ public class BannerController : ControllerBase
         if (Plugin.Instance is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
 
-        var incoming = body.Announcements ?? new List<Announcement>();
+        var incoming = CapList(body.Announcements, MaxAnnouncements, "Announcements") ?? new List<Announcement>();
 
         // Per-entry validation + normalisation pass.
         foreach (var a in incoming)
@@ -769,7 +779,7 @@ public class BannerController : ControllerBase
             a.CtaLabel = NormaliseOptionalString(a.CtaLabel, 80);
             a.Importance = AnnouncementHelper.NormaliseImportance(a.Importance);
             a.TargetRoles = AnnouncementHelper.NormaliseTargetRoles(a.TargetRoles);
-            a.TargetUserIds = AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds);
+            a.TargetUserIds = CapList(AnnouncementHelper.NormaliseTargetUserIds(a.TargetUserIds), MaxTargetUserIds, $"TargetUserIds on announcement '{a.Title}'")!;
             a.Theme = NormaliseAnnouncementThemeOverride(a.Theme);
             // v0.5.3: trim + cap image fields. Image URL allowlist already enforced above.
             a.ImageUrl = NormaliseOptionalString(a.ImageUrl, 2000);
@@ -1170,6 +1180,26 @@ public class BannerController : ControllerBase
     private const int MaxReleaseNoteBodyLength = 4000;
     private const int MaxIconLength = 8;
     private const int MaxScheduledRestartHorizonDays = 30;
+
+    // Sanity caps on top-level collection LENGTHS. Per-item content is already validated/clamped
+    // elsewhere; these bound the COUNT so a runaway or imported config can't bloat config.xml and
+    // every poll/serialize (no legitimate setup approaches these). Excess is truncated + logged.
+    private const int MaxRotationMessages = 100;
+    private const int MaxPermanentEntries = 100;
+    private const int MaxColorPresets = 100;
+    private const int MaxAnnouncements = 200;
+    private const int MaxTargetUserIds = 2000;
+
+    /// <summary>Truncates <paramref name="list"/> to <paramref name="max"/> items in place,
+    /// logging a warning naming <paramref name="what"/> if anything was dropped. Returns the
+    /// (possibly same) capped list.</summary>
+    private List<T>? CapList<T>(List<T>? list, int max, string what)
+    {
+        if (list is null || list.Count <= max) return list;
+        _logger.LogWarning("{What}: {Count} exceeds the cap of {Max}; truncating the extra {Dropped}.",
+            what, list.Count, max, list.Count - max);
+        return list.GetRange(0, max);
+    }
 
     private static readonly HashSet<string> _validThemes =
         new(StringComparer.Ordinal) { "velours" };

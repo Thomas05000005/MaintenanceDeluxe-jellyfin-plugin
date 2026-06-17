@@ -64,6 +64,10 @@
         } catch (e) {}
     }
     var maintenanceTimerId = null;
+    // a11y state for the maintenance takeover (focus restore + scroll lock undo, and the
+    // focus-trap keydown handler) so it gets the same treatment as the announcement modals.
+    var maintenanceA11yRestore = null;
+    var maintenanceKeyHandler = null;
     var MD_STYLES_INJECTED = false;
     var OVERLAY_Z_INDEX = 1000000; // above BANNER_Z_INDEX (999999)
 
@@ -932,8 +936,12 @@
         var overlay = document.createElement("div");
         overlay.id = "jf-md-overlay";
         overlay.className = "jf-md-tier-" + tier;
-        overlay.setAttribute("role", "status");
-        overlay.setAttribute("aria-live", "polite");
+        // It is a full-screen modal takeover, so it must announce as a dialog (was role="status",
+        // which a screen reader treats as a passive live region the user can tab straight past).
+        overlay.setAttribute("role", "dialog");
+        overlay.setAttribute("aria-modal", "true");
+        overlay.setAttribute("aria-labelledby", "jf-md-title");
+        overlay.setAttribute("aria-describedby", "jf-md-subtitle");
         mdApplyAppearance(overlay, m);
 
         var bg = document.createElement("div");
@@ -974,11 +982,12 @@
 
         var card = document.createElement("div");
         card.className = "jf-md-card";
+        card.setAttribute("tabindex", "-1"); // programmatically focusable as the dialog fallback target
 
         var cardHtml =
             '<svg class="jf-md-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="32" cy="32" r="5" fill="currentColor"/><circle cx="32" cy="14" r="3.5" fill="currentColor"/><circle cx="50" cy="32" r="3.5" fill="currentColor"/><circle cx="32" cy="50" r="3.5" fill="currentColor"/><circle cx="14" cy="32" r="3.5" fill="currentColor"/><circle cx="44" cy="20" r="2" fill="currentColor" opacity="0.5"/><circle cx="44" cy="44" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="44" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="20" r="2" fill="currentColor" opacity="0.5"/></svg>' +
-            '<h1 class="jf-md-title">' + escapeMdHtml(title) + '</h1>' +
-            '<p class="jf-md-subtitle">' + escapeMdHtml(subtitle) + '</p>';
+            '<h1 class="jf-md-title" id="jf-md-title">' + escapeMdHtml(title) + '</h1>' +
+            '<p class="jf-md-subtitle" id="jf-md-subtitle">' + escapeMdHtml(subtitle) + '</p>';
 
         cardHtml +=
             '<div class="jf-md-time" aria-hidden="true">' +
@@ -1038,7 +1047,25 @@
         maintenanceOverlay = overlay;
         cacheTimerRefs(overlay);
         updateMaintenanceTimer();
-        requestAnimationFrame(function () { overlay.classList.add("visible"); });
+
+        // Same a11y hygiene as the announcement modals: lock page scroll + remember focus, move
+        // focus into the dialog, and trap Tab inside it so keyboard/SR users can't reach the
+        // (blocked) page behind the takeover. restore() is invoked from removeMaintenanceOverlay.
+        maintenanceA11yRestore = captureModalA11yState();
+        var getFocusables = function () {
+            return overlay.querySelectorAll(
+                "a[href],button:not([disabled]),[tabindex]:not([tabindex=\"-1\"])");
+        };
+        maintenanceKeyHandler = function (ev) { cycleModalFocus(getFocusables, ev); };
+        document.addEventListener("keydown", maintenanceKeyHandler);
+
+        requestAnimationFrame(function () {
+            overlay.classList.add("visible");
+            // Focus the dismiss / "admin access" button so the dialog is announced and keyboard
+            // users have a reachable control; fall back to the card.
+            var focusTarget = overlay.querySelector(".jf-md-dismiss") || overlay.querySelector(".jf-md-card");
+            if (focusTarget) { try { focusTarget.focus(); } catch (e) {} }
+        });
         if (maintenanceTimerId) clearInterval(maintenanceTimerId);
         maintenanceTimerId = setInterval(updateMaintenanceTimer, 1000);
     }
@@ -1062,10 +1089,13 @@
 
     function removeMaintenanceOverlay() {
         if (maintenanceTimerId) { clearInterval(maintenanceTimerId); maintenanceTimerId = null; }
+        if (maintenanceKeyHandler) { document.removeEventListener("keydown", maintenanceKeyHandler); maintenanceKeyHandler = null; }
         if (maintenanceOverlay && maintenanceOverlay.parentNode) {
             maintenanceOverlay.parentNode.removeChild(maintenanceOverlay);
         }
         maintenanceOverlay = null;
+        // Undo scroll lock + restore focus to where it was before the takeover.
+        if (maintenanceA11yRestore) { try { maintenanceA11yRestore(); } catch (e) {} maintenanceA11yRestore = null; }
     }
 
     function applyMaintenanceState() {
@@ -1997,6 +2027,17 @@
         return html;
     }
 
+    // Hides a hero image whose URL is broken / blocked (admin-supplied imageUrl may 404 or be
+    // CSP-blocked) so the modal shows nothing rather than a broken-image icon. Set as a JS
+    // property (not an inline onerror= attribute) to stay safe under a strict script-src CSP.
+    function attachAnnImageFallback(root) {
+        if (!root || !root.querySelectorAll) return;
+        var imgs = root.querySelectorAll(".jf-ann-image");
+        for (var i = 0; i < imgs.length; i++) {
+            imgs[i].onerror = function () { this.style.display = "none"; };
+        }
+    }
+
     // Creates the chromeless overlay (positioning, backdrop, theme class, accent var)
     // but leaves innerHTML empty. Caller fills it. Used by all three display modes.
     // customTheme is the v0.6.0 admin-defined theme block; used when themeKey === "custom".
@@ -2038,6 +2079,7 @@
         var overlay = createAnnouncementOverlay(themeKey, accent, a.customTheme);
         overlay.setAttribute("aria-labelledby", "jf-ann-title");
         overlay.innerHTML = buildAnnouncementCardHtml(a, /* withOk */ true);
+        attachAnnImageFallback(overlay);
         // Re-set aria-labelledby target since the card title no longer has an id by default.
         var titleEl = overlay.querySelector(".jf-ann-title");
         if (titleEl) titleEl.id = "jf-ann-title";
@@ -2185,6 +2227,7 @@
             // stable counterEl below (after innerHTML overwrites everything else) and
             // only mutate its textContent so the aria-live region keeps its identity.
             overlay.innerHTML = html;
+            attachAnnImageFallback(overlay);
             overlay.appendChild(counterEl);
             counterEl.textContent = (idx + 1) + " / " + list.length;
             var titleEl = overlay.querySelector(".jf-ann-title");
@@ -2199,8 +2242,11 @@
         }
 
         function close() {
-            // Mark the currently-visible card as seen before tearing down.
-            markSeenLocal(list[idx]);
+            // Mark EVERY card as seen before tearing down, not just the visible one. Otherwise a
+            // user who clicks "Compris" on slide 0 without navigating leaves cards 1..N unmarked,
+            // and (onAllDismissed is null here) the whole carousel re-appears on every subsequent
+            // login. Mirrors showStackAnnouncementModal.close(); markSeenLocal dedupes via markedIds.
+            for (var j = 0; j < list.length; j++) markSeenLocal(list[j]);
             overlay.classList.remove("visible");
             overlay.style.opacity = "0";
             setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 250);
@@ -2289,7 +2335,7 @@
         var html = "<div class=\"jf-ann-stack-wrap\">";
         html += "<div class=\"jf-ann-stack-header\">"
              +    "<div class=\"jf-ann-stack-count\">"
-             +      list.length + " annonces"
+             +      list.length + (list.length === 1 ? " annonce" : " annonces")
              +    "</div>"
              + "</div>";
         for (var i = 0; i < list.length; i++) {
@@ -2302,6 +2348,7 @@
              + "</div>";
         html += "</div>";
         overlay.innerHTML = html;
+        attachAnnImageFallback(overlay);
         var firstTitle = overlay.querySelector(".jf-ann-title");
         if (firstTitle) firstTitle.id = "jf-ann-title";
 

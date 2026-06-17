@@ -32,7 +32,9 @@ Neither is great. This plugin gives your users a polished, informative "please w
 
 ## Requirements
 
-- Jellyfin **10.11.6** or newer (`targetAbi: 10.11.6.0`).
+- Jellyfin **10.11.10** or newer (`targetAbi: 10.11.10.0`). Verified through 10.11.11.
+  (Jellyfin 10.11.x removed `IUserManager.Users`; v0.8.1+ is built against the newer SDK, so
+  servers on 10.11.6–10.11.8 must stay on **v0.8.0** or upgrade Jellyfin.)
 - Two prerequisite plugins, both already active:
   - **JavaScript Injector** ([n00bcodr/Jellyfin-JavaScript-Injector](https://github.com/n00bcodr/Jellyfin-JavaScript-Injector)) — injects our script into the web UI.
   - **File Transformation** ([IAmParadox27/jellyfin-plugin-file-transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)) — used by JavaScript Injector to modify `index.html`.

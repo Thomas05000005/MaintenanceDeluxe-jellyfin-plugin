@@ -4244,7 +4244,16 @@
                   return { label: c.label || '', before: c.before || '', after: c.after || '', highlight: c.highlight || '' };
                 }),
                 ctaLabel: base.ctaLabel || null,
-                ctaUrl: base.ctaUrl || null
+                ctaUrl: base.ctaUrl || null,
+                // v0.8.5: these were silently dropped, so a template advertising a schedule
+                // (e.g. the annual Halloween/Christmas blocks) or an auto-expiry created an
+                // announcement with neither — the opposite of what the template name promised.
+                schedule: base.schedule || null,
+                expireAfterDays: base.expireAfterDays || null,
+                theme: base.theme || null,
+                imageUrl: base.imageUrl || null,
+                imageAlt: base.imageAlt || null,
+                isDraft: !!base.isDraft
               },
               seenCount: 0,
               totalUsers: 0

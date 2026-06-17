@@ -84,8 +84,10 @@ bump:
 ifndef V
 	$(error Usage: make bump V=1.2.0)
 endif
-	@sed -i '' 's|<AssemblyVersion>.*</AssemblyVersion>|<AssemblyVersion>$(V).0</AssemblyVersion>|' $(CSPROJ)
-	@sed -i '' 's|<FileVersion>.*</FileVersion>|<FileVersion>$(V).0</FileVersion>|' $(CSPROJ)
+	@# `-i.bak` is portable across GNU sed (Git Bash / Linux CI) AND BSD/macOS sed; the bare
+	@# `-i ''` form used before is BSD-only and silently no-ops on GNU sed (verified broken).
+	@sed -i.bak 's|<AssemblyVersion>.*</AssemblyVersion>|<AssemblyVersion>$(V).0</AssemblyVersion>|; s|<FileVersion>.*</FileVersion>|<FileVersion>$(V).0</FileVersion>|' $(CSPROJ) && rm -f $(CSPROJ).bak
+	@grep -q '<AssemblyVersion>$(V).0</AssemblyVersion>' $(CSPROJ) || (echo "error: bump failed — $(CSPROJ) not updated to $(V).0"; exit 1)
 	@echo "→ Version bumped to $(V).0 — commit, push, then create tag v$(V) on GitHub."
 
 # ── tests ──────────────────────────────────────────────────────────────────────
