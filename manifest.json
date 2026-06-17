@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "0.8.5.0",
-        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "checksum": "001FE0E9AFC7BA3C2366DD1AFE8F4460",
         "changelog": "v0.8.5 - Corrections UX/a11y/fonctionnel issues d'un 2e audit ultra-complet (toutes couches : UX, design, perf, code, a11y, docs ; 0 critique restant, 6 high corriges ici). Recommande. HIGH : (1) les modeles rapides d'annonce (ex : Halloween/Noel 'annuel') perdaient silencieusement leur planning / auto-expiration / theme / image -> l'annonce s'affichait toute l'annee au lieu de sa fenetre ; desormais tous les champs sont copies. (2) L'overlay de maintenance plein ecran a enfin la meme accessibilite que les modales d'annonce : role=dialog + aria-modal, focus piege a l'interieur, scroll de la page verrouille, focus restitue a la fermeture (avant : un utilisateur clavier/lecteur d'ecran pouvait tabuler derriere l'overlay). (3) En mode carousel, les cartes non visitees n'etaient jamais marquees 'vues' -> le carousel reapparaissait a chaque connexion ; maintenant toutes les cartes sont marquees a la fermeture. (4) Un redemarrage programme a la fin de la fenetre de maintenance etait annule silencieusement par la desactivation auto du meme tick -> il se declenche desormais correctement. (5) `make bump` (outil de dev) etait casse sur GNU sed (Git Bash / CI Linux). (6) README : exigence Jellyfin corrigee 10.11.6 -> 10.11.10. MEDIUM : cap sur le NOMBRE d'elements des collections (annonces 200 / messages 100 / etc.) anti-bloat config.xml ; image hero d'annonce masquee si l'URL est morte (plus d'icone cassee) ; pluralisation '1 annonce'. TESTS : 366/366 verts (+3 caps), build 0 warning, revue adversariale multi-agents (aucune regression critique/elevee). Compatible Jellyfin 10.11.10 et 10.11.11. PAS DE MIGRATION.",
         "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v0.8.5/MaintenanceDeluxe-v0.8.5.zip",
-        "timestamp": "2026-06-17T00:00:00"
+        "timestamp": "2026-06-17T21:05:08"
       },
       {
         "version": "0.8.4.0",
