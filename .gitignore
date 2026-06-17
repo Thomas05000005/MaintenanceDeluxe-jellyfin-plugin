@@ -24,3 +24,9 @@ StrykerOutput/
 
 # Local-only audit report (contains unpatched-vuln details — keep out of the public repo)
 AUDIT_2026-05-30.md
+
+# Local-only UX/perf audit report
+AUDIT_UIX_2026-06-17.md
+
+# Python bytecode
+__pycache__/
