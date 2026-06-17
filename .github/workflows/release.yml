@@ -25,9 +25,9 @@ jobs:
       matrix:
         # The build's targetAbi (manifest versions[0].targetAbi) is the FLOOR: a server
         # older than it legitimately refuses the plugin ("Skipping disabled plugin").
-        # So we smoke only on servers >= targetAbi. Current targetAbi 10.11.10.0 -> 10.11.10.
-        # Add newer Jellyfin patch tags here as they ship to widen forward-compat coverage.
-        jellyfin: ["10.11.10"]
+        # So we smoke on servers >= targetAbi: 10.11.10 (floor/prod) + every newer patch
+        # released since, to prove forward-compat. Add new Jellyfin patch tags here as they ship.
+        jellyfin: ["10.11.10", "10.11.11"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
