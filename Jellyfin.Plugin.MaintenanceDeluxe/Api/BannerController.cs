@@ -507,7 +507,6 @@ public class BannerController : ControllerBase
             {
                 Plugin.Instance!.UpdateConfiguration(config);
                 Plugin.Instance.SaveConfiguration();
-                return Task.CompletedTask;
             }).ConfigureAwait(false);
 
             // If maintenance is active and the admin just edited the whitelist, re-enable any

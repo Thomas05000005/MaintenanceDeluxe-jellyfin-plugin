@@ -145,7 +145,6 @@ public class MaintenanceScheduleTask : IScheduledTask
                     cfg.MaintenanceMode.ScheduledStart = null;
                     plugin.UpdateConfiguration(cfg);
                     plugin.SaveConfiguration();
-                    return Task.CompletedTask;
                 }).ConfigureAwait(false);
             }
         }
@@ -182,7 +181,6 @@ public class MaintenanceScheduleTask : IScheduledTask
                     config.MaintenanceMode.ScheduledRestart = null;
                 plugin.UpdateConfiguration(config);
                 plugin.SaveConfiguration();
-                return Task.CompletedTask;
             }).ConfigureAwait(false);
         }
 
@@ -204,7 +202,6 @@ public class MaintenanceScheduleTask : IScheduledTask
                 config.MaintenanceMode.ScheduledRestart = null;
                 plugin.UpdateConfiguration(config);
                 plugin.SaveConfiguration();
-                return Task.CompletedTask;
             }).ConfigureAwait(false);
             _systemManager.Restart();
         }

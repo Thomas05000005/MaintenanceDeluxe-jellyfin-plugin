@@ -146,16 +146,26 @@ internal static class WebhookNotifier
     private static async Task<string> ReadBodyCappedAsync(HttpContent content, int maxBytes, CancellationToken ct)
     {
         using var stream = await content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        var buffer = new byte[maxBytes];
-        var total = 0;
-        int read;
-        while (total < maxBytes
-            && (read = await stream.ReadAsync(buffer.AsMemory(total, maxBytes - total), ct).ConfigureAwait(false)) > 0)
+        // Rent from the shared pool instead of allocating a fresh 64KB array on every webhook
+        // call (most responses are a few hundred bytes). Rent may return a larger buffer; the
+        // loop still caps the read at maxBytes.
+        var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(maxBytes);
+        try
         {
-            total += read;
-        }
+            var total = 0;
+            int read;
+            while (total < maxBytes
+                && (read = await stream.ReadAsync(buffer.AsMemory(total, maxBytes - total), ct).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+            }
 
-        return Encoding.UTF8.GetString(buffer, 0, total);
+            return Encoding.UTF8.GetString(buffer, 0, total);
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private static async Task<(int StatusCode, string Body)> SendAsync(

@@ -41,9 +41,20 @@ internal static class MaintenanceHelper
         finally { _mutex.Release(); }
     }
 
-    /// <summary>Synchronous variant of <see cref="WithConfigLockAsync"/> for the synchronous
-    /// controller actions (SaveConfig / SaveAdminAnnouncements / MarkAnnouncementSeen /
-    /// ResetAnnouncementSeen). Same single lock, same non-reentrancy rule.</summary>
+    /// <summary>Awaitable lock with a SYNCHRONOUS body — for async callers whose critical section
+    /// is just a config write (no awaits inside). Avoids the <c>return Task.CompletedTask;</c>
+    /// ceremony of the <see cref="Func{Task}"/> overload while still yielding the thread on
+    /// <see cref="SemaphoreSlim.WaitAsync()"/> instead of blocking it.</summary>
+    internal static async Task WithConfigLockAsync(Action action)
+    {
+        await _mutex.WaitAsync().ConfigureAwait(false);
+        try { action(); }
+        finally { _mutex.Release(); }
+    }
+
+    /// <summary>Synchronous variant of <see cref="WithConfigLockAsync(System.Func{System.Threading.Tasks.Task})"/>
+    /// for the synchronous controller actions (SaveConfig / SaveAdminAnnouncements /
+    /// MarkAnnouncementSeen / ResetAnnouncementSeen). Same single lock, same non-reentrancy rule.</summary>
     internal static void WithConfigLock(Action action)
     {
         _mutex.Wait();
@@ -217,6 +228,16 @@ internal static class MaintenanceHelper
         }
     }
 
+    /// <summary>Convenience wrapper that binds <see cref="SetUserDisabledAsync"/> to a concrete
+    /// <see cref="IUserManager"/> (GetUserDto + UpdatePolicyAsync). The activate / deactivate /
+    /// drift-check / whitelist-reconcile loops all need the exact same delegate wiring — the glue
+    /// that broke on the 10.11.9 SDK — so it lives in ONE place instead of being repeated verbatim
+    /// at each call site.</summary>
+    internal static Task<bool> SetUserDisabledViaManagerAsync(
+        IUserManager userManager, Guid userId, User user, bool disabled, ILogger? logger = null) =>
+        SetUserDisabledAsync(u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
+            userId, user, disabled, logger);
+
     internal static async Task ActivateAsync(IUserManager userManager, ILogger? logger = null)
     {
         using var _scope = logger?.BeginScope("Activate");
@@ -239,9 +260,7 @@ internal static class MaintenanceHelper
             var successfullyDisabled = new List<string>();
             foreach (var user in toDisable)
             {
-                if (await SetUserDisabledAsync(
-                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
-                        user.Id, user, disabled: true, logger).ConfigureAwait(false))
+                if (await SetUserDisabledViaManagerAsync(userManager, user.Id, user, disabled: true, logger).ConfigureAwait(false))
                     successfullyDisabled.Add(user.Id.ToString());
             }
 
@@ -288,9 +307,7 @@ internal static class MaintenanceHelper
             int reenabled = 0;
             foreach (var (guid, user) in plan.ToReEnable)
             {
-                if (await SetUserDisabledAsync(
-                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
-                        guid, user, disabled: false, logger).ConfigureAwait(false))
+                if (await SetUserDisabledViaManagerAsync(userManager, guid, user, disabled: false, logger).ConfigureAwait(false))
                     reenabled++;
             }
 
@@ -331,9 +348,7 @@ internal static class MaintenanceHelper
             var restoredNames = new List<string>();
             foreach (var (guid, user) in driftedUsers)
             {
-                if (await SetUserDisabledAsync(
-                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
-                        guid, user, disabled: true, logger).ConfigureAwait(false))
+                if (await SetUserDisabledViaManagerAsync(userManager, guid, user, disabled: true, logger).ConfigureAwait(false))
                 {
                     restored++;
                     restoredNames.Add(user.Username ?? guid.ToString());
@@ -382,9 +397,7 @@ internal static class MaintenanceHelper
             {
                 var user = userManager.GetUserById(guid);
                 if (user is not null
-                    && await SetUserDisabledAsync(
-                        u => userManager.GetUserDto(u, string.Empty), userManager.UpdatePolicyAsync,
-                        guid, user, disabled: false, logger).ConfigureAwait(false))
+                    && await SetUserDisabledViaManagerAsync(userManager, guid, user, disabled: false, logger).ConfigureAwait(false))
                 {
                     reenabled++;
                 }
