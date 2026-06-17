@@ -1075,12 +1075,18 @@
     function showReconnectAndReload() {
         if (!maintenanceOverlay) return;
         if (maintenanceTimerId) { clearInterval(maintenanceTimerId); maintenanceTimerId = null; }
+        // The reconnect card has no focusable controls, so the dialog focus-trap would swallow
+        // every Tab for the ~2.5s until reload, and scroll would stay locked. Tear those down now
+        // (the overlay itself stays visible to show the "back online" message). Keep the
+        // aria-labelledby/aria-describedby targets valid by reusing the same ids on the new H1/P.
+        if (maintenanceKeyHandler) { document.removeEventListener("keydown", maintenanceKeyHandler); maintenanceKeyHandler = null; }
+        if (maintenanceA11yRestore) { try { maintenanceA11yRestore(); } catch (e) {} maintenanceA11yRestore = null; }
         var card = maintenanceOverlay.querySelector(".jf-md-card");
         if (card) {
             card.innerHTML =
                 '<div class="jf-md-logo" style="color:#5EB35D;font-size:48px">\u2713</div>' +
-                '<h1 class="jf-md-title" style="color:#5EB35D">' + escapeMdHtml(MD_I18N.reconnectTitle) + '</h1>' +
-                '<p class="jf-md-subtitle">' + escapeMdHtml(MD_I18N.reconnectSubtitle) + '</p>';
+                '<h1 class="jf-md-title" id="jf-md-title" style="color:#5EB35D">' + escapeMdHtml(MD_I18N.reconnectTitle) + '</h1>' +
+                '<p class="jf-md-subtitle" id="jf-md-subtitle">' + escapeMdHtml(MD_I18N.reconnectSubtitle) + '</p>';
         }
         setTimeout(function () {
             try { window.location.reload(); } catch (e) {}

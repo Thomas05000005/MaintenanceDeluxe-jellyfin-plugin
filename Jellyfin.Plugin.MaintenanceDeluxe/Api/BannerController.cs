@@ -1190,9 +1190,9 @@ public class BannerController : ControllerBase
     private const int MaxAnnouncements = 200;
     private const int MaxTargetUserIds = 2000;
 
-    /// <summary>Truncates <paramref name="list"/> to <paramref name="max"/> items in place,
-    /// logging a warning naming <paramref name="what"/> if anything was dropped. Returns the
-    /// (possibly same) capped list.</summary>
+    /// <summary>Returns <paramref name="list"/> unchanged if it has &lt;= <paramref name="max"/>
+    /// items, otherwise a NEW list of its first <paramref name="max"/> items, logging a warning
+    /// naming <paramref name="what"/>. Null in -&gt; null out. Callers reassign the result.</summary>
     private List<T>? CapList<T>(List<T>? list, int max, string what)
     {
         if (list is null || list.Count <= max) return list;
