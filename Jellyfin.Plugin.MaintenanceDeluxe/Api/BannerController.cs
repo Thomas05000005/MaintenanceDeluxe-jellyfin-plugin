@@ -270,6 +270,12 @@ public class BannerController : ControllerBase
         config.DisplayDuration = Math.Max(1, config.DisplayDuration);
         config.PauseDuration = Math.Max(0, config.PauseDuration);
         config.BannerHeight = Math.Clamp(config.BannerHeight, 24, 80);
+        // v0.8.6: clamp the dismiss glyph sizes + font size server-side too (A#22). The client
+        // clamps fontSize but leaves the dismiss sizes unbounded, and a raw POST bypasses the UI
+        // entirely — an absurd value would blow up the banner layout. Ranges match the UI intent.
+        config.DismissButtonSize = Math.Clamp(config.DismissButtonSize, 8, 64);
+        config.DismissAllSize = Math.Clamp(config.DismissAllSize, 8, 64);
+        config.FontSize = Math.Clamp(config.FontSize, 10, 32);
 
         // Normalise enum-like string fields to prevent unknown tokens being stored
         string[] validTextAlign = ["center", "left"];
@@ -360,9 +366,6 @@ public class BannerController : ControllerBase
             if (err is not null) return BadRequest(err);
         }
 
-        // Maintenance mode is managed by its own endpoint — preserve the live state unchanged.
-        config.MaintenanceMode = Plugin.Instance.Configuration.MaintenanceMode ?? new MaintenanceSetting();
-
         // v0.7.0: LastModified must be monotonic. If the system clock jumps backwards (NTP
         // correction, admin manually setting time), a naive `now` would shrink LastModified
         // and break client-side if-modified-since style polling. Math.Max ensures we never
@@ -371,7 +374,11 @@ public class BannerController : ControllerBase
         config.LastModified = Math.Max(config.LastModified, now);
         MaintenanceHelper.WithConfigLock(() =>
         {
-            Plugin.Instance!.UpdateConfiguration(config);
+            // Maintenance mode is managed by its own endpoint — re-read the LIVE MaintenanceMode
+            // INSIDE the lock (A#8) so a concurrent SaveMaintenance write that landed after this
+            // request deserialised isn't discarded when we swap the whole config object below.
+            config.MaintenanceMode = Plugin.Instance!.Configuration.MaintenanceMode ?? new MaintenanceSetting();
+            Plugin.Instance.UpdateConfiguration(config);
             Plugin.Instance.SaveConfiguration();
         });
         return NoContent();
@@ -515,7 +522,13 @@ public class BannerController : ControllerBase
             // a synchronous _mutex.Wait while a drift tick / ActivateAsync holds it).
             await MaintenanceHelper.WithConfigLockAsync(() =>
             {
-                Plugin.Instance!.UpdateConfiguration(config);
+                // A#8: graft the mutated MaintenanceMode onto the CURRENT live config (re-read inside
+                // the lock) instead of re-installing the whole object captured before the lock — a
+                // concurrent SaveConfig may have swapped the singleton, and its banner edits must not
+                // be lost. In the common (no-race) case live == config, so this is a self-assign.
+                var live = Plugin.Instance!.Configuration;
+                live.MaintenanceMode = config.MaintenanceMode;
+                Plugin.Instance.UpdateConfiguration(live);
                 Plugin.Instance.SaveConfiguration();
             }).ConfigureAwait(false);
 
@@ -691,15 +704,18 @@ public class BannerController : ControllerBase
         if (Plugin.Instance is null)
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Plugin not initialised yet.");
 
-        var (userId, _) = ResolveCurrentUser();
+        var (userId, isAdmin) = ResolveCurrentUser();
         if (userId is null)
             return Unauthorized();
 
         var config = Plugin.Instance.Configuration;
-        // Guard against marking-seen on a non-existent or untargeted announcement —
-        // prevents users from spamming arbitrary IDs into the tracking list.
+        // Guard against marking-seen on a non-existent OR non-targeted announcement — prevents a
+        // user from pre-suppressing (for themselves) an announcement not aimed at them.
         var match = config.Announcements.FirstOrDefault(a => a.Id == id);
         if (match is null) return NoContent(); // unknown id: silent no-op (announcement may have been deleted)
+        // v0.8.6: gate on STATIC targeting (role + UUID) only — not schedule/expiry/draft — so a
+        // legitimate late dismiss just after a scheduled window closes still persists.
+        if (!AnnouncementHelper.IsStaticallyTargeted(match, userId, isAdmin)) return NoContent();
 
         // This endpoint is [Authorize] (ANY authenticated user) and called by every client at
         // login, so concurrent calls race on the shared AnnouncementsSeen List<T>. The whole
@@ -822,11 +838,17 @@ public class BannerController : ControllerBase
         config.AnnouncementTheme = NormaliseAnnouncementTheme(body.Theme);
         // v0.6.0: persist (or clear) the custom theme block.
         config.CustomAnnouncementTheme = NormaliseCustomAnnouncementTheme(body.CustomTheme);
-        // Drop tracking for announcements that no longer exist, then persist — both under the
-        // single config lock (PruneOrphanedSeenEntries mutates the shared AnnouncementsSeen list).
+        // v0.8.6 (A#16): also prune UUIDs of deleted users from the seen-tracking so it can't grow
+        // unbounded. Snapshot the live user ids (canonical lowercase "D", matching how MarkSeen
+        // stores them) before taking the config lock. Null-safe: when the user manager is
+        // unavailable (e.g. the pure endpoint unit tests pass null), skip user pruning rather than
+        // NRE — passing null to PruneOrphanedSeenEntries leaves per-entry UserIds untouched.
+        var liveUserIds = _userManager?.GetUsers()?.Select(u => u.Id.ToString()).ToHashSet(StringComparer.Ordinal);
+        // Drop tracking for announcements that no longer exist (and stale users), then persist —
+        // both under the single config lock (PruneOrphanedSeenEntries mutates the shared list).
         MaintenanceHelper.WithConfigLock(() =>
         {
-            AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming);
+            AnnouncementHelper.PruneOrphanedSeenEntries(config.AnnouncementsSeen, incoming, liveUserIds);
             Plugin.Instance!.UpdateConfiguration(config);
             Plugin.Instance.SaveConfiguration();
         });
@@ -962,6 +984,13 @@ public class BannerController : ControllerBase
             switch (sch.Type)
             {
                 case "fixed":
+                    // v0.8.6: reject a non-empty but unparseable bound at the boundary. Otherwise it
+                    // persists and is then silently ignored server-side (announcement shows 24/7) while
+                    // banner.js hides it — a behavioural divergence between the two schedule engines.
+                    if (!string.IsNullOrEmpty(sch.FixedStart) && !DateTimeOffset.TryParse(sch.FixedStart, out _))
+                        return $"Invalid fixed schedule in {context}: fixedStart is not a valid date/time.";
+                    if (!string.IsNullOrEmpty(sch.FixedEnd) && !DateTimeOffset.TryParse(sch.FixedEnd, out _))
+                        return $"Invalid fixed schedule in {context}: fixedEnd is not a valid date/time.";
                     // If both bounds are set and parseable, FixedStart must precede FixedEnd.
                     if (!string.IsNullOrEmpty(sch.FixedStart) && !string.IsNullOrEmpty(sch.FixedEnd)
                         && DateTimeOffset.TryParse(sch.FixedStart, out var fs)
@@ -1051,17 +1080,19 @@ public class BannerController : ControllerBase
     }
 
     /// <summary>Returns true for null/empty URLs and URLs starting with http://, https://,
-    /// or a single-leading-slash path. Explicitly rejects protocol-relative URLs (`//evil.com`)
-    /// which would navigate to an arbitrary host when used in href attributes.</summary>
+    /// or a single-leading-slash path. Explicitly rejects protocol-relative URLs (`//evil.com`
+    /// AND `/\evil.com`, which browsers normalise to `//` for special schemes) which would
+    /// navigate to an arbitrary host when used in href attributes.</summary>
     internal static bool IsUrlSafe(string? url)
     {
         if (string.IsNullOrEmpty(url)) return true;
         if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
             || url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             return true;
-        // Single-leading-slash path: allow `/foo` but reject `//foo` (protocol-relative).
-        return url.StartsWith("/", StringComparison.Ordinal)
-            && !url.StartsWith("//", StringComparison.Ordinal);
+        // Single-leading-slash path: allow `/foo` but reject `//foo` and `/\foo` — the browser
+        // normalises a leading backslash to a slash, so both are protocol-relative to a host.
+        if (!url.StartsWith("/", StringComparison.Ordinal)) return false;
+        return url.Length < 2 || (url[1] != '/' && url[1] != '\\');
     }
 
     /// <summary>SSRF defense for outbound webhook URLs (v0.7.0). The plugin makes the request
@@ -1302,12 +1333,30 @@ public class BannerController : ControllerBase
 
     private static readonly Regex _hexColorRegex = new(@"^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
 
-    /// <summary>Trims, truncates, and returns null for empty strings.</summary>
+    /// <summary>Truncates to at most <paramref name="maxLength"/> UTF-16 code units WITHOUT splitting
+    /// a surrogate pair. A raw <c>s[..maxLength]</c> that cuts between a high and low surrogate leaves a
+    /// lone surrogate; Jellyfin then serialises the config through XmlWriter (CheckCharacters=true), which
+    /// throws ArgumentException on the lone surrogate — turning an admin save into a 500 and leaving disk
+    /// out of sync. This is accidentally hittable with emoji content near a length cap (the icon default
+    /// is itself an emoji). When the boundary would land mid-pair we back off one unit so the astral char
+    /// is dropped whole instead of half-kept.</summary>
+    internal static string TruncateToMaxUtf16(string s, int maxLength)
+    {
+        if (maxLength <= 0) return string.Empty;
+        if (s.Length <= maxLength) return s;
+        var cut = maxLength;
+        // s[cut-1] is the last kept unit; if it is a high surrogate its low half sits at index cut,
+        // so the pair straddles the boundary — drop it whole by moving the cut back one unit.
+        if (char.IsHighSurrogate(s[cut - 1])) cut--;
+        return s[..cut];
+    }
+
+    /// <summary>Trims, truncates (surrogate-safe), and returns null for empty strings.</summary>
     internal static string? NormaliseOptionalString(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         var trimmed = value.Trim();
-        return trimmed.Length > maxLength ? trimmed[..maxLength] : trimmed;
+        return trimmed.Length > maxLength ? TruncateToMaxUtf16(trimmed, maxLength) : trimmed;
     }
 
     /// <summary>Whitelists the theme key, falling back to "velours" for unknown values.</summary>
@@ -1361,7 +1410,7 @@ public class BannerController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(value)) return "✨";
         var trimmed = value.Trim();
-        return trimmed.Length > MaxIconLength ? trimmed[..MaxIconLength] : trimmed;
+        return trimmed.Length > MaxIconLength ? TruncateToMaxUtf16(trimmed, MaxIconLength) : trimmed;
     }
 
     private static readonly HashSet<string> _validAnimationSpeeds =

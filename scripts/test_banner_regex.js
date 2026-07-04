@@ -26,6 +26,11 @@ const cases = [
   ['//evil.com', false, 'protocol-relative host (XSS vector)'],
   ['//evil.com/path', false, 'protocol-relative with path'],
   ['///triple', false, 'triple slash'],
+  // v0.8.6: backslash protocol-relative — browsers normalise leading \ to /, so these
+  // resolve to //evil.com. Must be rejected like //. Mirror of BannerController.IsUrlSafe.
+  ['/\\evil.com', false, 'backslash protocol-relative'],
+  ['/\\/evil.com', false, 'backslash + slash'],
+  ['https://\\evil.com', false, 'https then backslash host'],
   ['javascript:alert(1)', false, 'javascript scheme'],
   ['data:text/html,x', false, 'data scheme'],
   ['vbscript:msgbox', false, 'vbscript scheme'],

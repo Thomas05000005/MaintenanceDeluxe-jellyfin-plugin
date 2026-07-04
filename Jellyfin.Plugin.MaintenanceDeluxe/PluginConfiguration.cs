@@ -784,9 +784,12 @@ public class PluginConfiguration : BasePluginConfiguration
     [JsonPropertyName("lastModified")]
     public long LastModified { get; set; }
 
-    /// <summary>Gets or sets the maintenance mode configuration.</summary>
+    /// <summary>Gets or sets the maintenance mode configuration.
+    /// v0.8.6: property-level initializer (like Announcements / AnnouncementsSeen below) —
+    /// XmlSerializer can bypass the constructor on legacy XML with an explicit nil value,
+    /// leaving this null and NRE-ing the toggle endpoint and every 1-minute scheduler tick.</summary>
     [JsonPropertyName("maintenanceMode")]
-    public MaintenanceSetting MaintenanceMode { get; set; }
+    public MaintenanceSetting MaintenanceMode { get; set; } = new();
 
     /// <summary>Gets or sets the list of admin-authored announcements (see <see cref="Announcement"/>).
     /// v0.7.0: property-level initializer in addition to the constructor — XmlSerializer

@@ -1,7 +1,13 @@
 (function () {
     "use strict";
 
-    // Prevent double-execution (JS Injector + direct <script> tag).
+    // Prevent double-execution (JS Injector + direct <script> tag). v0.8.6: a SYNCHRONOUS
+    // window-level flag set before any async work -- the #jf-maintenance-deluxe element below is
+    // only attached after the /config fetch resolves, so the old element-only guard could not stop
+    // two near-simultaneous executions from both duplicating the <style>, BroadcastChannel and
+    // history/nav hooks. The element check stays as a secondary safeguard.
+    if (window.__jfMdLoaded) return;
+    window.__jfMdLoaded = true;
     if (document.getElementById("jf-maintenance-deluxe")) return;
 
     var CONFIG = null; // loaded asynchronously from /MaintenanceDeluxe/config
@@ -17,9 +23,10 @@
     // v0.6.1: centralised URL allowlist. Same regex previously duplicated 4x across
     // the file (linkSafeUrl in mdToHtml, safeUrl in showBanner, ctaUrl in announcement
     // builder, imageUrl in announcement builder). Allows http(s) absolute URLs and
-    // single-leading-slash paths. Explicitly rejects protocol-relative URLs (//evil.com)
-    // which would navigate to an arbitrary host when used in href/src attributes.
-    var SAFE_URL_RE = /^(https?:\/\/[^\/]|\/(?!\/))/i;
+    // single-leading-slash paths. Explicitly rejects protocol-relative URLs (//evil.com AND
+    // /\evil.com, which browsers normalise to // for special schemes) which would navigate to an
+    // arbitrary host when used in href/src attributes. v0.8.6: mirror of BannerController.IsUrlSafe.
+    var SAFE_URL_RE = /^(https?:\/\/[^\/\\]|\/(?![\/\\]))/i;
     var SEL_SKIN_HEADER = ".skinHeader";
     var SEL_SKIN_BODY_PAGE = ".skinBody .page";
 
@@ -1014,7 +1021,10 @@
         }
 
         cardHtml += '<div class="jf-md-footer">';
-        if (statusUrl) {
+        // v0.8.6: gate statusUrl through SAFE_URL_RE like imageUrl / ctaUrl (the server already
+        // validates it, but this makes the client the consistent last line of defence and closes
+        // the unvalidated live-preview postMessage injection path).
+        if (statusUrl && SAFE_URL_RE.test(statusUrl)) {
             cardHtml += '<a class="jf-md-status-link" href="' + encodeURI(statusUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeMdHtml(MD_I18N.statusLink) + '</a>';
         }
         // Always expose a dismiss button: admins need it to keep working, and on
@@ -1532,7 +1542,15 @@
     }
 
     // Re-fetches /MaintenanceDeluxe/maintenance and applies state. Safe to call often.
+    // v0.8.6: an in-flight guard coalesces overlapping calls. This function is bound to
+    // hashchange/popstate/viewshow AND invoked from onNavigate, so a single SPA navigation used
+    // to fire two concurrent /maintenance fetches; the guard drops the redundant one. Maintenance
+    // state is global (not per-route), so skipping a concurrent duplicate loses nothing.
+    var _maintInFlight = false;
     function refetchAndApplyMaintenance() {
+        if (_maintInFlight) return Promise.resolve();
+        _maintInFlight = true;
+        var clear = function () { _maintInFlight = false; };
         return fetch("/MaintenanceDeluxe/maintenance")
             .then(function (r) { return r.ok ? r.json() : null; })
             .catch(function () { return null; })
@@ -1545,7 +1563,8 @@
                 // every time we revisit maintenance state; the idempotency guard
                 // inside maybeShowAnnouncements ensures we only POST once per token.
                 maybeShowAnnouncements();
-            });
+            })
+            .then(clear, clear);
     }
 
     // Tracks which token we've already shown the queue for. Reset to null when
@@ -2524,11 +2543,11 @@
                     if (document.body.classList.contains('jf-banner-active')) {
                         requestAnimationFrame(applyBodyMargin);
                     }
-                    // Re-check maintenance state on each navigation (unauthenticated).
-                    fetch("/MaintenanceDeluxe/maintenance")
-                        .then(function (r) { return r.ok ? r.json() : null; })
-                        .then(function (m) { if (!m) return; MAINTENANCE = m; applyMaintenanceState(); })
-                        .catch(function () {});
+                    // Re-check maintenance state on each navigation. v0.8.6: route through the
+                    // shared, in-flight-guarded refetchAndApplyMaintenance so this no longer issues
+                    // a SECOND /maintenance fetch alongside the one bound directly to hashchange/
+                    // popstate (A#21). Same behaviour, one request per navigation.
+                    refetchAndApplyMaintenance();
                     // Poll config for changes: if lastModified has advanced, reload
                     // the full config so new messages appear within one rotation cycle.
                     var tok = getToken();

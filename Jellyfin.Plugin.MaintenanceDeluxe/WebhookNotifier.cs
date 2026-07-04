@@ -236,7 +236,10 @@ internal static class WebhookNotifier
             }
             catch (HttpRequestException ex) when (attempt == 1)
             {
-                logger?.LogDebug(ex, "Webhook transport error, retrying once.");
+                // v0.8.6: never pass the raw exception (its message can embed host:port) — mirror
+                // the sanitisation used by NotifyAsync/TestAsync so a Debug log can't leak the host.
+                logger?.LogDebug("Webhook transport error, retrying once: {ExType}: {ExMessage}",
+                    ex.GetType().Name, SanitiseExceptionMessage(ex.Message, url));
                 continue;
             }
         }
@@ -353,13 +356,25 @@ internal static class WebhookNotifier
         };
     }
 
+    /// <summary>Strips Slack mrkdwn control characters from admin-entered content so it cannot
+    /// break out of link markup or inject broadcast mentions like <c>&lt;!channel&gt;</c> / <c>&lt;!here&gt;</c>.
+    /// Angle brackets start every mrkdwn control sequence; the pipe additionally delimits
+    /// <c>&lt;url|label&gt;</c> links. Admin-only content, but this closes the markup-injection footgun.</summary>
+    private static string SlackSanitise(string? s) =>
+        string.IsNullOrEmpty(s) ? string.Empty
+            : s.Replace("<", string.Empty, StringComparison.Ordinal)
+               .Replace(">", string.Empty, StringComparison.Ordinal)
+               .Replace("|", string.Empty, StringComparison.Ordinal);
+
     private static object BuildSlackPayload(WebhookEvent evt, MaintenanceSetting m)
     {
         var (title, desc, _, _) = GetEventMeta(evt, m);
         var blocks = new System.Collections.Generic.List<object>
         {
+            // header is plain_text (control chars are literal there); the section is mrkdwn, so
+            // strip the control chars from admin-controlled desc.
             new { type = "header", text = new { type = "plain_text", text = title } },
-            new { type = "section", text = new { type = "mrkdwn", text = desc } }
+            new { type = "section", text = new { type = "mrkdwn", text = SlackSanitise(desc) } }
         };
 
         var fieldList = new System.Collections.Generic.List<object>();
@@ -377,7 +392,7 @@ internal static class WebhookNotifier
         if (fieldList.Count > 0)
             blocks.Add(new { type = "section", fields = fieldList.ToArray() });
         if (!string.IsNullOrWhiteSpace(m.StatusUrl))
-            blocks.Add(new { type = "section", text = new { type = "mrkdwn", text = $"<{m.StatusUrl}|Page de statut>" } });
+            blocks.Add(new { type = "section", text = new { type = "mrkdwn", text = $"<{SlackSanitise(m.StatusUrl)}|Page de statut>" } });
 
         return new { blocks = blocks.ToArray() };
     }

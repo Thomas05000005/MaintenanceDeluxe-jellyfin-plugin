@@ -4,7 +4,7 @@
           // `_pluginVersion` so a config exported now is traceable to the version
           // that produced it. The csproj <AssemblyVersion> remains the source of
           // truth — keep this string aligned with it.
-          var PLUGIN_VERSION = '0.8.5.0';
+          var PLUGIN_VERSION = '0.9.0.0';
 
           var DEFAULT_PRESETS = [
             { label: '⚠️ Maintenance', bg: '#ff9800', color: '#000000' },
@@ -154,7 +154,11 @@
 
           function switchTab(name) {
             document.querySelectorAll('.jf-tab').forEach(function (t) {
-              t.classList.toggle('active', t.dataset.tab === name);
+              var on = t.dataset.tab === name;
+              t.classList.toggle('active', on);
+              // v0.8.6 (A#26): keep the ARIA selected state + roving tabindex in sync.
+              t.setAttribute('aria-selected', on ? 'true' : 'false');
+              t.tabIndex = on ? 0 : -1;
             });
             document.querySelectorAll('.jf-panel').forEach(function (p) {
               p.classList.toggle('active', p.dataset.panel === name);
@@ -663,6 +667,18 @@
             colorText.addEventListener('input', function () {
               onPresetsChangedDebounced();
             });
+            // v0.8.6 (A#23): on blur, expand a valid 3-digit hex (#ff0) to the 6-digit form the
+            // server accepts (#ffff00). Otherwise the swatch/preview shows the colour but the save
+            // silently resets it to the type default (server NormaliseHexColor only takes #RRGGBB).
+            function expandShortHexOnBlur() {
+              var h = toHex6(this.value.trim());
+              if (/^#[0-9a-fA-F]{6}$/.test(h) && this.value.trim() !== h) {
+                this.value = h;
+                onPresetsChangedDebounced();
+              }
+            }
+            bgText.addEventListener('change', expandShortHexOnBlur);
+            colorText.addEventListener('change', expandShortHexOnBlur);
             labelInput.addEventListener('input', function () {
               onPresetsChangedDebounced();
             });
@@ -703,7 +719,29 @@
             var dragHandle = document.createElement('span');
             dragHandle.className = 'jf-drag-handle';
             dragHandle.textContent = '⠿';
-            dragHandle.title = 'Drag to reorder';
+            dragHandle.title = 'Glisser pour réordonner (flèches haut/bas au clavier)';
+            // v0.8.6: keyboard-accessible reorder (WCAG 2.1.1). Row order sets message priority /
+            // announcement order, and used to be mouse-drag-only — a keyboard/motor user could not
+            // reorder at all. The handle is now a focusable button; ArrowUp/ArrowDown move the row
+            // via the SAME insertBefore the drop handler uses, then re-focus the handle.
+            dragHandle.setAttribute('role', 'button');
+            dragHandle.setAttribute('tabindex', '0');
+            dragHandle.setAttribute('aria-label', 'Réordonner : flèches haut ou bas pour déplacer cette entrée');
+            dragHandle.addEventListener('keydown', function (e) {
+              if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+              var prev = row.previousElementSibling;
+              var next = row.nextElementSibling;
+              if (e.key === 'ArrowUp' && prev) {
+                e.preventDefault();
+                row.parentNode.insertBefore(row, prev);
+              } else if (e.key === 'ArrowDown' && next) {
+                e.preventDefault();
+                row.parentNode.insertBefore(row, next.nextElementSibling);
+              } else {
+                return; // already at the top / bottom edge
+              }
+              dragHandle.focus();
+            });
 
             var swatch = document.createElement('span');
             swatch.className = 'jf-msg-swatch';
@@ -1238,11 +1276,52 @@
             if (_initialized) return;
             _initialized = true;
 
-            document.querySelectorAll('.jf-tab').forEach(function (t) {
-              t.addEventListener('click', function () {
-                switchTab(this.dataset.tab);
+            // v0.8.6 (A#26): wire the ARIA tab pattern (tablist/tab/tabpanel) + roving-tabindex
+            // arrow navigation so the tab widget is announced and keyboard-operable like a real
+            // tablist. Done in JS to keep configPage.html declarative.
+            var tabStrip = document.querySelector('.jf-tab-strip');
+            if (tabStrip) tabStrip.setAttribute('role', 'tablist');
+            var tabEls = Array.prototype.slice.call(document.querySelectorAll('.jf-tab'));
+            tabEls.forEach(function (t) {
+              var name = t.dataset.tab;
+              t.setAttribute('role', 'tab');
+              t.id = 'jf-tab-' + name;
+              t.setAttribute('aria-controls', 'jf-panel-' + name);
+              t.setAttribute('aria-selected', t.classList.contains('active') ? 'true' : 'false');
+              t.tabIndex = t.classList.contains('active') ? 0 : -1;
+              t.addEventListener('click', function () { switchTab(this.dataset.tab); });
+              t.addEventListener('keydown', function (ev) {
+                var idx = tabEls.indexOf(this);
+                var next = -1;
+                if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') next = (idx + 1) % tabEls.length;
+                else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') next = (idx - 1 + tabEls.length) % tabEls.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = tabEls.length - 1;
+                if (next < 0) return;
+                ev.preventDefault();
+                switchTab(tabEls[next].dataset.tab);
+                tabEls[next].focus();
               });
             });
+            document.querySelectorAll('.jf-panel').forEach(function (p) {
+              var pname = p.dataset.panel;
+              p.setAttribute('role', 'tabpanel');
+              p.id = 'jf-panel-' + pname;
+              p.setAttribute('aria-labelledby', 'jf-tab-' + pname);
+              p.setAttribute('tabindex', '0');
+            });
+
+            // v0.8.6 (A#28): hide decorative Material Icons ligatures from assistive tech (so a
+            // ligature like "restore" isn't announced as the button's name) and give icon-only
+            // buttons an accessible name from their title. One sweep covers every static icon.
+            try {
+              document.querySelectorAll('#MaintenanceDeluxeConfigPage .material-icons')
+                .forEach(function (s) { s.setAttribute('aria-hidden', 'true'); });
+              document.querySelectorAll('#MaintenanceDeluxeConfigPage .jf-icon-btn[title]')
+                .forEach(function (b) {
+                  if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', b.getAttribute('title'));
+                });
+            } catch (e) { /* ignore */ }
 
             document
               .getElementById('addPermanentEntry')
@@ -1618,18 +1697,12 @@
                     ) || 0,
                   showDismissButton:
                     document.getElementById('showDismissButton').checked,
-                  dismissButtonSize:
-                    parseInt(
-                      document.getElementById('dismissButtonSize').value,
-                      10
-                    ) || 20,
+                  dismissButtonSize: Math.max(8, Math.min(64,
+                    parseInt(document.getElementById('dismissButtonSize').value, 10) || 20)),
                   showDismissAll:
                     document.getElementById('showDismissAll').checked,
-                  dismissAllSize:
-                    parseInt(
-                      document.getElementById('dismissAllSize').value,
-                      10
-                    ) || 10,
+                  dismissAllSize: Math.max(8, Math.min(64,
+                    parseInt(document.getElementById('dismissAllSize').value, 10) || 10)),
                   dismissAllText:
                     document.getElementById('dismissAllText').value ||
                     'hide all',
@@ -1698,7 +1771,14 @@
                     var configErr = results[0].status === 'rejected';
                     var maintErr = results[1].status === 'rejected';
                     var annErr = results[2].status === 'rejected';
-                    if (!configErr && !maintErr && !annErr) {
+                    // A maintenance "rejection" tagged {cancelled:true} is the admin aborting the
+                    // streaming pre-flight — NOT a failure. Maintenance was intentionally not saved
+                    // (config + announcements still did). It must be treated as neither success
+                    // (which would clear dirty + drop the draft, lying about the maintenance edits)
+                    // nor a hard error.
+                    var maintCancelled = maintErr && results[1].reason && results[1].reason.cancelled === true;
+                    var realMaintErr = maintErr && !maintCancelled;
+                    if (!configErr && !realMaintErr && !annErr && !maintCancelled) {
                       // Successful save: clear dirty state + drop autosave draft + clear per-row pulse.
                       try { setConfigDirty(false); } catch (e) {}
                       try { localStorage.removeItem('md_draft_v1'); } catch (e) {}
@@ -1708,13 +1788,21 @@
                       } else {
                         Dashboard.alert('Configuration enregistrée.');
                       }
-                    } else {
-                      var msgs = [];
-                      if (configErr) msgs.push('config bannière/préréglage : ' + ((results[0].reason && results[0].reason.responseText) || results[0].reason || 'erreur inconnue'));
-                      if (maintErr) msgs.push('maintenance : ' + ((results[1].reason && results[1].reason.responseText) || results[1].reason || 'erreur inconnue'));
-                      if (annErr) msgs.push('annonces : ' + ((results[2].reason && results[2].reason.responseText) || results[2].reason || 'erreur inconnue'));
-                      Dashboard.alert('Échec partiel des sauvegardes :\n- ' + msgs.join('\n- '));
+                      return;
                     }
+                    // Partial / cancelled: keep dirty + draft so the admin is warned on navigate-away.
+                    var msgs = [];
+                    if (configErr) msgs.push('config bannière/préréglage : ' + ((results[0].reason && results[0].reason.responseText) || results[0].reason || 'erreur inconnue'));
+                    if (realMaintErr) msgs.push('maintenance : ' + ((results[1].reason && results[1].reason.responseText) || results[1].reason || 'erreur inconnue'));
+                    if (annErr) msgs.push('annonces : ' + ((results[2].reason && results[2].reason.responseText) || results[2].reason || 'erreur inconnue'));
+                    var parts = [];
+                    if (maintCancelled) {
+                      parts.push(msgs.length
+                        ? 'Maintenance non enregistrée (activation annulée).'
+                        : 'Maintenance non enregistrée (activation annulée). Les autres réglages ont été sauvegardés.');
+                    }
+                    if (msgs.length) parts.push('Échec partiel des sauvegardes :\n- ' + msgs.join('\n- '));
+                    Dashboard.alert(parts.join('\n'));
                   })
                   .catch(function (err) {
                     restoreBtn();
@@ -1738,6 +1826,54 @@
             return String(s).replace(/[<>&"']/g, function (c) {
               return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c];
             });
+          }
+
+          // ── Shared modal accessibility (v0.8.6) ─────────────────────────────
+          // The plain (non-dangerConfirm) overlays — the Uptime Kuma URL builder and the
+          // Import preview — used to open by just flipping display:flex, without moving focus
+          // into the dialog or trapping Tab. A keyboard/AT user could tab straight out into the
+          // still-focusable background form, and a screen reader was never told a dialog opened.
+          // These helpers add the focus move + Tab-trap + focus-restore; dangerConfirm keeps its
+          // own equivalent inline trap. The role/aria-modal/aria-labelledby markup is static in
+          // configPage.html.
+          function modalFocusables(modalEl) {
+            var sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), '
+              + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+            return Array.prototype.slice.call(modalEl.querySelectorAll(sel))
+              .filter(function (el) { return el.offsetParent !== null || el === document.activeElement; });
+          }
+          function openModalA11y(modalEl) {
+            if (!modalEl) return;
+            modalEl._mdPrevFocus = document.activeElement;
+            modalEl.style.display = 'flex';
+            var handler = function (e) {
+              if (e.key !== 'Tab') return;
+              var list = modalFocusables(modalEl);
+              if (!list.length) return;
+              var first = list[0];
+              var last = list[list.length - 1];
+              var active = document.activeElement;
+              if (e.shiftKey) {
+                if (active === first || !modalEl.contains(active)) { e.preventDefault(); last.focus(); }
+              } else {
+                if (active === last || !modalEl.contains(active)) { e.preventDefault(); first.focus(); }
+              }
+            };
+            modalEl._mdKeyHandler = handler;
+            document.addEventListener('keydown', handler);
+            var firstEl = modalFocusables(modalEl)[0];
+            if (firstEl) { try { firstEl.focus(); } catch (e) { /* ignore */ } }
+          }
+          function closeModalA11y(modalEl) {
+            if (!modalEl) return;
+            if (modalEl._mdKeyHandler) {
+              document.removeEventListener('keydown', modalEl._mdKeyHandler);
+              modalEl._mdKeyHandler = null;
+            }
+            modalEl.style.display = 'none';
+            var prev = modalEl._mdPrevFocus;
+            modalEl._mdPrevFocus = null;
+            if (prev && typeof prev.focus === 'function') { try { prev.focus(); } catch (e) { /* ignore */ } }
           }
 
           // Custom confirmation modal for destructive actions. Returns a Promise<boolean>.
@@ -2375,9 +2511,10 @@
           }
 
           function buildDraftSnapshot() {
-            // Snapshot the maintenance form state and the global config form together
-            // so a restore puts everything back. We reuse the same builders the save
-            // path uses so the schema stays consistent.
+            // v0.8.6 (A#24): this snapshots the MAINTENANCE tab only (buildPreviewConfig). The dirty
+            // tracker / beforeunload / autosave fire on edits to ANY tab, but only maintenance is
+            // captured here and restored below — so the restore prompt is explicit that banner /
+            // announcement edits are NOT part of the draft (previously it implied a full restore).
             try {
               var snap = {
                 savedAt: Date.now(),
@@ -2455,8 +2592,9 @@
             }
             var iso = new Date(draft.savedAt).toLocaleString('fr-FR');
             var keep = window.confirm(
-              "Un brouillon non enregistré a été détecté (sauvegardé le " + iso + ").\n\n" +
-              "Le restaurer ? (OK = restaurer, Annuler = ignorer et supprimer le brouillon)"
+              "Un brouillon non enregistré de l'onglet Maintenance a été détecté (sauvegardé le " + iso + ").\n\n" +
+              "Le restaurer ? Seul l'onglet Maintenance est concerné (pas les bannières ni les annonces).\n" +
+              "(OK = restaurer, Annuler = ignorer et supprimer le brouillon)"
             );
             if (!keep) {
               try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
@@ -2659,7 +2797,7 @@
                 }
                 updateKumaPreview();
                 document.getElementById('mdKumaTestResult').style.display = 'none';
-                kumaModal.style.display = 'flex';
+                openModalA11y(kumaModal);
               });
               ['mdKumaInstance', 'mdKumaSlug'].forEach(function (id) {
                 var el = document.getElementById(id);
@@ -2667,7 +2805,7 @@
               });
               var kumaCancel = document.getElementById('mdKumaCancelBtn');
               if (kumaCancel) kumaCancel.addEventListener('click', function () {
-                kumaModal.style.display = 'none';
+                closeModalA11y(kumaModal);
               });
               var kumaApply = document.getElementById('mdKumaApplyBtn');
               if (kumaApply) kumaApply.addEventListener('click', function () {
@@ -2678,7 +2816,15 @@
                   statusEl.value = url;
                   setConfigDirty(true);
                 }
-                kumaModal.style.display = 'none';
+                closeModalA11y(kumaModal);
+              });
+              // v0.8.6: Escape + backdrop click close the Kuma modal too (parity with Import),
+              // routed through closeModalA11y so focus is restored and the Tab-trap is torn down.
+              kumaModal.addEventListener('click', function (e) {
+                if (e.target === kumaModal) closeModalA11y(kumaModal);
+              });
+              document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && kumaModal.style.display !== 'none') closeModalA11y(kumaModal);
               });
               var kumaTest = document.getElementById('mdKumaTestBtn');
               if (kumaTest) kumaTest.addEventListener('click', function () {
@@ -3048,10 +3194,16 @@
 
             return preflightCheckActiveSessions(isActive).then(function (proceed) {
               if (!proceed) {
-                // Admin cancelled at the streaming-sessions confirm. Re-sync the checkbox
-                // with the backend so the UI doesn't lie about a state we never POSTed.
+                // Admin cancelled at the streaming-sessions confirm. Re-sync the maintenance
+                // form with the backend so the UI doesn't lie about a state we never POSTed,
+                // then signal a DISTINCT non-success outcome (a tagged rejection, not a resolve)
+                // so the submit handler does not report a full save, does not clear the dirty
+                // flag, and does not drop the autosave draft (which would silently discard the
+                // admin's unsaved maintenance-tab edits).
                 return ApiClient.getJSON(ApiClient.getUrl('MaintenanceDeluxe/config-admin'))
-                  .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); });
+                  .then(function (cfg) { applyMaintenanceUi(cfg && cfg.maintenanceMode); })
+                  .catch(function () {})
+                  .then(function () { return Promise.reject({ cancelled: true }); });
               }
               return ApiClient.ajax({
                 type: 'POST',
@@ -3220,7 +3372,7 @@
             if (warnEl) {
               warnEl.textContent = (warnings && warnings.length) ? '⚠ ' + warnings.join(' | ') : '';
             }
-            modal.style.display = 'flex';
+            openModalA11y(modal);
             _pendingImport = parsed;
             // v0.8.0: reactive le bouton Apply maintenant qu'on a un payload valide.
             var applyBtn = document.getElementById('mdImportApplyBtn');
@@ -3235,7 +3387,7 @@
           // application reussie) pour eviter qu'un ancien payload reste applicable.
           function closeImportModal() {
             var modal = document.getElementById('mdImportModal');
-            if (modal) modal.style.display = 'none';
+            if (modal) closeModalA11y(modal);
             _pendingImport = null;
             var applyBtn = document.getElementById('mdImportApplyBtn');
             if (applyBtn) {
@@ -3347,9 +3499,12 @@
             ];
             ApiClient.getJSON(ApiClient.getUrl('Plugins'))
               .then(function (plugins) {
-                var activeNames = plugins
-                  .filter(function (p) { return p.Status === 'Active'; })
-                  .map(function (p) { return p.Name.toLowerCase(); });
+                var activeNames = (plugins || [])
+                  .filter(function (p) { return p && p.Status === 'Active'; })
+                  // v0.8.6 (A#23/A#25 guard): a single plugin with a null Name used to throw here,
+                  // which the empty catch below swallowed -> the missing-prerequisite banner would
+                  // then NEVER appear even when JS Injector / File Transformation are absent.
+                  .map(function (p) { return (p.Name || '').toLowerCase(); });
                 var missing = REQUIRED.filter(function (r) {
                   return !activeNames.some(function (n) { return n.includes(r.match); });
                 }).map(function (r) { return r.name; });
@@ -3361,7 +3516,12 @@
                   warn.style.display = 'none';
                 }
               })
-              .catch(function () {});
+              .catch(function (err) {
+                // v0.8.6 (A#25): fail SOFT but not SILENT — we couldn't verify the prerequisites,
+                // so log it (devtools) instead of swallowing. Don't force-show the banner: a
+                // transient /Plugins hiccup shouldn't cry wolf about missing dependencies.
+                try { console.warn('MaintenanceDeluxe: dependency check failed', err); } catch (e) {}
+              });
           }
 
           // ── Announcements admin UI (v0.3.9) ─────────────────────────────

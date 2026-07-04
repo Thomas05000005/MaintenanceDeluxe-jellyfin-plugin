@@ -40,6 +40,17 @@ internal static class AnnouncementHelper
         if (IsExpired(a, now)) return false;
         if (!IsScheduleActive(a.Schedule, now)) return false;
 
+        return IsStaticallyTargeted(a, userId, isAdmin);
+    }
+
+    /// <summary>The STATIC targeting predicate only: role filter + explicit-UUID filter (no
+    /// schedule / expiry / draft checks). Used by <c>IsTargetedAtUser</c> and by the
+    /// mark-seen endpoint so a user can only suppress an announcement actually aimed at them —
+    /// but WITHOUT the time predicates, so a legitimate late dismiss just after a scheduled
+    /// window closes still persists (avoiding a re-appear regression). An empty list on either
+    /// dimension means "no filter on that dimension".</summary>
+    internal static bool IsStaticallyTargeted(Announcement a, string userId, bool isAdmin)
+    {
         if (a.TargetRoles is { Count: > 0 })
         {
             var wantsAdmin = a.TargetRoles.Contains("admin");
@@ -80,12 +91,16 @@ internal static class AnnouncementHelper
         switch (schedule.Type)
         {
             case "fixed":
+                // v0.8.6: an unparseable-but-present bound now HIDES (fail-safe), matching
+                // banner.js isInSchedule (`isNaN(date) || now < start => hide`). Previously the
+                // TryParse short-circuit made C# IGNORE a malformed bound and SHOW the item 24/7,
+                // diverging from the client. The save boundary (ValidateSchedules) already rejects
+                // malformed bounds, but legacy / hand-edited XML could still reach here and the two
+                // engines must agree.
                 if (!string.IsNullOrEmpty(schedule.FixedStart)
-                    && DateTimeOffset.TryParse(schedule.FixedStart, out var fs)
-                    && now < fs) return false;
+                    && (!DateTimeOffset.TryParse(schedule.FixedStart, out var fs) || now < fs)) return false;
                 if (!string.IsNullOrEmpty(schedule.FixedEnd)
-                    && DateTimeOffset.TryParse(schedule.FixedEnd, out var fe)
-                    && now > fe) return false;
+                    && (!DateTimeOffset.TryParse(schedule.FixedEnd, out var fe) || now > fe)) return false;
                 return true;
 
             case "annual":
@@ -222,13 +237,25 @@ internal static class AnnouncementHelper
 
     /// <summary>Removes seen-tracking entries that reference announcement IDs no longer in
     /// the announcements list. Garbage-collects stale tracking when admins delete announcements.
-    /// Mutates the input list. Returns the count removed.</summary>
+    /// Mutates the input list. Returns the count of ENTRIES removed.
+    /// v0.8.6: when <paramref name="liveUserIds"/> is supplied, also drops UUIDs of deleted users
+    /// from the surviving entries' UserIds lists, so seen-tracking cannot grow unbounded on a
+    /// high-churn instance with a long-lived announcement. Null (the default) skips user pruning
+    /// for callers that don't have the live user set handy.</summary>
     internal static int PruneOrphanedSeenEntries(
         List<AnnouncementsSeenEntry> seenTracking,
-        IEnumerable<Announcement> announcements)
+        IEnumerable<Announcement> announcements,
+        IReadOnlyCollection<string>? liveUserIds = null)
     {
         var validIds = announcements.Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
-        return seenTracking.RemoveAll(e => !validIds.Contains(e.AnnouncementId));
+        var removed = seenTracking.RemoveAll(e => !validIds.Contains(e.AnnouncementId));
+        if (liveUserIds is not null)
+        {
+            var live = liveUserIds as HashSet<string> ?? new HashSet<string>(liveUserIds, StringComparer.Ordinal);
+            foreach (var e in seenTracking)
+                e.UserIds?.RemoveAll(uid => !live.Contains(uid));
+        }
+        return removed;
     }
 
     private static readonly HashSet<string> _validImportances =
@@ -265,13 +292,22 @@ internal static class AnnouncementHelper
             .ToList();
     }
 
-    /// <summary>Filters out malformed UUIDs and deduplicates. Empty / null input returns empty list.</summary>
+    /// <summary>Filters out malformed UUIDs, canonicalises, and deduplicates. Empty / null input
+    /// returns empty list. v0.8.6: each id is projected through <c>Guid.ToString()</c> (the "D",
+    /// lowercase, unbraced form) so a non-canonical GUID arriving via a raw API POST or imported
+    /// config still matches the runtime user id — which is <c>user.Id.ToString()</c> — instead of
+    /// silently never targeting that user because the ordinal string compare differed on casing.</summary>
     internal static List<string> NormaliseTargetUserIds(IEnumerable<string>? input)
     {
         if (input is null) return new List<string>();
-        return input
-            .Where(id => !string.IsNullOrEmpty(id) && Guid.TryParse(id, out _))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var id in input)
+        {
+            if (string.IsNullOrEmpty(id) || !Guid.TryParse(id, out var g)) continue;
+            var canon = g.ToString();
+            if (seen.Add(canon)) result.Add(canon);
+        }
+        return result;
     }
 }

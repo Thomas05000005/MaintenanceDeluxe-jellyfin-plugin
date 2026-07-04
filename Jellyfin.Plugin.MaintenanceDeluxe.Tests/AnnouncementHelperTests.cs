@@ -597,6 +597,42 @@ public class AnnouncementHelperTests
         Assert.Contains(validGuid, result);
     }
 
+    [Fact]
+    public void NormaliseTargetUserIds_CanonicalisesUppercaseAndBracedToLowercaseD()
+    {
+        var g = Guid.NewGuid();
+        var upper = g.ToString().ToUpperInvariant();
+        var braced = "{" + g.ToString() + "}";
+        // Both are the SAME GUID in non-canonical forms; must collapse to one canonical
+        // lowercase "D" string that equals user.Id.ToString() at match time.
+        var result = AnnouncementHelper.NormaliseTargetUserIds(new[] { upper, braced });
+        Assert.Single(result);
+        Assert.Equal(g.ToString(), result[0]);
+    }
+
+    [Fact]
+    public void IsScheduleActive_FixedUnparseableBound_Hides_MatchingBannerJs()
+    {
+        var now = new DateTimeOffset(2026, 5, 20, 12, 0, 0, TimeSpan.Zero);
+        // v0.8.6: an unparseable fixed bound HIDES (fail-safe), mirroring banner.js isInSchedule.
+        Assert.False(AnnouncementHelper.IsScheduleActive(
+            new BannerSchedule { Type = "fixed", FixedStart = "garbage" }, now));
+        Assert.False(AnnouncementHelper.IsScheduleActive(
+            new BannerSchedule { Type = "fixed", FixedEnd = "not-a-date" }, now));
+    }
+
+    [Fact]
+    public void IsStaticallyTargeted_AppliesRoleAndUuidFiltersOnly()
+    {
+        var uid = Guid.NewGuid().ToString();
+        // IsDraft is deliberately IGNORED by the static predicate (used by the mark-seen guard).
+        var a = new Announcement { Id = "x", TargetRoles = new() { "user" }, TargetUserIds = new() { uid }, IsDraft = true };
+        Assert.True(AnnouncementHelper.IsStaticallyTargeted(a, uid, isAdmin: false));                     // role + uuid match
+        Assert.False(AnnouncementHelper.IsStaticallyTargeted(a, uid, isAdmin: true));                     // admin not in TargetRoles
+        Assert.False(AnnouncementHelper.IsStaticallyTargeted(a, Guid.NewGuid().ToString(), isAdmin: false)); // uuid mismatch
+        Assert.True(AnnouncementHelper.IsStaticallyTargeted(new Announcement { Id = "y" }, uid, isAdmin: false)); // no filters -> everyone
+    }
+
     // ── Hardening (mutation testing showed kill-count == 1 for these) ─────────
     // Each InlineData row is an independent test case, so a value mutation on
     // HasUserSeen is now caught by several cases, not one fragile assertion block.
@@ -616,6 +652,40 @@ public class AnnouncementHelperTests
             new() { AnnouncementId = "a2", UserIds = new() { "alice" } }
         };
         Assert.Equal(expected, AnnouncementHelper.HasUserSeen(tracking, announceId, userId));
+    }
+
+    [Fact]
+    public void PruneOrphanedSeenEntries_WithLiveUsers_DropsDeletedUserUuids()
+    {
+        var alive1 = Guid.NewGuid().ToString();
+        var alive2 = Guid.NewGuid().ToString();
+        var deleted = Guid.NewGuid().ToString();
+        var tracking = new List<AnnouncementsSeenEntry>
+        {
+            new() { AnnouncementId = "keep", UserIds = new() { alive1, deleted, alive2 } },
+            new() { AnnouncementId = "gone", UserIds = new() { alive1, deleted } }
+        };
+        var announcements = new List<Announcement> { new() { Id = "keep" } }; // "gone" no longer exists
+        var live = new HashSet<string>(new[] { alive1, alive2 }, StringComparer.Ordinal);
+
+        var removedEntries = AnnouncementHelper.PruneOrphanedSeenEntries(tracking, announcements, live);
+
+        Assert.Equal(1, removedEntries);                              // "gone" entry removed
+        var keep = Assert.Single(tracking);
+        Assert.Equal("keep", keep.AnnouncementId);
+        Assert.Equal(new[] { alive1, alive2 }, keep.UserIds);         // deleted user's UUID pruned
+    }
+
+    [Fact]
+    public void PruneOrphanedSeenEntries_NullLiveUsers_LeavesUserIdsUntouched()
+    {
+        var u = Guid.NewGuid().ToString();
+        var tracking = new List<AnnouncementsSeenEntry>
+        {
+            new() { AnnouncementId = "keep", UserIds = new() { u, "stale-but-kept" } }
+        };
+        AnnouncementHelper.PruneOrphanedSeenEntries(tracking, new List<Announcement> { new() { Id = "keep" } });
+        Assert.Equal(2, tracking[0].UserIds.Count); // no user pruning when live set not supplied
     }
 
     [Fact]

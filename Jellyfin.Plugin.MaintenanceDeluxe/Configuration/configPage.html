@@ -19,7 +19,7 @@
           <form id="MaintenanceDeluxeConfigForm">
             <div class="sectionTitleContainer flex align-items-center">
               <h2 class="sectionTitle">MaintenanceDeluxe</h2>
-              <a href="https://github.com/MorganKryze/MaintenanceDeluxe/blob/main/docs/configuration.md" target="_blank" rel="noopener" class="button-link headerHelpButton emby-button" title="Documentation" style="margin-left: auto">
+              <a href="https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/blob/main/docs/configuration.md" target="_blank" rel="noopener" class="button-link headerHelpButton emby-button" title="Documentation" style="margin-left: auto">
                 <span>Docs</span>
               </a>
             </div>
@@ -30,7 +30,7 @@
             <div id="jf-dep-warning" style="display:none; background:#7b2b2b; color:#fff; border-radius:4px; padding:0.6em 1em; margin-bottom:1em; font-size:0.9em">
               <strong>Missing dependencies:</strong> <span id="jf-dep-list"></span>.
               The banner will not appear until these are installed and active.
-              See the <a href="https://github.com/MorganKryze/MaintenanceDeluxe/blob/main/README.md#prerequisites" target="_blank" rel="noopener" style="color:#ffd;text-decoration:underline">prerequisites</a>.
+              See the <a href="https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/blob/main/README.md#prerequisites" target="_blank" rel="noopener" style="color:#ffd;text-decoration:underline">prerequisites</a>.
             </div>
 
             <!-- ── Tab strip ───────────────────────────────────────── -->
@@ -1020,9 +1020,9 @@
             <!-- /panel: announcements -->
 
             <!-- ── Modal: Uptime Kuma URL builder ─────────────────────────── -->
-            <div id="mdKumaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
+            <div id="mdKumaModal" role="dialog" aria-modal="true" aria-labelledby="mdKumaTitle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
               <div style="background:#222;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:1.4em;max-width:520px;width:100%">
-                <h3 style="margin-top:0">Construire l'URL Uptime Kuma</h3>
+                <h3 id="mdKumaTitle" style="margin-top:0">Construire l'URL Uptime Kuma</h3>
                 <div class="fieldDescription" style="margin-bottom:1em">
                   Entre l'URL de ton instance Uptime Kuma (sans <code>/status/...</code>) et le slug de ta page publique. Le bouton <i>Tester</i> vérifie que l'URL répond.
                 </div>
@@ -1048,9 +1048,9 @@
             </div>
 
             <!-- ── Modal: Import preview ──────────────────────────────────── -->
-            <div id="mdImportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
+            <div id="mdImportModal" role="dialog" aria-modal="true" aria-labelledby="mdImportTitle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9999;align-items:center;justify-content:center;padding:1em">
               <div style="background:#222;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:1.4em;max-width:640px;width:100%;max-height:80vh;display:flex;flex-direction:column">
-                <h3 style="margin-top:0">Aperçu de l'import</h3>
+                <h3 id="mdImportTitle" style="margin-top:0">Aperçu de l'import</h3>
                 <div class="fieldDescription" style="margin-bottom:1em">
                   Vérifie le contenu avant d'écraser ton formulaire. <b>Aucune modification n'est envoyée au serveur</b> tant que tu n'as pas cliqué sur <i>Enregistrer</i> en bas de page.
                 </div>

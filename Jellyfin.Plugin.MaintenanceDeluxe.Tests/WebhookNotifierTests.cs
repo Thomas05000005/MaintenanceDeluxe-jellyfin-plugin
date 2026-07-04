@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Jellyfin.Plugin.MaintenanceDeluxe.Api;
 using Jellyfin.Plugin.MaintenanceDeluxe.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Jellyfin.Plugin.MaintenanceDeluxe.Tests;
@@ -272,5 +277,93 @@ public class WebhookNotifierTests
     public void BuildPayload_Generic_RestartingEventCode()
     {
         Assert.Contains("server_restarting", SerializePayload(WebhookFormat.Generic, WebhookEvent.Restarting));
+    }
+
+    // ── SSRF ENFORCEMENT wiring (v0.8.6) ───────────────────────────────────────
+    // The classifier (IsIpAddressSafeToCall) is covered above, but the ENFORCEMENT
+    // layer that actually stops an SSRF at connect time — AllowAutoRedirect=false +
+    // the ConnectCallback that re-validates the resolved IP, wired by
+    // PluginServiceRegistrator — had zero coverage. A regression flipping the redirect
+    // flag or dropping the callback would leave every classifier test green while
+    // reopening redirect / DNS-rebind SSRF. These two tests pin the wiring.
+
+    [Theory]
+    [InlineData("127.0.0.1")]                 // loopback
+    [InlineData("169.254.169.254")]           // cloud metadata link-local
+    [InlineData("10.0.0.1")]                   // RFC1918
+    [InlineData("192.168.1.1")]               // RFC1918
+    [InlineData("::1")]                        // IPv6 loopback
+    [InlineData("::ffff:169.254.169.254")]     // IPv4-mapped IPv6 metadata (rebinding bypass)
+    [InlineData("100.64.0.1")]                // CGNAT
+    public void EnsureAddressesSafe_ThrowsForInternalAddress(string ip)
+    {
+        var ex = Assert.Throws<HttpRequestException>(() =>
+            PluginServiceRegistrator.EnsureAddressesSafe("evil.example", new[] { IPAddress.Parse(ip) }));
+        Assert.Contains("Refusing webhook connection", ex.Message);
+    }
+
+    [Fact]
+    public void EnsureAddressesSafe_ThrowsWhenAnyAddressIsInternal()
+    {
+        // A host that resolves to BOTH a public and an internal address must be refused
+        // (a rebinding host could hand back the internal one).
+        var addrs = new[] { IPAddress.Parse("8.8.8.8"), IPAddress.Parse("10.0.0.1") };
+        Assert.Throws<HttpRequestException>(() =>
+            PluginServiceRegistrator.EnsureAddressesSafe("mixed.example", addrs));
+    }
+
+    [Fact]
+    public void EnsureAddressesSafe_ThrowsForNoAddresses()
+    {
+        var ex = Assert.Throws<HttpRequestException>(() =>
+            PluginServiceRegistrator.EnsureAddressesSafe("nx.example", Array.Empty<IPAddress>()));
+        Assert.Contains("did not resolve", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("8.8.8.8")]
+    [InlineData("1.1.1.1")]
+    [InlineData("::ffff:8.8.8.8")]             // mapped public stays callable
+    [InlineData("2001:4860:4860::8888")]       // public IPv6
+    public void EnsureAddressesSafe_AllowsPublicAddress(string ip)
+    {
+        // Must not throw.
+        PluginServiceRegistrator.EnsureAddressesSafe("public.example", new[] { IPAddress.Parse(ip) });
+    }
+
+    [Fact]
+    public void RegisterServices_ConfiguresWebhookClient_RedirectsOffWithConnectCallback()
+    {
+        var services = new ServiceCollection();
+        // RegisterServices only uses the service collection (never the app host), so null is fine.
+        new PluginServiceRegistrator().RegisterServices(services, null!);
+        using var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<IOptionsMonitor<HttpClientFactoryOptions>>()
+            .Get(PluginServiceRegistrator.WebhookClientName);
+
+        // Run the registered primary-handler configuration against a capturing builder to
+        // materialize the SocketsHttpHandler the factory would hand out for this named client.
+        var builder = new CapturingHandlerBuilder();
+        foreach (var configure in options.HttpMessageHandlerBuilderActions)
+            configure(builder);
+
+        var primary = Assert.IsType<SocketsHttpHandler>(builder.PrimaryHandler);
+        Assert.False(primary.AllowAutoRedirect); // a 3xx can no longer relocate to an internal host
+        Assert.NotNull(primary.ConnectCallback);  // resolved-IP re-validation is wired
+    }
+
+    /// <summary>Minimal <see cref="HttpMessageHandlerBuilder"/> used to capture the primary handler
+    /// that <see cref="PluginServiceRegistrator.RegisterServices"/> configures for the named client,
+    /// without building a real HTTP pipeline.</summary>
+    private sealed class CapturingHandlerBuilder : HttpMessageHandlerBuilder
+    {
+        public override string? Name { get; set; }
+
+        public override HttpMessageHandler PrimaryHandler { get; set; } = new HttpClientHandler();
+
+        public override IList<DelegatingHandler> AdditionalHandlers { get; } = new List<DelegatingHandler>();
+
+        public override HttpMessageHandler Build() => PrimaryHandler;
     }
 }

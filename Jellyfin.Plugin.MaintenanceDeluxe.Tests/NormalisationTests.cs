@@ -319,6 +319,11 @@ public class NormalisationTests
     [InlineData("//evil.com", false)]
     [InlineData("//evil.com/path", false)]
     [InlineData("///triple-slash", false)]
+    // v0.8.6: backslash protocol-relative — browsers normalise a leading `\` to `/`, so
+    // `/\evil.com` resolves to `//evil.com`. Must be rejected like `//`.
+    [InlineData("/\\evil.com", false)]
+    [InlineData("/\\/evil.com", false)]
+    [InlineData("/", true)]                 // bare site root stays allowed
     public void IsUrlSafe_RejectsDangerousSchemes(string? input, bool expected)
     {
         Assert.Equal(expected, BannerController.IsUrlSafe(input));

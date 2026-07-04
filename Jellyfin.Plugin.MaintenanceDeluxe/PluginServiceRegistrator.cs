@@ -71,16 +71,10 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             addresses = await Dns.GetHostAddressesAsync(host, cancellationToken).ConfigureAwait(false);
         }
 
-        if (addresses.Length == 0)
-            throw new HttpRequestException($"Webhook host '{host}' did not resolve to any address.");
-
         // Validate the EXACT set we will connect to (no re-resolution between check and connect,
-        // so there is no TOCTOU window here).
-        foreach (var addr in addresses)
-        {
-            if (!BannerController.IsIpAddressSafeToCall(addr, out var reason))
-                throw new HttpRequestException($"Refusing webhook connection to '{host}' ({addr}): it {reason}.");
-        }
+        // so there is no TOCTOU window here). Extracted to EnsureAddressesSafe so this SSRF
+        // enforcement can be unit-tested without opening a socket (see WebhookNotifierTests).
+        EnsureAddressesSafe(host, addresses);
 
         var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
@@ -92,6 +86,26 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         {
             socket.Dispose();
             throw;
+        }
+    }
+
+    /// <summary>Throws <see cref="HttpRequestException"/> unless EVERY candidate address for
+    /// <paramref name="host"/> is publicly routable (per <see cref="BannerController.IsIpAddressSafeToCall"/>),
+    /// and unless there is at least one address. This is the connection-time SSRF gate that actually
+    /// defeats DNS rebinding and redirect-to-internal (the entry-time name check in
+    /// <see cref="BannerController.IsWebhookHostSafe"/> is only fast-fail UX). Kept as an internal
+    /// static — separate from the socket I/O in <see cref="SafeConnectAsync"/> — so the enforcement
+    /// invariant can be unit-tested without a live DNS lookup or an open socket.</summary>
+    internal static void EnsureAddressesSafe(string host, IReadOnlyList<IPAddress> addresses)
+    {
+        ArgumentNullException.ThrowIfNull(addresses);
+        if (addresses.Count == 0)
+            throw new HttpRequestException($"Webhook host '{host}' did not resolve to any address.");
+
+        foreach (var addr in addresses)
+        {
+            if (!BannerController.IsIpAddressSafeToCall(addr, out var reason))
+                throw new HttpRequestException($"Refusing webhook connection to '{host}' ({addr}): it {reason}.");
         }
     }
 }

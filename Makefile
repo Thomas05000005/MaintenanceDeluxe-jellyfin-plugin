@@ -5,6 +5,7 @@ PLUGIN_DLL := Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plug
 PLUGIN_DIR := docker/config/data/plugins/MaintenanceDeluxe
 COMPOSE    := docker compose -f docker/compose.yml
 CSPROJ     := Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+ADMIN_JS   := Jellyfin.Plugin.MaintenanceDeluxe/Configuration/admin.js
 
 # ── build ──────────────────────────────────────────────────────────────────────
 
@@ -88,7 +89,11 @@ endif
 	@# `-i ''` form used before is BSD-only and silently no-ops on GNU sed (verified broken).
 	@sed -i.bak 's|<AssemblyVersion>.*</AssemblyVersion>|<AssemblyVersion>$(V).0</AssemblyVersion>|; s|<FileVersion>.*</FileVersion>|<FileVersion>$(V).0</FileVersion>|' $(CSPROJ) && rm -f $(CSPROJ).bak
 	@grep -q '<AssemblyVersion>$(V).0</AssemblyVersion>' $(CSPROJ) || (echo "error: bump failed — $(CSPROJ) not updated to $(V).0"; exit 1)
-	@echo "→ Version bumped to $(V).0 — commit, push, then create tag v$(V) on GitHub."
+	@# v0.8.6 (A#41): keep admin.js PLUGIN_VERSION in lockstep — it's echoed in the config export
+	@# payload and gated by scripts/check_version_coherence.py, so a partial bump would fail CI.
+	@sed -i.bak "s|var PLUGIN_VERSION = '.*';|var PLUGIN_VERSION = '$(V).0';|" $(ADMIN_JS) && rm -f $(ADMIN_JS).bak
+	@grep -q "var PLUGIN_VERSION = '$(V).0';" $(ADMIN_JS) || (echo "error: bump failed — $(ADMIN_JS) PLUGIN_VERSION not updated to $(V).0"; exit 1)
+	@echo "→ Version bumped to $(V).0 (csproj + admin.js) — commit, push, then create tag v$(V) on GitHub."
 
 # ── tests ──────────────────────────────────────────────────────────────────────
 

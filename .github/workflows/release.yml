@@ -260,6 +260,7 @@ jobs:
       - name: Switch to main and patch manifest.json
         env:
           TAG_VERSION: ${{ steps.version.outputs.dll_version }}
+          TAG: ${{ steps.version.outputs.tag }}
           CHECKSUM: ${{ steps.md5.outputs.checksum }}
         run: |
           git config user.name "github-actions[bot]"
@@ -275,7 +276,11 @@ jobs:
           from pathlib import Path
 
           tag_version = os.environ["TAG_VERSION"]
+          tag = os.environ["TAG"]
           checksum = os.environ["CHECKSUM"]
+          # Derive the canonical owner/repo from the Actions context so the check catches ANY
+          # deviation (case typos included) rather than trusting a second hardcoded literal.
+          repo = os.environ["GITHUB_REPOSITORY"]
           timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
           p = Path("manifest.json")
@@ -287,6 +292,19 @@ jobs:
                   f"error: manifest.json versions[0].version is {top['version']!r} "
                   f"but the tag implies {tag_version!r}. Refusing to patch — "
                   f"main branch is out of sync with the released tag."
+              )
+
+          # Guard the hand-typed sourceUrl against the exact class of typo that broke v0.6.0
+          # (a lowercase repo slug returned 404 and shipped an uninstallable release with a
+          # valid checksum). The asset name is deterministic: MaintenanceDeluxe-<tag>.zip.
+          expected_url = (
+              f"https://github.com/{repo}/releases/download/{tag}/MaintenanceDeluxe-{tag}.zip"
+          )
+          if top.get("sourceUrl") != expected_url:
+              raise SystemExit(
+                  f"error: manifest.json versions[0].sourceUrl is {top.get('sourceUrl')!r} "
+                  f"but the released asset is at {expected_url!r}. Fix the sourceUrl before "
+                  f"tagging — a mismatched URL ships an uninstallable release."
               )
 
           top["checksum"] = checksum

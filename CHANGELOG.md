@@ -4,6 +4,36 @@ Toutes les modifications notables de MaintenanceDeluxe sont consignées ici.
 
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le projet suit le [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0.0] — 2026-07-04
+
+🛡️ **Grande passe de durcissement** issue d'un **3ᵉ audit ultra-complet** (10 dimensions — backend, contrôleur, SSRF/webhooks, annonces, `banner.js`, `admin.js`, UI/CSS/a11y, compat, tests, release — chaque finding vérifié par une revue adversariale multi-agents). **6 corrections MEDIUM + ~29 durcissements LOW, 0 critique/élevé restant.** **Recommandée.** Aucune migration. Compatible Jellyfin **10.11.10 et 10.11.11**. Prépare la future compatibilité Jellyfin 12.0 (multi-cible, différée jusqu'à la sortie officielle et aux prérequis compatibles).
+
+### Corrigé (MEDIUM)
+
+- **Sauvegarde de config qui échoue sur un emoji** — coller un emoji juste au ras d'une limite de longueur (titre, sous-titre, icône, corps…) pouvait couper une paire de surrogates UTF-16 et faire **échouer la sauvegarde en 500**. Troncature désormais rune-safe (`TruncateToMaxUtf16`).
+- **Faux succès + perte d'édits en annulant le pré-vol streaming** — quand la maintenance est activée pendant qu'un utilisateur regarde un film, annuler l'avertissement affichait « Configuration enregistrée » **tout en écrasant les modifs de l'onglet Maintenance** et en effaçant l'état « non enregistré ». L'annulation est maintenant un résultat distinct : message dédié, brouillon et badge conservés.
+- **Accessibilité des modales Uptime Kuma / Import** — `role=dialog` + `aria-modal` + `aria-labelledby`, **focus piégé** à l'intérieur, **Échap** et clic sur le fond, focus restitué à la fermeture (avant : un utilisateur clavier tabulait derrière l'overlay).
+- **Réordonnancement au clavier** — la poignée de glisser-déposer est désormais un contrôle focusable ; **flèches haut/bas** pour déplacer une ligne (priorité de message / ordre d'annonce), WCAG 2.1.1.
+- **Couche anti-SSRF des webhooks testée** — le câblage d'enforcement (`AllowAutoRedirect=false` + re-validation de l'IP résolue) était la vraie défense mais n'avait **aucun test** ; une régression serait passée inaperçue. Couvert désormais (14 tests).
+- **Garde-fou release sur `sourceUrl`** — le pipeline vérifie que l'URL d'asset du manifest correspond à l'asset uploadé (attrape le typo de casse qui avait cassé l'installation en v0.6.0).
+
+### Corrigé (LOW — durcissement)
+
+- **Backend** : anti *lost-update* entre onglets (lecture-modif-écriture de `MaintenanceMode` sous verrou des deux côtés), `MaintenanceMode` initialisé pour éviter un NRE sur XML hérité, rejet des URL `/\evil.com` (protocol-relative backslash, + miroir client), log de retry webhook sanitisé, anti-injection `<!channel>` Slack, parité C#/JS des plannings `fixed` invalides, UUID de ciblage canonicalisés, **purge des utilisateurs supprimés** du suivi « vu », garde de ciblage sur mark-seen, tailles de boutons de fermeture bornées (client + serveur).
+- **Script injecté (`banner.js`)** : garde de double-exécution synchrone (anti duplication de style/BroadcastChannel/hooks), `statusUrl` de maintenance passé par l'allowlist d'URL, **un seul fetch `/maintenance` par navigation** (fin du double-appel).
+- **UI admin (`admin.js`)** : hex à 3 chiffres (`#ff0`) étendu à `#ffff00` à la sortie de champ (fin du reset silencieux), brouillon d'autosauvegarde honnêtement libellé « onglet Maintenance uniquement », vérification des prérequis robuste (plus de plantage silencieux si un plugin n'a pas de nom).
+- **Accessibilité / CSS** : motif ARIA **tablist/tab/tabpanel** + navigation aux flèches sur les onglets, ligatures Material Icons masquées aux lecteurs d'écran + noms accessibles sur les boutons-icônes, contrastes relevés (WCAG AA), cibles tactiles portées à 24 px (WCAG 2.5.8).
+
+### Tests / CI
+
+- **Test des tiers d'autorisation** — garde par réflexion sur chaque endpoint de `BannerController` : un attribut `[Authorize]` retiré ou modifié fait échouer le build (le seul contrôle d'accès serveur n'était pas testé).
+- **Cohérence de version sur 4 sources** — `check_version_coherence.py` valide désormais `<AssemblyVersion>`, `<FileVersion>`, `PLUGIN_VERSION` (admin.js) **et** le manifest ; `make bump` réécrit aussi `admin.js`.
+- **391 tests verts** (+25), build 0 warning, `banner.js` 100 % ASCII, 17 vecteurs XSS d'allowlist d'URL.
+
+### Reporté (documenté)
+
+Fallback de thème clair CSS (contrôle visuel des 2 thèmes requis), harnais JS de parité des plannings (refactor de `banner.js`), extension de la cible Stryker aux helpers sécurité (re-tuning du seuil), tolérance ETag faible (0 impact observable). Aucun n'est un bug — ce sont des améliorations d'infrastructure de test / de cosmétique à mener isolément.
+
 ## [0.8.5.0] — 2026-06-17
 
 🩹 **Corrections UX / accessibilité / fonctionnel**, issues d'un 2ᵉ audit ultra-complet de toutes les couches (UX, design, perf, code, a11y, docs — 0 critique restant). **Recommandée.** Aucune migration. Compatible Jellyfin **10.11.10 et 10.11.11**.
