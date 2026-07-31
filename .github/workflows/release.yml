@@ -18,16 +18,17 @@ jobs:
   #     Catches the runtime API-incompatibility bug class (MissingMethodException on
   #     IUserManager.GetUsers() that shipped in v0.8.0) that no unit test can see.
   smoke:
-    name: smoke (${{ matrix.jellyfin }})
+    # TEST BRANCH (test/rc3-smoke): probes Jellyfin 12.0-rc3 with BOTH the current
+    # net9/10.11.10 DLL (does the shipped v0.9.0 survive a server upgrade?) and a
+    # net10/12.0.0-rc3 rebuild (is the source forward-compatible?). Throwaway change,
+    # never merged to main.
+    name: smoke (${{ matrix.jellyfin }} / ${{ matrix.variant }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # The build's targetAbi (manifest versions[0].targetAbi) is the FLOOR: a server
-        # older than it legitimately refuses the plugin ("Skipping disabled plugin").
-        # So we smoke on servers >= targetAbi: 10.11.10 (floor/prod) + every newer patch
-        # released since, to prove forward-compat. Add new Jellyfin patch tags here as they ship.
-        jellyfin: ["10.11.10", "10.11.11"]
+        jellyfin: ["12.0-rc3"]
+        variant: ["net9-current", "net10-rc3"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -37,6 +38,19 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      - name: Setup .NET 10 (rc3 variant)
+        if: matrix.variant == 'net10-rc3'
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Retarget csproj to net10.0 + Jellyfin 12.0.0-rc3 (rc3 variant)
+        if: matrix.variant == 'net10-rc3'
+        run: |
+          sed -i 's|<TargetFramework>net9.0</TargetFramework>|<TargetFramework>net10.0</TargetFramework>|' Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+          sed -i 's|Include="Jellyfin.Controller" Version="10.11.10"|Include="Jellyfin.Controller" Version="12.0.0-rc3"|; s|Include="Jellyfin.Model" Version="10.11.10"|Include="Jellyfin.Model" Version="12.0.0-rc3"|' Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+          grep -E "TargetFramework|Jellyfin\.(Controller|Model)" Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
+
       - name: Build Release DLL
         run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
 
@@ -44,7 +58,8 @@ jobs:
         run: |
           PLUGDIR="$PWD/jf-config/plugins/MaintenanceDeluxe"
           mkdir -p "$PLUGDIR"
-          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll "$PLUGDIR/"
+          TFM=$([ "${{ matrix.variant }}" = "net10-rc3" ] && echo net10.0 || echo net9.0)
+          cp "Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/$TFM/Jellyfin.Plugin.MaintenanceDeluxe.dll" "$PLUGDIR/"
           python3 - <<'PY'
           import json
           from pathlib import Path
