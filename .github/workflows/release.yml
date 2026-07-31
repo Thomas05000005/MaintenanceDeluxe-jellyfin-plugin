@@ -76,7 +76,7 @@ jobs:
           LOG=$(docker logs jf 2>&1 || true)
           echo "$LOG" | grep -i "MaintenanceDeluxe" || echo "(no MaintenanceDeluxe log lines)"
           # Positive: the assembly must actually be loaded on this server version.
-          if ! echo "$LOG" | grep -q "Loaded assembly Jellyfin.Plugin.MaintenanceDeluxe"; then
+          if ! echo "$LOG" | grep -qiE "Loaded (assembly )?Jellyfin\.Plugin\.MaintenanceDeluxe|Loaded plugin: .?MaintenanceDeluxe"; then
             echo "::error::Plugin assembly was NOT loaded on Jellyfin ${{ matrix.jellyfin }} (targetAbi mismatch? plugin disabled?)"
             exit 1
           fi

@@ -27,7 +27,11 @@ set -euo pipefail
 BASE="${1:-http://localhost:8096}"
 ADMIN_USER="smokeadmin"
 ADMIN_PASS="Smoke-Test-Pw-123"
-AUTH_HEADER='X-Emby-Authorization: MediaBrowser Client="smoke", Device="ci", DeviceId="ci-smoke-device", Version="1.0.0"'
+# Modern auth scheme (Authorization:). Jellyfin 12.0 DISABLES the legacy
+# X-Emby-Authorization header by default — AuthenticateByName then 400s with
+# ArgumentNullException on request.App because the client identity never arrives.
+# The modern header works on 10.11.x too, so this is safe across the matrix.
+AUTH_HEADER='Authorization: MediaBrowser Client="smoke", Device="ci", DeviceId="ci-smoke-device", Version="1.0.0"'
 
 say() { printf '\n=== %s ===\n' "$1"; }
 
