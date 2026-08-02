@@ -28,5 +28,8 @@ AUDIT_2026-05-30.md
 # Local-only UX/perf audit report
 AUDIT_UIX_2026-06-17.md
 
+# Local-only product/roadmap planning docs (strategy notes — keep out of the public repo)
+PLAN_SUITE.md
+
 # Python bytecode
 __pycache__/
