@@ -99,9 +99,15 @@ public sealed class ScriptInjectionMiddleware
             var isHtml = contentType is not null
                 && contentType.Contains("text/html", StringComparison.OrdinalIgnoreCase);
 
-            // Only rewrite a successful HTML document; anything else (304, redirect, JSON, an
-            // asset that happened to match the path test) is streamed back byte-for-byte.
-            if (!isHtml || context.Response.StatusCode != StatusCodes.Status200OK)
+            // A compressed body is NOT text: decoding gzip/br bytes as UTF-8 would produce garbage
+            // and the injected tag would corrupt the document. Today compression happens in the
+            // reverse proxy (i.e. after us), but if the server ever enables response compression
+            // inside the pipeline we must hand the bytes back untouched instead of mangling them.
+            var isCompressed = context.Response.Headers.ContentEncoding.Count > 0;
+
+            // Only rewrite a successful, uncompressed HTML document; anything else (304, redirect,
+            // JSON, an asset that happened to match the path test) is streamed back byte-for-byte.
+            if (!isHtml || isCompressed || context.Response.StatusCode != StatusCodes.Status200OK)
             {
                 context.Response.Body = originalBody;
                 await buffer.CopyToAsync(originalBody).ConfigureAwait(false);
