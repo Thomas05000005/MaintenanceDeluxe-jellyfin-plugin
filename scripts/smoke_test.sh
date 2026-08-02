@@ -121,8 +121,9 @@ say "7. STANDALONE SCRIPT INJECTION (suite 1.0) — no JavaScript Injector insta
 # must rewrite the web UI document in flight and add the <script id="maintenancedeluxe-suite"> tag.
 # No File Transformation, no JS Injector, no write access to jellyfin-web involved.
 INJECT_FAIL=0
+# -L follows redirects: Jellyfin answers "/" with a 302 to /web/, which is what a browser does.
 for DOC in "/web/index.html" "/"; do
-  BODY=$(curl -s "$BASE$DOC" || true)
+  BODY=$(curl -sL "$BASE$DOC" || true)
   if echo "$BODY" | grep -q 'id="maintenancedeluxe-suite"'; then
     echo "-> $DOC : script tag INJECTED"
   else
@@ -139,9 +140,9 @@ echo "GET /MaintenanceDeluxe/banner.js -> $c"
 [ "$c" = "200" ] || { echo "::error::injected script URL returned $c"; exit 1; }
 
 # Injection must not corrupt the document: it still has to parse as the SPA shell.
-curl -s "$BASE/web/index.html" | grep -qi "</body>" || { echo "::error::index.html lost its </body>"; exit 1; }
+curl -sL "$BASE/web/index.html" | grep -qi "</body>" || { echo "::error::index.html lost its </body>"; exit 1; }
 # ...and must be idempotent (exactly ONE tag, never a double load).
-N=$(curl -s "$BASE/web/index.html" | grep -o 'id="maintenancedeluxe-suite"' | wc -l)
+N=$(curl -sL "$BASE/web/index.html" | grep -o 'id="maintenancedeluxe-suite"' | wc -l)
 echo "tag occurrences: $N"
 [ "$N" = "1" ] || { echo "::error::expected exactly 1 injected tag, got $N"; exit 1; }
 
