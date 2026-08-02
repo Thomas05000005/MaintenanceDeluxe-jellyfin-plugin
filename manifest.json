@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "1.0.0.0",
+        "checksum": "PLACEHOLDER_RECOMPUTE_AFTER_BUILD",
+        "changelog": "v1.0.0 - Ligne SUITE : cible Jellyfin 12+ uniquement (.NET 10). Nouveau : livraison autonome du script client via middleware ASP.NET interne - le plugin n'a PLUS BESOIN de JavaScript Injector ni de File Transformation. Les serveurs 10.11.x restent sur la v0.9.0.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/Thomas05000005/MaintenanceDeluxe-jellyfin-plugin/releases/download/v1.0.0/MaintenanceDeluxe-v1.0.0.zip",
+        "timestamp": "2026-08-02T00:00:00"
+      },
+      {
         "version": "0.9.0.0",
         "checksum": "65D05BB839B73963A06E9B7950A6E609",
         "changelog": "v0.9.0 - Grande passe de durcissement issue d'un 3e audit ultra-complet (10 dimensions, revue adversariale multi-agents) : 6 corrections MEDIUM + ~29 durcissements LOW, 0 critique/eleve restant. Recommandee. PAS DE MIGRATION. Compatible Jellyfin 10.11.10 et 10.11.11. MEDIUM : (1) coller un emoji au ras d'une limite de longueur pouvait faire echouer la sauvegarde de config (500 ; troncature UTF-16 rune-safe) ; (2) annuler l'avertissement 'utilisateurs en streaming' n'efface plus silencieusement les modifs de l'onglet Maintenance et n'affiche plus un faux succes ; (3) modales Uptime Kuma / Import accessibles (role=dialog, focus piege, Echap, focus restitue) ; (4) reordonnancement des lignes au clavier (fleches haut/bas) ; (5) la couche d'enforcement anti-SSRF des webhooks est desormais couverte par des tests ; (6) le pipeline de release verifie que l'URL d'asset du manifest correspond (anti-typo de casse type v0.6.0). LOW notables : anti lost-update entre onglets, purge des utilisateurs supprimes du suivi 'vu', tailles de boutons bornees, coherence de planning fixe C#/JS, ARIA onglets + navigation fleches, contrastes et cibles tactiles WCAG, garde double-execution du script injecte, un seul fetch /maintenance par navigation, test de reflexion des tiers d'autorisation, coherence de version sur 4 sources. + 2 liens de documentation corriges. 391 tests verts, build 0 warning.",

@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- Suite line (1.x): Jellyfin 12+ ONLY. The 10.11.x line stays served by the released
+         v0.9.0 build. Jellyfin 12 runs on .NET 10 and its SDK packages ship net10.0 only. -->
+    <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Jellyfin.Plugin.MaintenanceDeluxe</AssemblyName>
     <RootNamespace>Jellyfin.Plugin.MaintenanceDeluxe</RootNamespace>
-    <AssemblyVersion>0.9.0.0</AssemblyVersion>
-    <FileVersion>0.9.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
@@ -18,13 +20,14 @@
 
   <ItemGroup>
     <!-- Jellyfin SDK — ExcludeAssets:runtime because the server provides these at runtime -->
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.10">
+    <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rc3">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <PackageReference Include="Jellyfin.Model" Version="10.11.10">
+    <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc3">
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
-    <!-- Needed for the JObject payload sent to JS Injector via reflection -->
+    <!-- Still needed for the JObject payload sent to JS Injector via reflection (legacy fallback
+         path; the primary delivery is now our own IStartupFilter middleware). -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

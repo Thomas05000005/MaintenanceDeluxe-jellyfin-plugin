@@ -27,15 +27,15 @@ jobs:
         # older than it legitimately refuses the plugin ("Skipping disabled plugin").
         # So we smoke on servers >= targetAbi: 10.11.10 (floor/prod) + every newer patch
         # released since, to prove forward-compat. Add new Jellyfin patch tags here as they ship.
-        jellyfin: ["10.11.10", "10.11.11"]
+        jellyfin: ["12.0-rc3"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Build Release DLL
         run: dotnet build --configuration Release Jellyfin.Plugin.MaintenanceDeluxe/MaintenanceDeluxe.csproj
@@ -44,7 +44,7 @@ jobs:
         run: |
           PLUGDIR="$PWD/jf-config/plugins/MaintenanceDeluxe"
           mkdir -p "$PLUGDIR"
-          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll "$PLUGDIR/"
+          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net10.0/Jellyfin.Plugin.MaintenanceDeluxe.dll "$PLUGDIR/"
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -102,10 +102,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET 9
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       - name: Setup Node 20
         uses: actions/setup-node@v6
@@ -182,7 +182,7 @@ jobs:
       - name: Generate deploy bundle (DLL + meta.json derived from manifest.json)
         run: |
           mkdir -p deploy/MaintenanceDeluxe
-          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net9.0/Jellyfin.Plugin.MaintenanceDeluxe.dll deploy/MaintenanceDeluxe/
+          cp Jellyfin.Plugin.MaintenanceDeluxe/bin/Release/net10.0/Jellyfin.Plugin.MaintenanceDeluxe.dll deploy/MaintenanceDeluxe/
           python - <<'PY'
           import json
           from pathlib import Path

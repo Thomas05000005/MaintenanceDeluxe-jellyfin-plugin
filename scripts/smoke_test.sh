@@ -116,5 +116,39 @@ if [ "$c" != "200" ]; then
   echo "::error::/MaintenanceDeluxe/announcements/admin returned $c (expected 200)"; cat /tmp/body | head -5; exit 1
 fi
 
+say "7. STANDALONE SCRIPT INJECTION (suite 1.0) — no JavaScript Injector installed"
+# THE proof that the suite can deliver its client script on its own: our IStartupFilter middleware
+# must rewrite the web UI document in flight and add the <script id="maintenancedeluxe-suite"> tag.
+# No File Transformation, no JS Injector, no write access to jellyfin-web involved.
+INJECT_FAIL=0
+for DOC in "/web/index.html" "/"; do
+  BODY=$(curl -s "$BASE$DOC" || true)
+  if echo "$BODY" | grep -q 'id="maintenancedeluxe-suite"'; then
+    echo "-> $DOC : script tag INJECTED"
+  else
+    echo "::error::$DOC : script tag MISSING (standalone injection failed)"
+    echo "$BODY" | head -c 400; echo
+    INJECT_FAIL=1
+  fi
+done
+[ "$INJECT_FAIL" = "0" ] || exit 1
+
+# The injected src must actually serve JavaScript (not a 404 that would silently no-op).
+c=$(code GET "$BASE/MaintenanceDeluxe/banner.js")
+echo "GET /MaintenanceDeluxe/banner.js -> $c"
+[ "$c" = "200" ] || { echo "::error::injected script URL returned $c"; exit 1; }
+
+# Injection must not corrupt the document: it still has to parse as the SPA shell.
+curl -s "$BASE/web/index.html" | grep -qi "</body>" || { echo "::error::index.html lost its </body>"; exit 1; }
+# ...and must be idempotent (exactly ONE tag, never a double load).
+N=$(curl -s "$BASE/web/index.html" | grep -o 'id="maintenancedeluxe-suite"' | wc -l)
+echo "tag occurrences: $N"
+[ "$N" = "1" ] || { echo "::error::expected exactly 1 injected tag, got $N"; exit 1; }
+
+# Non-HTML routes must stream through untouched (no buffering/corruption of API payloads).
+curl -s "$BASE/System/Info/Public" | grep -q 'maintenancedeluxe-suite' && { echo "::error::injected into a JSON API response"; exit 1; }
+echo "API responses untouched: OK"
+
 echo
-echo "SMOKE TEST PASSED: plugin loaded, controller routable, GetUsers()-backed endpoints all 200."
+echo "SMOKE TEST PASSED: plugin loaded, controller routable, GetUsers()-backed endpoints all 200,"
+echo "                   standalone script injection working without JavaScript Injector."

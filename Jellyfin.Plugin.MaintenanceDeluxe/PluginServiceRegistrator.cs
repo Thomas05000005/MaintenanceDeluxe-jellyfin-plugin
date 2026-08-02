@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Jellyfin.Plugin.MaintenanceDeluxe.Api;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.MaintenanceDeluxe;
@@ -40,6 +41,13 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         ArgumentNullException.ThrowIfNull(serviceCollection);
+
+        // Standalone client-script delivery: our own ASP.NET middleware rewrites the index.html
+        // response to add our <script> tag, so the suite no longer NEEDS the third-party
+        // JavaScript Injector + File Transformation pair (which as of 2026-08 has no Jellyfin 12
+        // build). The legacy JS Injector registration in Plugin.cs stays as a fallback, and the
+        // middleware is idempotent (it skips a document that already carries our script id).
+        serviceCollection.AddSingleton<IStartupFilter, Web.InjectionStartupFilter>();
 
         serviceCollection.AddHttpClient(WebhookClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
